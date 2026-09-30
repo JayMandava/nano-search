@@ -3,6 +3,7 @@ package ai.nanosearch.launcher
 import ai.nanosearch.launcher.ui.MenuItem
 import ai.nanosearch.launcher.ui.Overlays
 import ai.nanosearch.launcher.ui.Palette
+import ai.nanosearch.launcher.ui.pressScale
 import android.app.Activity
 import android.appwidget.AppWidgetHost
 import android.content.ComponentName
@@ -108,6 +109,7 @@ class HomePage(
                     gravity = Gravity.CENTER
                     ellipsize = android.text.TextUtils.TruncateAt.END
                 }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(6) })
+                pressScale()
                 setOnClickListener { launch(cn, it) }
                 setOnLongClickListener {
                     overlays.popupFor(it, listOf(listOf(

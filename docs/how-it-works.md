@@ -2,6 +2,16 @@
 
 Numbers below were measured on a mid-range 2023 phone (8 GB RAM, CPU only). Other devices will differ.
 
+## Launcher interface
+
+- **Menus.** Long-press menus are drawn by the launcher itself (`ui/Overlays.kt`), not by system dialogs: a popup anchored at the press point or the icon, rows as stacked pills with 2 dp gaps (24 dp outer and 4 dp inner corners), an arrow pointing at the icon,
+  and Launcher3's two-stage scale-in (half size to 102% in 200 ms, then settle). Longer lists (widgets, apps, wallpaper) open as a bottom sheet with a drag handle. Both are dismissed when Home or Back is pressed.
+- **Pages.** The home screen is a pager of pages (`HomePage.kt`); each holds its own widgets and a grid of app shortcuts, the first carries the clock. "Add page" and "Remove this page" are in the long-press menu; Home or Back returns to the first page.
+  A Launcher3-style indicator (6 dp dots, the active one stretched) slides with the swipe.
+- **Dock.** Long-press an icon for App info, Change app and Remove; a removed slot shows a "+". "Add to home" and "Add to dock" are in the drawer's long-press menu.
+- **Drawer.** It rises with a decelerating curve while the home screen behind it eases back (scale 0.97) and fades. Icons grow slightly when pressed, and apps open from the icon that was tapped.
+- **Settings run in their own task,** so pressing Home from a settings screen behaves like leaving any other app instead of replaying a back animation.
+
 ## Search
 
 1. **Instant path (no model).** One SQLite FTS4 index holds every kind of item (Android's SQLite has no FTS5). Queries match titles first, then

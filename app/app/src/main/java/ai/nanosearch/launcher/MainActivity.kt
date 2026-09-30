@@ -5,6 +5,7 @@ import ai.nanosearch.launcher.ui.Overlays
 import ai.nanosearch.launcher.ui.PageDots
 import ai.nanosearch.launcher.ui.Palette
 import ai.nanosearch.launcher.ui.PickApp
+import ai.nanosearch.launcher.ui.pressScale
 import android.Manifest
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
@@ -563,6 +564,7 @@ class MainActivity : Activity() {
             val entry = dockEntry(slot, saved[slot]) ?: continue
             dockRow.addView(ImageView(this).apply {
                 setImageDrawable(entry.icon)
+                pressScale()
                 setOnClickListener { v -> launchIntent(entry.launch, v) }
                 setOnLongClickListener { v ->
                     val pkg = entry.component?.packageName
@@ -1447,6 +1449,14 @@ class MainActivity : Activity() {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER_HORIZONTAL
                 setPadding(dp(2), dp(4), dp(2), dp(4))
+                // pressed: grow a little, as in Android's launchers (a state animator follows the list's own pressed state)
+                stateListAnimator = android.animation.StateListAnimator().apply {
+                    fun scaled(v: Float) = ObjectAnimator.ofPropertyValuesHolder(
+                        null as Any?, android.animation.PropertyValuesHolder.ofFloat(View.SCALE_X, v), android.animation.PropertyValuesHolder.ofFloat(View.SCALE_Y, v),
+                    ).setDuration(130)
+                    addState(intArrayOf(android.R.attr.state_pressed), scaled(1.08f))
+                    addState(intArrayOf(), scaled(1f))
+                }
                 addView(ImageView(context), LinearLayout.LayoutParams(dp(54), dp(54)))
                 addView(TextView(context).apply {
                     textSize = 12f; setTextColor(pal.onSurface); maxLines = 1; gravity = Gravity.CENTER

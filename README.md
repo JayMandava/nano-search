@@ -6,7 +6,7 @@ answers questions, and listens when you speak. Small language models run entirel
 
 ## Features
 
-- **Home screen and launcher:** wallpaper, clock, widgets, an editable dock and an app drawer. The search bar sits at the top of both
+- **Home screen and launcher:** wallpaper, clock, widgets, app shortcuts, several swipeable home pages, an editable dock and an app drawer. Long-press menus are anchored popups, and lists open as bottom sheets, in the style of Android's own launchers. The search bar sits at the top of both
   the home screen and the drawer and searches in place. Portrait only.
 - **Search everything:** apps, contacts, messages, call history, calendar events, files, system settings and photos. Results appear as
   you type, with no model involved, and small typos still find things ("calclator" finds Calculator).
