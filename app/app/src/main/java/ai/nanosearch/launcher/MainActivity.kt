@@ -791,6 +791,8 @@ class MainActivity : Activity() {
         searchActive = active
         searchLayer.layoutParams = searchLayer.layoutParams.apply { height = if (active) ViewGroup.LayoutParams.MATCH_PARENT else ViewGroup.LayoutParams.WRAP_CONTENT }
         resultsPanel.visibility = if (active) View.VISIBLE else View.GONE
+        // The whole layer, including the status and navigation bar areas its padding leaves, gets the panel colour while results show.
+        searchLayer.setBackgroundColor(if (active) pal.panel else Color.TRANSPARENT)
         updateBars(active || drawerOpen)
         home.visibility = if (active || drawerOpen) View.INVISIBLE else View.VISIBLE // nothing ghosts through the panel
         updateBanner()
