@@ -15,8 +15,18 @@
 #include <string>
 #include <vector>
 
+#include "ggml-backend.h"
 #include "ggml-cpu.h"
 #include "llama.h"
+
+// The same source builds two libraries: the CPU one (NativeLlm) and an optional GPU one (NativeLlmGpu, with the Vulkan backend
+// compiled in). They are separate so that the GPU driver is never touched unless the user turns the GPU on.
+#ifndef NANO_JNI_CLASS
+#define NANO_JNI_CLASS NativeLlm
+#endif
+#define NANO_JNI_JOIN(cls, fn) Java_ai_nanosearch_launcher_##cls##_##fn
+#define NANO_JNI_EXPAND(cls, fn) NANO_JNI_JOIN(cls, fn)
+#define NANO_JNI(fn) NANO_JNI_EXPAND(NANO_JNI_CLASS, fn)
 
 #define TAG "nanollm"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
@@ -113,16 +123,16 @@ llama_token pickToken(Engine *e, llama_sampler *grammar) {
 extern "C" {
 
 JNIEXPORT jlong JNICALL
-Java_ai_nanosearch_launcher_NativeLlm_load(JNIEnv *env, jobject, jstring path, jint threads, jint nCtx, jlong cpuMask) {
+NANO_JNI(load)(JNIEnv *env, jobject, jstring path, jint threads, jint nCtx, jlong cpuMask, jint gpuLayers) {
     static bool inited = false;
     if (!inited) { llama_backend_init(); inited = true; }
     pin(cpuMask);
     const char *p = env->GetStringUTFChars(path, nullptr);
     llama_model_params mp = llama_model_default_params();
-    mp.n_gpu_layers = 0;
+    mp.n_gpu_layers = gpuLayers;
     llama_model *model = llama_model_load_from_file(p, mp);
     env->ReleaseStringUTFChars(path, p);
-    if (!model) { LOGE("model load failed"); return 0; }
+    if (!model) { LOGE("model load failed (gpuLayers=%d)", (int) gpuLayers); return 0; }
 
     llama_context_params cp = llama_context_default_params();
     cp.n_ctx = nCtx;
@@ -186,7 +196,7 @@ static void savePrefixCache(Engine *e, const char *cachePath) {
 // Evaluates the fixed prompt prefix once and saves its state. If cachePath is set, the state is
 // restored from that file when it exists (skipping the prompt processing) and written when it does not.
 JNIEXPORT jint JNICALL
-Java_ai_nanosearch_launcher_NativeLlm_setPrefix(JNIEnv *env, jobject, jlong h, jstring text, jstring cachePath) {
+NANO_JNI(setPrefix)(JNIEnv *env, jobject, jlong h, jstring text, jstring cachePath) {
     auto *e = (Engine *) h;
     pin(e->cpuMask);
     std::string cache;
@@ -217,7 +227,7 @@ Java_ai_nanosearch_launcher_NativeLlm_setPrefix(JNIEnv *env, jobject, jlong h, j
 // Returns the generated text (valid UTF-8) or null on failure. listener may be null;
 // otherwise listener.onToken(String): Boolean is called per piece and returns false to stop.
 JNIEXPORT jstring JNICALL
-Java_ai_nanosearch_launcher_NativeLlm_complete(JNIEnv *env, jobject, jlong h, jstring suffix, jstring grammar,
+NANO_JNI(complete)(JNIEnv *env, jobject, jlong h, jstring suffix, jstring grammar,
                                                jint maxTokens, jobject listener) {
     auto *e = (Engine *) h;
     pin(e->cpuMask);
@@ -292,7 +302,7 @@ Java_ai_nanosearch_launcher_NativeLlm_complete(JNIEnv *env, jobject, jlong h, js
 }
 
 JNIEXPORT jstring JNICALL
-Java_ai_nanosearch_launcher_NativeLlm_stats(JNIEnv *env, jobject, jlong h) {
+NANO_JNI(stats)(JNIEnv *env, jobject, jlong h) {
     auto *e = (Engine *) h;
     char b[240];
     snprintf(b, sizeof(b), "prefix=%d%s prompt=%dtok/%ldms gen=%dtok/%ldms (sample %ldms, decode %ldms)", e->prefixTokens,
@@ -302,7 +312,7 @@ Java_ai_nanosearch_launcher_NativeLlm_stats(JNIEnv *env, jobject, jlong h) {
 }
 
 JNIEXPORT void JNICALL
-Java_ai_nanosearch_launcher_NativeLlm_free(JNIEnv *, jobject, jlong h) {
+NANO_JNI(free)(JNIEnv *, jobject, jlong h) {
     auto *e = (Engine *) h;
     if (!e) return;
     llama_free(e->ctx);
@@ -310,5 +320,22 @@ Java_ai_nanosearch_launcher_NativeLlm_free(JNIEnv *, jobject, jlong h) {
     llama_model_free(e->model);
     delete e;
 }
+
+#ifdef NANO_GPU
+// One line per GPU the backend can see ("name | free/total bytes"); empty when there is none. Does not load a model.
+JNIEXPORT jstring JNICALL
+NANO_JNI(gpuInfo)(JNIEnv *env, jobject) {
+    std::string out;
+    for (size_t i = 0; i < ggml_backend_dev_count(); i++) {
+        ggml_backend_dev_t dev = ggml_backend_dev_get(i);
+        auto type = ggml_backend_dev_type(dev);
+        if (type != GGML_BACKEND_DEVICE_TYPE_GPU && type != GGML_BACKEND_DEVICE_TYPE_IGPU) continue;
+        size_t freeB = 0, totalB = 0;
+        ggml_backend_dev_memory(dev, &freeB, &totalB);
+        out += std::string(ggml_backend_dev_description(dev)) + " | " + std::to_string(freeB) + "/" + std::to_string(totalB) + "\n";
+    }
+    return env->NewStringUTF(out.c_str());
+}
+#endif
 
 }  // extern "C"

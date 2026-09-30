@@ -9,7 +9,7 @@ import java.io.File
  * choice is made from that, and [CpuTuner] can replace it with a measured one. The user can override both in Settings > Advanced.
  */
 object CpuPlan {
-    class Plan(val mask: Long, val threads: Int, val label: String, val id: String)
+    class Plan(val mask: Long, val threads: Int, val label: String, val id: String, val gpu: Boolean = false)
 
     private lateinit var app: Context
     private val prefs get() = app.getSharedPreferences("nano", Context.MODE_PRIVATE)
@@ -35,8 +35,7 @@ object CpuPlan {
         return Plan(cores.fold(0L) { m, c -> m or (1L shl c) }, cores.size.coerceIn(1, MAX_THREADS), label, id)
     }
 
-    /** The groupings worth trying, most conservative first. */
-    val candidates: List<Plan> by lazy {
+    private val cpuCandidates: List<Plan> by lazy {
         if (unreadable) return@lazy listOf(fallback())
         val out = mutableListOf(plan("top", "${clusters[0].size} fastest cores", listOf(clusters[0])))
         if (clusters.size >= 2 && clusters[0].size + clusters[1].size <= MAX_THREADS)
@@ -45,19 +44,25 @@ object CpuPlan {
         out.distinctBy { it.mask }
     }
 
+    /** The groupings worth trying, most conservative first; the GPU comes last, and only when the user has switched it on and the phone has one. */
+    val candidates: List<Plan> get() = if (GpuSupport.usable) cpuCandidates + gpuPlan() else cpuCandidates
+
+    /** The GPU still needs the CPU for the parts it does not run, so it keeps the default core grouping for those. */
+    fun gpuPlan(): Plan = default().let { Plan(it.mask, it.threads, "GPU (${GpuSupport.deviceName ?: "Vulkan"}) with ${it.threads} CPU threads", "gpu", gpu = true) }
+
     private fun fallback(): Plan = if (coreCount == 8) Plan(0xC0L, 2, "2 fastest cores (assumed)", "top") else Plan(0L, 2, "Any 2 cores", "top")
 
     /** Used before anything is measured: the fastest group if it has at least two cores, otherwise the two fastest groups. */
     fun default(): Plan {
         if (unreadable) return fallback()
-        return if (clusters[0].size >= 2) candidates.first() else candidates.getOrElse(1) { candidates.first() }
+        return if (clusters[0].size >= 2) cpuCandidates.first() else cpuCandidates.getOrElse(1) { cpuCandidates.first() }
     }
 
     /** Stamp of everything that should invalidate a measurement: the chip, its core layout, and the installed build. */
     fun tuneKey(): String {
         val soc = if (Build.VERSION.SDK_INT >= 31) Build.SOC_MODEL else Build.HARDWARE
         val updated = runCatching { app.packageManager.getPackageInfo(app.packageName, 0).lastUpdateTime }.getOrDefault(0L)
-        return "$soc|${clusters.joinToString(",") { it.size.toString() }}|$updated"
+        return "$soc|${clusters.joinToString(",") { it.size.toString() }}|$updated|gpu=${GpuSupport.enabled}"
     }
 
     fun tuned(): Plan? {

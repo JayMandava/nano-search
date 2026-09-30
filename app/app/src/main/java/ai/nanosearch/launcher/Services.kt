@@ -32,6 +32,7 @@ object Services {
         ModelStore.init(appContext)
         CpuPlan.init(appContext)
         MemoryPolicy.init(appContext)
+        GpuSupport.init(appContext)
     }
 
     fun parserUsed() {

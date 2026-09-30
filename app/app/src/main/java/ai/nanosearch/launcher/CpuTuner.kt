@@ -37,7 +37,8 @@ object CpuTuner {
         status.value = "Measuring…"
         Services.llm.execute {
             Services.parser.unload(); Services.answerer.unload()
-            status.value = runCatching { measure(app, file, model, dryRunWith) }.getOrElse { "Measuring failed; keeping the current choice." }
+            val result = runCatching { measure(app, file, model, dryRunWith) }.getOrElse { "Measuring failed; keeping the current choice." }
+            status.value = (GpuSupport.blocked?.let { "$it " } ?: "") + result
         }
     }
 
@@ -48,7 +49,7 @@ object CpuTuner {
         val queries = app.assets.open("parser_selftest.txt").bufferedReader().readLines().filter { it.isNotBlank() }.map { it.substringBefore('|') }.take(REQUESTS)
         val results = LinkedHashMap<CpuPlan.Plan, Long>()
         for (plan in dryRun ?: CpuPlan.candidates) {
-            val engine = LlmEngine(file, model.format.prefix(system), cacheDir = Services.models.cacheDir, plan = plan)
+            val engine = LlmEngine(file, model.format.prefix(system), cacheDir = Services.models.cacheDir, plan = plan, cpuFallback = false)
             if (!engine.load()) continue
             val times = queries.mapIndexed { i, q ->
                 val t0 = System.nanoTime()

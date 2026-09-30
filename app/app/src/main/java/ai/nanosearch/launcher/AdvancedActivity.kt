@@ -31,6 +31,7 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
@@ -84,6 +85,7 @@ private fun AdvancedScreen(onBack: () -> Unit) {
                 )
             }
             item { ProcessorCard(v) { version++ } }
+            item { GpuCard(v) { version++ } }
             item { MemoryCard(v) { version++ } }
             item {
                 TextButton(onClick = { CpuPlan.setAuto(); MemoryPolicy.mode = "auto"; reloadModels(); version++ }) { Text("Reset everything to Auto") }
@@ -171,6 +173,39 @@ private fun MemoryCard(version: Int, changed: () -> Unit) {
                     if (MemoryPolicy.keepBoth) "Both can be loaded at once." else "Only one is loaded at a time.",
                 style = MaterialTheme.typography.bodyMedium,
             )
+        }
+    }
+}
+
+@Composable
+private fun GpuCard(version: Int, changed: () -> Unit) {
+    val context = LocalContext.current
+    val measuring = CpuTuner.status.value // read here so the card refreshes when a background test finishes
+    val on = GpuSupport.enabled
+    Card(shape = RoundedCornerShape(24.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("GPU (experimental)", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Runs the language models on the graphics chip (Vulkan). It helps on some phones and slows down others, so it is only used if a test on this phone shows it is faster. " +
+                    "If it fails or crashes, it switches itself off.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Try the GPU", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                Switch(checked = on, onCheckedChange = {
+                    GpuSupport.enabled = it
+                    reloadModels()
+                    if (it) CpuTuner.run(context, force = true)
+                    changed()
+                })
+            }
+            val blocked = GpuSupport.blocked
+            val name = if (on) GpuSupport.deviceName else null
+            when {
+                blocked != null -> Text(blocked, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+                on && name != null -> Text("GPU found: $name. $measuring", style = MaterialTheme.typography.bodyMedium)
+                on -> Text("This phone reports no usable GPU, so the CPU is used.", style = MaterialTheme.typography.bodyMedium)
+            }
         }
     }
 }

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -55,6 +57,34 @@ android {
         jvmTarget = "17"
     }
 }
+
+// The optional GPU build of the language model layer (Vulkan). It is a second, separate native library so that the GPU driver is never
+// loaded unless the user turns the GPU on. AGP builds one CMake project per module, so this one is built here and packaged as a jniLib.
+val gpuLibs = layout.buildDirectory.dir("gpuLibs")
+val buildGpuLib = tasks.register<Exec>("buildGpuLib") {
+    val src = file("src/main/cpp_gpu")
+    val work = layout.buildDirectory.dir("gpu").get().asFile
+    val out = gpuLibs.get().asFile.resolve("arm64-v8a")
+    val ndk = android.ndkDirectory
+    val props = Properties()
+    val localProps = rootProject.file("local.properties")
+    if (localProps.exists()) localProps.inputStream().use { stream -> props.load(stream) }
+    val cmakeDir: String? = props.getProperty("cmake.dir")
+    val cmake = if (cmakeDir != null) "$cmakeDir/bin/cmake" else "cmake"
+    inputs.dir(src)
+    inputs.file(file("src/main/cpp/nanollm.cpp"))
+    outputs.dir(out)
+    doFirst { work.mkdirs(); out.mkdirs() }
+    commandLine(
+        "sh", "-c",
+        "'$cmake' -S '$src' -B '$work' -DCMAKE_TOOLCHAIN_FILE='$ndk/build/cmake/android.toolchain.cmake' -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-33 " +
+            "-DCMAKE_BUILD_TYPE=Release -DANDROID_STL=c++_static -DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON " +
+            "-DCMAKE_C_FLAGS=-march=armv8.2-a+dotprod -DCMAKE_CXX_FLAGS=-march=armv8.2-a+dotprod > '$work/configure.log' 2>&1 && " +
+            "'$cmake' --build '$work' --target nanollm_gpu -j 8 > '$work/build.log' 2>&1 && cp '$work/libnanollm_gpu.so' '$out/'",
+    )
+}
+android.sourceSets.getByName("main").jniLibs.srcDir(gpuLibs)
+tasks.named("preBuild") { dependsOn(buildGpuLib) }
 
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2025.09.00"))

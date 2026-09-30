@@ -4,3 +4,9 @@
 [submodule "whisper.cpp"]
 	path = whisper.cpp
 	url = https://github.com/ggml-org/whisper.cpp
+[submodule "third_party/Vulkan-Headers"]
+	path = third_party/Vulkan-Headers
+	url = https://github.com/KhronosGroup/Vulkan-Headers
+[submodule "third_party/SPIRV-Headers"]
+	path = third_party/SPIRV-Headers
+	url = https://github.com/KhronosGroup/SPIRV-Headers
