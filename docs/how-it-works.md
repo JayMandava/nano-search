@@ -93,6 +93,16 @@ processed prompt prefix is cached on disk.
 - **Memory:** `MemoryPolicy` scales how long each model stays loaded with total RAM (and allows both language models to be resident on phones with 11 GB or more). Settings > Advanced can force "keep loaded" or "free quickly".
 - **Override:** Settings > Advanced has Auto or Manual for the processor (grouping and thread count) and a memory mode, with one tap back to Auto.
 
+## GPU backend (experimental)
+
+- **A separate library.** llama.cpp's Vulkan backend initialises the graphics driver as soon as it is linked in and any model loads, which would expose everyone to driver bugs. So the GPU build is its own
+  library (`libnanollm_gpu.so`, built from `cpp_gpu/` and the same `nanollm.cpp`, with its own hidden copy of llama.cpp and ggml) and is only loaded when the user turns the GPU on in Settings > Advanced.
+  The CPU library is unchanged. The Vulkan C++ headers and SPIR-V headers are submodules under `third_party/`; the shader compiler and the Vulkan loader come from the NDK.
+- **Chosen by measurement.** With the switch on, the tuner adds a "GPU" candidate (GPU plus the default CPU cores) and uses it only if it beats the default by the usual margin.
+- **Safe to try.** The first load and first generation on the GPU run with a crash mark set; if the app restarts with the mark still there, the GPU is disabled for good. A GPU that cannot load the model
+  (for example a driver without 16-bit storage support) is switched off with a message and the CPU carries on.
+- **Status.** Verified on a phone whose GPU cannot run the model: it is detected, fails cleanly, and the CPU path is unaffected. Its speed on a GPU that works has not been measured yet.
+
 ## Model management
 
 Settings > Models is backed by a catalogue (`ModelCatalog.kt`) of files with sizes and SHA-256 hashes, and a store (`ModelStore.kt`) that downloads with Android's DownloadManager (resumable, survives the app closing),

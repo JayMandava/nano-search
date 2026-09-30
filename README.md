@@ -19,6 +19,7 @@ answers questions, and listens when you speak. Small language models run entirel
 - **Voice:** the mic button transcribes with an on-device Whisper model and presses Enter for you.
 - **Models you choose:** pick, download, test or import the model for each job in Settings > Models.
 - **Adapts to the phone:** it detects the CPU core layout and RAM, measures once in the background which core grouping runs the models fastest, and sizes how long models stay loaded to the available memory. Settings > Advanced shows what it chose and lets you override it.
+- **Optional GPU (experimental):** Settings > Advanced can try running the language models on the GPU through Vulkan. It is off by default, only used if an on-device test shows it is faster, and switches itself off if it fails or crashes.
 - **Material 3 Expressive design:** colours from your wallpaper (or a fixed accent), light, dark or system, and an adaptive icon.
 
 ## Privacy
@@ -87,5 +88,6 @@ Nano Search is licensed under the [Apache License 2.0](LICENSE). The models it d
 
 - [llama.cpp](https://github.com/ggml-org/llama.cpp) and [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (MIT) run the language and speech models.
 - [ONNX Runtime](https://onnxruntime.ai) (MIT) runs the image and OCR models.
+- [Vulkan-Headers](https://github.com/KhronosGroup/Vulkan-Headers) and [SPIRV-Headers](https://github.com/KhronosGroup/SPIRV-Headers) are used to build the optional GPU backend.
 - Place names come from [GeoNames](https://www.geonames.org), licensed CC BY 4.0.
 - Models are the work of their authors under the licences in the table above.
