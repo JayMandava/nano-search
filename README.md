@@ -78,6 +78,10 @@ Copy `queries.txt` to the app's `files/models/`, run the app's `bench` debug hoo
 
 [docs/how-it-works.md](docs/how-it-works.md) explains the search index, the photo, OCR and voice pipelines, the performance work, and the limits.
 
+## Licence
+
+Nano Search is licensed under the [Apache License 2.0](LICENSE). The models it downloads have their own licences, listed above.
+
 ## Credits and licences
 
 - [llama.cpp](https://github.com/ggml-org/llama.cpp) and [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (MIT) run the language and speech models.
