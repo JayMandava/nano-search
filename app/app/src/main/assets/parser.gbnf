@@ -1,0 +1,4 @@
+root   ::= "{\"action\":" action ",\"kind\":" kind ",\"text\":\"" text "\"}"
+action ::= "\"open\"" | "\"call\"" | "\"message\"" | "\"search\""
+kind   ::= "\"app\"" | "\"contact\"" | "\"any\""
+text   ::= [a-z0-9 ]*

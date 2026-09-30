@@ -1,0 +1,14 @@
+open camera|open|app|camera
+take me to settings|open|app|settings
+i want to check my email|open|app|email
+open the app for banking|open|app|banking
+open chrome|open|app|chrome
+phone rahul|call|contact|rahul
+dial my dentist|call|contact|dentist
+text ananya|message|contact|ananya
+sms amit|message|contact|amit
+find rahul|search|contact|rahul
+which apps do i have for cricket|search|app|cricket
+search for taxi|search|any|taxi
+papa ko phone lagao|call|contact|papa
+whatsapp kholo|open|app|whatsapp
