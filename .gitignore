@@ -1,0 +1,13 @@
+# build output
+build/
+.gradle/
+.cxx/
+*.iml
+local.properties
+*.apk
+# model weights are large and some are not redistributable; see models/README.md
+models/*
+!models/README.md
+.DS_Store
+bakeoff/prompts*/
+bakeoff/*.log
