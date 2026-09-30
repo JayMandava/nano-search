@@ -18,6 +18,7 @@ answers questions, and listens when you speak. Small language models run entirel
 - **Text in photos:** on-device OCR makes screenshots, receipts and documents searchable ("wifi password", "invoice").
 - **Voice:** the mic button transcribes with an on-device Whisper model and presses Enter for you.
 - **Models you choose:** pick, download, test or import the model for each job in Settings > Models.
+- **Adapts to the phone:** it detects the CPU core layout and RAM, measures once in the background which core grouping runs the models fastest, and sizes how long models stay loaded to the available memory. Settings > Advanced shows what it chose and lets you override it.
 - **Material 3 Expressive design:** colours from your wallpaper (or a fixed accent), light, dark or system, and an adaptive icon.
 
 ## Privacy

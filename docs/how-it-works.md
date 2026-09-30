@@ -84,6 +84,15 @@ processed prompt prefix is cached on disk.
 - **16 KB pages.** Native libraries are linked with flexible page sizes (`ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON`) so they load on 16 KB-page devices.
 - **Debug flags are one-shot** and only honoured on a fresh launch, so rotation cannot replay them.
 
+## Adapting to the device
+
+- **Cores:** `CpuPlan` reads each core's capacity and maximum speed from sysfs, groups the cores into clusters, and builds candidate plans (fastest cluster, fastest two clusters, all but the slowest).
+  The default is the fastest cluster if it has at least two cores, otherwise the fastest two clusters. On a phone whose layout cannot be read it falls back to a fixed guess.
+- **Measuring:** `CpuTuner` times the understanding model on the same requests under each candidate, while charging and not hot, and switches from the default only if a candidate is at least 8% faster.
+  The result is keyed to the chip, core layout and installed build, so it is redone only when one of those changes. A failed or interrupted run leaves the default in place.
+- **Memory:** `MemoryPolicy` scales how long each model stays loaded with total RAM (and allows both language models to be resident on phones with 11 GB or more). Settings > Advanced can force "keep loaded" or "free quickly".
+- **Override:** Settings > Advanced has Auto or Manual for the processor (grouping and thread count) and a memory mode, with one tap back to Auto.
+
 ## Model management
 
 Settings > Models is backed by a catalogue (`ModelCatalog.kt`) of files with sizes and SHA-256 hashes, and a store (`ModelStore.kt`) that downloads with Android's DownloadManager (resumable, survives the app closing),
@@ -99,6 +108,7 @@ Launch the main activity with one of these string extras (honoured once, on a fr
 | `bench` | Runs `files/models/queries.txt` through the understanding model and writes `files/bench.txt` |
 | `askbench` | Runs `files/models/questions.txt` through the answer model |
 | `whisper_wav` | Transcribes a 16 kHz mono WAV and logs the text |
+| `tune` | Times the understanding model on each core grouping plus an "all cores" candidate and logs the medians; saves nothing |
 | `clip_tokenize`, `ocr_test` | Logs tokenizer and OCR output for checking |
 | `wallpaper_uri`, `wallpaper_which`, `wallpaper_backup`, `wallpaper_restore` | Wallpaper testing |
 
