@@ -9,3 +9,6 @@
 # ONNX Runtime calls back into Java from its native library.
 -keep class ai.onnxruntime.** { *; }
 -dontwarn ai.onnxruntime.**
+
+# Optional private built-in widgets, found by name (absent from release builds).
+-keep class ai.nanosearch.launcher.personal.** { *; }

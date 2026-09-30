@@ -49,54 +49,67 @@ class HomeWidgets(
     /** The first page keeps the original key, so widgets placed before there were pages stay where they were. */
     private val idsKey = if (pageKey == "0") "widgets" else "widgets_$pageKey"
 
-    private var ids: List<Int>
-        get() = prefs.getString(idsKey, "")!!.split(',').mapNotNull { it.toIntOrNull() }
+    /** What is on this page, in order: an Android widget id ("42"), or a built-in widget ("b:<id>:<n>"). */
+    private var items: List<String>
+        get() = prefs.getString(idsKey, "")!!.split(',').filter { it.isNotBlank() }
         set(v) = prefs.edit().putString(idsKey, v.joinToString(",")).apply()
 
-    val count get() = ids.size
+    private val ids: List<Int> get() = items.mapNotNull { it.toIntOrNull() }
+
+    val count get() = items.size
 
     /** Saved size in dp as (width, height); width 0 means full width. */
-    private fun savedSize(id: Int): Pair<Int, Int>? =
+    private fun savedSize(id: Any): Pair<Int, Int>? =
         prefs.getString("wsize_$id", null)?.split(',')?.let { p -> if (p.size == 2) (p[0].toIntOrNull() ?: 0) to (p[1].toIntOrNull() ?: 0) else null }
 
-    private fun saveSize(id: Int, wDp: Int, hDp: Int) = prefs.edit().putString("wsize_$id", "$wDp,$hDp").apply()
+    private fun saveSize(id: Any, wDp: Int, hDp: Int) = prefs.edit().putString("wsize_$id", "$wDp,$hDp").apply()
 
     private val maxWidthPx get() = activity.resources.displayMetrics.widthPixels - dp(32)
 
     /** Removes every widget on this page for good (the page is being deleted). */
     fun removeAll() {
-        ids.forEach { host.deleteAppWidgetId(it); prefs.edit().remove("wsize_$it").apply() }
-        ids = emptyList()
+        items.forEach { token -> token.toIntOrNull()?.let { host.deleteAppWidgetId(it) }; prefs.edit().remove("wsize_$token").apply() }
+        items = emptyList()
         box.removeAllViews()
     }
 
     /** Rebuilds the views for every saved widget; drops ones whose provider has since been uninstalled. */
     fun restore() {
         box.removeAllViews()
-        val alive = ids.filter { manager.getAppWidgetInfo(it) != null }
-        (ids - alive.toSet()).forEach { host.deleteAppWidgetId(it) }
-        ids = alive
-        alive.forEach { show(it) }
+        val kept = items.filter { token ->
+            val id = token.toIntOrNull()
+            when {
+                id != null -> manager.getAppWidgetInfo(id) != null.also { }
+                else -> token.startsWith("b:") && BuiltinWidgets.find(token.split(':').getOrNull(1) ?: "") != null
+            }
+        }
+        items.filter { it !in kept }.forEach { token -> token.toIntOrNull()?.let { host.deleteAppWidgetId(it) } }
+        items = kept
+        kept.forEach { token -> token.toIntOrNull()?.let { show(it) } ?: showBuiltin(token) }
     }
 
     fun pick() {
         val providers = manager.installedProviders.sortedBy { it.loadLabel(activity.packageManager).toString().lowercase() }
-        if (providers.isEmpty()) {
+        val builtins = BuiltinWidgets.all
+        val entries: List<Any> = builtins + providers
+        if (entries.isEmpty()) {
             Toast.makeText(activity, "This phone has no widgets installed", Toast.LENGTH_SHORT).show()
             return
         }
         val adapter = object : BaseAdapter() {
-            override fun getCount() = providers.size
-            override fun getItem(position: Int) = providers[position]
+            override fun getCount() = entries.size
+            override fun getItem(position: Int) = entries[position]
             override fun getItemId(position: Int) = position.toLong()
             override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                val info = providers[position]
+                val entry = entries[position]
+                val info = entry as? AppWidgetProviderInfo
                 val row = LinearLayout(activity).apply {
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.CENTER_VERTICAL
                     setPadding(dp(24), dp(10), dp(24), dp(10))
                 }
-                val preview = runCatching { info.loadPreviewImage(activity, 0) }.getOrNull() ?: runCatching { info.loadIcon(activity, 0) }.getOrNull()
+                val preview = if (info == null) runCatching { (entry as BuiltinWidget).preview(activity) }.getOrNull()
+                else runCatching { info.loadPreviewImage(activity, 0) }.getOrNull() ?: runCatching { info.loadIcon(activity, 0) }.getOrNull()
                 row.addView(ImageView(activity).apply {
                     setImageDrawable(preview)
                     scaleType = ImageView.ScaleType.FIT_CENTER
@@ -104,7 +117,7 @@ class HomeWidgets(
                     setPadding(dp(6), dp(6), dp(6), dp(6))
                 }, LinearLayout.LayoutParams(dp(88), dp(64)))
                 row.addView(TextView(activity).apply {
-                    text = info.loadLabel(activity.packageManager)
+                    text = info?.loadLabel(activity.packageManager) ?: (entry as BuiltinWidget).label
                     textSize = 16f
                     setTextColor(pal.onSurface)
                     setPadding(dp(16), 0, 0, 0)
@@ -112,7 +125,7 @@ class HomeWidgets(
                 return row
             }
         }
-        overlays.adapterSheet("Add widget", adapter) { add(providers[it]) }
+        overlays.adapterSheet("Add widget", adapter) { i -> (entries[i] as? BuiltinWidget)?.let { addBuiltin(it) } ?: add(entries[i] as AppWidgetProviderInfo) }
     }
 
     private fun add(info: AppWidgetProviderInfo) {
@@ -141,8 +154,14 @@ class HomeWidgets(
     }
 
     private fun save(id: Int) {
-        ids = ids + id
+        items = items + id.toString()
         show(id)
+    }
+
+    private fun addBuiltin(b: BuiltinWidget) {
+        val token = "b:${b.id}:${System.currentTimeMillis()}"
+        items = items + token
+        showBuiltin(token)
     }
 
     private fun handleResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
@@ -173,8 +192,8 @@ class HomeWidgets(
         }
         frame.onLongPress = {
             overlays.popupFor(frame, listOf(listOf(
-                MenuItem(R.drawable.ic_menu_resize, "Resize") { startResize(id, info, frame, view) },
-                MenuItem(R.drawable.ic_menu_remove, "Remove widget", destructive = true) { remove(id, frame) },
+                MenuItem(R.drawable.ic_menu_resize, "Resize") { startResize(id, minWidthPx(info), minHeightPx(info), frame) { w, h -> sizeChanged(view, w, h) } },
+                MenuItem(R.drawable.ic_menu_remove, "Remove widget", destructive = true) { remove(id.toString(), frame) },
             )))
         }
         box.addView(frame, LinearLayout.LayoutParams(widthPx, heightPx).apply { bottomMargin = dp(12); gravity = Gravity.CENTER_HORIZONTAL })
@@ -189,7 +208,7 @@ class HomeWidgets(
     }
 
     /** Shows a frame with a drag handle in the bottom-right corner and a Done button; releasing saves the size. */
-    private fun startResize(id: Int, info: AppWidgetProviderInfo, frame: LongPressFrame, view: AppWidgetHostView) {
+    private fun startResize(key: Any, minW: Int, minH: Int, frame: LongPressFrame, onSize: (Int, Int) -> Unit) {
         frame.longPressEnabled = false
         val border = View(activity).apply {
             background = GradientDrawable().apply { setStroke(dp(2), pal.primary); cornerRadius = dp(12).toFloat() }
@@ -223,15 +242,15 @@ class HomeWidgets(
                     startW = frame.width; startH = frame.height; downX = e.rawX; downY = e.rawY
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    val w = (startW + (e.rawX - downX)).toInt().coerceIn(minWidthPx(info), maxWidthPx)
-                    val h = (startH + (e.rawY - downY)).toInt().coerceIn(minHeightPx(info), dp(640))
+                    val w = (startW + (e.rawX - downX)).toInt().coerceIn(minW, maxWidthPx)
+                    val h = (startH + (e.rawY - downY)).toInt().coerceIn(minH, dp(640))
                     frame.layoutParams = (frame.layoutParams as LinearLayout.LayoutParams).apply { width = w; height = h }
-                    sizeChanged(view, w, h)
+                    onSize(w, h)
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     v.parent.requestDisallowInterceptTouchEvent(false)
                     val full = frame.width >= maxWidthPx - dp(8)
-                    saveSize(id, if (full) 0 else toDp(frame.width), toDp(frame.height))
+                    saveSize(key, if (full) 0 else toDp(frame.width), toDp(frame.height))
                 }
             }
             true
@@ -241,11 +260,28 @@ class HomeWidgets(
         frame.addView(done, FrameLayout.LayoutParams(-2, -2, Gravity.END or Gravity.TOP).apply { setMargins(0, dp(6), dp(6), 0) })
     }
 
-    private fun remove(id: Int, view: View) {
+    private fun remove(token: String, view: View) {
         box.removeView(view)
-        host.deleteAppWidgetId(id)
-        ids = ids - id
-        prefs.edit().remove("wsize_$id").apply()
+        token.toIntOrNull()?.let { host.deleteAppWidgetId(it) }
+        items = items - token
+        prefs.edit().remove("wsize_$token").apply()
+    }
+
+    /** A widget the launcher draws itself: no provider, no binding, no host view; it is an ordinary View in the page. */
+    private fun showBuiltin(token: String) {
+        val b = BuiltinWidgets.find(token.split(':').getOrNull(1) ?: return) ?: return
+        val view = b.create(activity)
+        val saved = savedSize(token)
+        val heightPx = saved?.second?.takeIf { it > 0 }?.let { dp(it) } ?: dp(b.defaultHeightDp)
+        val widthPx = saved?.first?.takeIf { it > 0 }?.let { dp(it) } ?: ViewGroup.LayoutParams.MATCH_PARENT
+        val frame = LongPressFrame(activity).apply { addView(view, FrameLayout.LayoutParams(-1, -1)) }
+        frame.onLongPress = {
+            overlays.popupFor(frame, listOf(listOf(
+                MenuItem(R.drawable.ic_menu_resize, "Resize") { startResize(token, dp(180), dp(90), frame) { _, _ -> } },
+                MenuItem(R.drawable.ic_menu_remove, "Remove widget", destructive = true) { remove(token, frame) },
+            )))
+        }
+        box.addView(frame, LinearLayout.LayoutParams(widthPx, heightPx).apply { bottomMargin = dp(12); gravity = Gravity.CENTER_HORIZONTAL })
     }
 
     companion object {

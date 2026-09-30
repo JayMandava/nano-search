@@ -10,6 +10,7 @@ Numbers below were measured on a mid-range 2023 phone (8 GB RAM, CPU only). Othe
   A Launcher3-style indicator (6 dp dots, the active one stretched) slides with the swipe.
 - **Dock.** Long-press an icon for App info, Change app and Remove; a removed slot shows a "+". "Add to home" and "Add to dock" are in the drawer's long-press menu.
 - **Drawer.** It rises with a decelerating curve while the home screen behind it eases back (scale 0.97) and fades. Icons grow slightly when pressed, and apps open from the icon that was tapped.
+- **Built-in widgets.** Besides Android widgets, a page can hold widgets the launcher draws itself (`BuiltinWidgets.kt`). The launcher ships none: it looks for an optional class supplied by a local `src/personal` source set, which is compiled into debug and test builds only and ignored by git, and offers whatever it provides first in the widget picker.
 - **Settings run in their own task,** so pressing Home from a settings screen behaves like leaving any other app instead of replaying a back animation.
 
 ## Search

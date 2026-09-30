@@ -76,6 +76,17 @@ android {
 
     lint { checkReleaseBuilds = false }
 
+    // Private, local-only built-in widgets live in src/personal (git ignores it). They are compiled into the debug and minified test builds only,
+    // never into release, so nothing in it can reach a published APK. The launcher finds them by name at run time (see BuiltinWidgets.kt).
+    if (file("src/personal").exists()) {
+        listOf("debug", "minified").forEach { name ->
+            sourceSets.getByName(name) {
+                java.srcDir("src/personal/java")
+                assets.srcDir("src/personal/assets")
+            }
+        }
+    }
+
     buildFeatures { compose = true }
 
     compileOptions {
