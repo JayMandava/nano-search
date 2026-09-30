@@ -1,0 +1,278 @@
+[
+{
+"q": "open camera",
+"action": "open",
+"kind": "app",
+"text": "camera"
+},
+{
+"q": "launch the calculator",
+"action": "open",
+"kind": "app",
+"text": "calculator"
+},
+{
+"q": "take me to settings",
+"action": "open",
+"kind": "app",
+"text": "settings"
+},
+{
+"q": "start spotify",
+"action": "open",
+"kind": "app",
+"text": "spotify"
+},
+{
+"q": "i want to check my email",
+"action": "open",
+"kind": "app",
+"text": "email"
+},
+{
+"q": "where is the clock app",
+"action": "open",
+"kind": "app",
+"text": "clock"
+},
+{
+"q": "fire up the music player",
+"action": "open",
+"kind": "app",
+"text": "music"
+},
+{
+"q": "open the app for banking",
+"action": "open",
+"kind": "app",
+"text": "banking"
+},
+{
+"q": "pull up the calendar",
+"action": "open",
+"kind": "app",
+"text": "calendar"
+},
+{
+"q": "open chrome",
+"action": "open",
+"kind": "app",
+"text": "chrome"
+},
+{
+"q": "open files",
+"action": "open",
+"kind": "app",
+"text": "files"
+},
+{
+"q": "call mom",
+"action": "call",
+"kind": "contact",
+"text": "mom"
+},
+{
+"q": "phone rahul",
+"action": "call",
+"kind": "contact",
+"text": "rahul"
+},
+{
+"q": "ring dr sharma",
+"action": "call",
+"kind": "contact",
+"text": "sharma"
+},
+{
+"q": "give a call to uncle ravi",
+"action": "call",
+"kind": "contact",
+"text": "ravi"
+},
+{
+"q": "dial my dentist",
+"action": "call",
+"kind": "contact",
+"text": "dentist"
+},
+{
+"q": "can you call priya",
+"action": "call",
+"kind": "contact",
+"text": "priya"
+},
+{
+"q": "hey call my brother",
+"action": "call",
+"kind": "contact",
+"text": "brother"
+},
+{
+"q": "text ananya",
+"action": "message",
+"kind": "contact",
+"text": "ananya"
+},
+{
+"q": "message the plumber",
+"action": "message",
+"kind": "contact",
+"text": "plumber"
+},
+{
+"q": "send a message to dad",
+"action": "message",
+"kind": "contact",
+"text": "dad"
+},
+{
+"q": "sms amit",
+"action": "message",
+"kind": "contact",
+"text": "amit"
+},
+{
+"q": "drop a note to suresh anna",
+"action": "message",
+"kind": "contact",
+"text": "suresh"
+},
+{
+"q": "tell meena i am late",
+"action": "message",
+"kind": "contact",
+"text": "meena"
+},
+{
+"q": "message kiran",
+"action": "message",
+"kind": "contact",
+"text": "kiran"
+},
+{
+"q": "find rahul",
+"action": "search",
+"kind": "contact",
+"text": "rahul"
+},
+{
+"q": "who is bhandari",
+"action": "search",
+"kind": "contact",
+"text": "bhandari"
+},
+{
+"q": "anything about airtel",
+"action": "search",
+"kind": "any",
+"text": "airtel"
+},
+{
+"q": "look up electricals",
+"action": "search",
+"kind": "any",
+"text": "electricals"
+},
+{
+"q": "find my bank apps",
+"action": "search",
+"kind": "app",
+"text": "bank"
+},
+{
+"q": "which apps do i have for cricket",
+"action": "search",
+"kind": "app",
+"text": "cricket"
+},
+{
+"q": "do i have a contact called chotu",
+"action": "search",
+"kind": "contact",
+"text": "chotu"
+},
+{
+"q": "all my airtel stuff",
+"action": "search",
+"kind": "any",
+"text": "airtel"
+},
+{
+"q": "any messaging apps",
+"action": "search",
+"kind": "app",
+"text": "messaging"
+},
+{
+"q": "find a plumber",
+"action": "search",
+"kind": "contact",
+"text": "plumber"
+},
+{
+"q": "search for taxi",
+"action": "search",
+"kind": "any",
+"text": "taxi"
+},
+{
+"q": "is there a weather app",
+"action": "search",
+"kind": "app",
+"text": "weather"
+},
+{
+"q": "look for contacts with sharma",
+"action": "search",
+"kind": "contact",
+"text": "sharma"
+},
+{
+"q": "find something called cook",
+"action": "search",
+"kind": "any",
+"text": "cook"
+},
+{
+"q": "amma ko call karo",
+"action": "call",
+"kind": "contact",
+"text": "amma"
+},
+{
+"q": "papa ko phone lagao",
+"action": "call",
+"kind": "contact",
+"text": "papa"
+},
+{
+"q": "camera kholo",
+"action": "open",
+"kind": "app",
+"text": "camera"
+},
+{
+"q": "rahul ko message bhejo",
+"action": "message",
+"kind": "contact",
+"text": "rahul"
+},
+{
+"q": "calculator chalao",
+"action": "open",
+"kind": "app",
+"text": "calculator"
+},
+{
+"q": "whatsapp kholo",
+"action": "open",
+"kind": "app",
+"text": "whatsapp"
+},
+{
+"q": "gallery dikhao",
+"action": "open",
+"kind": "app",
+"text": "gallery"
+}
+]

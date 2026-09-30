@@ -1,0 +1,46 @@
+open camera|open|app|camera
+launch the calculator|open|app|calculator
+take me to settings|open|app|settings
+start spotify|open|app|spotify
+i want to check my email|open|app|email
+where is the clock app|open|app|clock
+fire up the music player|open|app|music
+open the app for banking|open|app|banking
+pull up the calendar|open|app|calendar
+open chrome|open|app|chrome
+open files|open|app|files
+call mom|call|contact|mom
+phone rahul|call|contact|rahul
+ring dr sharma|call|contact|sharma
+give a call to uncle ravi|call|contact|ravi
+dial my dentist|call|contact|dentist
+can you call priya|call|contact|priya
+hey call my brother|call|contact|brother
+text ananya|message|contact|ananya
+message the plumber|message|contact|plumber
+send a message to dad|message|contact|dad
+sms amit|message|contact|amit
+drop a note to suresh anna|message|contact|suresh
+tell meena i am late|message|contact|meena
+message kiran|message|contact|kiran
+find rahul|search|contact|rahul
+who is bhandari|search|contact|bhandari
+anything about airtel|search|any|airtel
+look up electricals|search|any|electricals
+find my bank apps|search|app|bank
+which apps do i have for cricket|search|app|cricket
+do i have a contact called chotu|search|contact|chotu
+all my airtel stuff|search|any|airtel
+any messaging apps|search|app|messaging
+find a plumber|search|contact|plumber
+search for taxi|search|any|taxi
+is there a weather app|search|app|weather
+look for contacts with sharma|search|contact|sharma
+find something called cook|search|any|cook
+amma ko call karo|call|contact|amma
+papa ko phone lagao|call|contact|papa
+camera kholo|open|app|camera
+rahul ko message bhejo|message|contact|rahul
+calculator chalao|open|app|calculator
+whatsapp kholo|open|app|whatsapp
+gallery dikhao|open|app|gallery
