@@ -9,9 +9,10 @@ import java.io.File
 class LlmEngine(
     private val modelFile: File,
     private val prefix: String,
-    private val threads: Int = 2,
     private val nCtx: Int = 2048,
     private val cacheDir: File? = null,
+    /** Which cores and threads to use; null means whatever [CpuPlan.current] says. */
+    private val plan: CpuPlan.Plan? = null,
 ) {
     private val native = NativeLlm()
     private var handle = 0L
@@ -26,7 +27,8 @@ class LlmEngine(
     fun load(): Boolean {
         if (handle != 0L) return true
         val t0 = System.nanoTime()
-        val h = native.load(modelFile.absolutePath, threads, nCtx, CpuInfo.bigCoreMask())
+        val p = plan ?: CpuPlan.current()
+        val h = native.load(modelFile.absolutePath, p.threads, nCtx, p.mask)
         if (h == 0L) return false
         if (native.setPrefix(h, prefix, cachePath()) < 0) {
             native.free(h)
@@ -65,20 +67,3 @@ class LlmEngine(
 }
 
 private const val CACHE_VERSION = 1
-
-object CpuInfo {
-    /**
-     * Bitmask of the fastest cores. Inference is fastest and steadiest pinned to them: on
-     * big.LITTLE phones, adding the little cores made generation slower and noisier.
-     */
-    fun bigCoreMask(): Long {
-        val freqs = (0 until Runtime.getRuntime().availableProcessors()).map { cpu ->
-            runCatching { File("/sys/devices/system/cpu/cpu$cpu/cpufreq/cpuinfo_max_freq").readText().trim().toLong() }.getOrDefault(0L)
-        }
-        val max = freqs.maxOrNull() ?: 0L
-        if (max == 0L) return if (freqs.size == 8) 0xC0L else 0L // sysfs unreadable: assume 6+2 layout
-        var mask = 0L
-        freqs.forEachIndexed { i, f -> if (f == max) mask = mask or (1L shl i) }
-        return mask
-    }
-}

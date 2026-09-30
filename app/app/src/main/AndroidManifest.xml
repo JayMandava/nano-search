@@ -57,6 +57,13 @@
             android:theme="@style/Theme.Settings" />
 
         <activity
+            android:name=".AdvancedActivity"
+            android:exported="false"
+            android:label="Advanced"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.Settings" />
+
+        <activity
             android:name=".ModelsActivity"
             android:exported="false"
             android:label="Models"

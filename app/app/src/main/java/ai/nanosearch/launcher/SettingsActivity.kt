@@ -106,6 +106,7 @@ private fun SettingsScreen(onBack: () -> Unit) {
             item { Header("Your data") }
             item { DataCard(tick) }
             item { SetupRow() }
+            item { AdvancedRow() }
         }
     }
 }
@@ -280,6 +281,18 @@ private fun SetupRow() {
             colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
             headlineContent = { Text("Run setup again") },
             supportingContent = { Text("The short tour: permissions, models and default home.") },
+        )
+    }
+}
+
+@Composable
+private fun AdvancedRow() {
+    val context = LocalContext.current
+    Card(shape = RoundedCornerShape(24.dp), onClick = { context.startActivity(Intent(context, AdvancedActivity::class.java)) }) {
+        ListItem(
+            colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
+            headlineContent = { Text("Advanced") },
+            supportingContent = { Text("Processor and memory. Automatic by default.") },
         )
     }
 }

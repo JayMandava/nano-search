@@ -177,6 +177,7 @@ class MainActivity : Activity() {
      */
     private fun consumeDebugExtras(i: Intent) {
         if (i.hasExtra("bench")) { i.removeExtra("bench"); runBench() }
+        if (i.hasExtra("tune")) { i.removeExtra("tune"); CpuTuner.run(this, force = true, dryRunWith = CpuPlan.candidates + CpuPlan.Plan((1L shl CpuPlan.coreCount) - 1, 6, "all cores, 6 threads", "all")) }
         if (i.hasExtra("askbench")) { i.removeExtra("askbench"); runAskBench() }
         i.getStringExtra("wallpaper_uri")?.let {
             val which = when (i.getStringExtra("wallpaper_which")) {
@@ -682,6 +683,7 @@ class MainActivity : Activity() {
         search()
         updateBanner()
         startEmbedding()
+        CpuTuner.maybeRun(this)
     }
 
     /** Fingerprints new photos for "photos of a beach" style search; a no-op if the image models are not installed or a run is in progress. */
@@ -924,7 +926,7 @@ class MainActivity : Activity() {
 
     private fun answerWith(question: String, found: List<Item>, seq: Int) {
         Services.answererBusy()
-        parser.unload() // memory budget: the two models are never resident together
+        if (!MemoryPolicy.keepBoth) parser.unload() // memory budget: on phones without RAM to spare the two models are never resident together
         val shown = StringBuilder()
         val t0 = System.nanoTime()
         val out = answerer.answer(question, found) { piece ->

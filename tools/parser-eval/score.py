@@ -1,5 +1,5 @@
-import json, re, sys
-gold = json.load(open('queries.json'))
+import json, os, re, sys
+gold = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'queries.json')))
 def toks(s): return [t for t in re.split(r'[^a-z0-9]+', s.lower()) if t]
 def score(path):
     rows = {}

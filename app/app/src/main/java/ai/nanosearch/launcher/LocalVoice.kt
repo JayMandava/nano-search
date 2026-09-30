@@ -144,7 +144,8 @@ class LocalVoice(
     /** Whisper adds bracketed noise labels and a full stop; a search request needs neither. */
     fun transcribe(pcm: FloatArray, prompt: String? = null, fullWindow: Boolean = false): String? {
         if (handle == 0L) {
-            handle = native.load(modelFile.absolutePath, 2, CpuInfo.bigCoreMask())
+            val plan = CpuPlan.current()
+            handle = native.load(modelFile.absolutePath, plan.threads, plan.mask)
             if (handle == 0L) return null
         }
         val t0 = System.nanoTime()

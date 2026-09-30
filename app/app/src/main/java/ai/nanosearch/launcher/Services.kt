@@ -11,9 +11,6 @@ import java.util.concurrent.Executors
  * not to any one activity, or every recreation would load another copy.
  */
 object Services {
-    private const val PARSER_IDLE_MS = 5 * 60_000L
-    private const val ANSWER_IDLE_MS = 30_000L
-
     private lateinit var appContext: Context
     private val main = Handler(Looper.getMainLooper())
 
@@ -33,16 +30,18 @@ object Services {
     fun init(context: Context) {
         appContext = context.applicationContext
         ModelStore.init(appContext)
+        CpuPlan.init(appContext)
+        MemoryPolicy.init(appContext)
     }
 
     fun parserUsed() {
         main.removeCallbacks(unloadParser)
-        main.postDelayed(unloadParser, PARSER_IDLE_MS)
+        main.postDelayed(unloadParser, MemoryPolicy.parserIdleMs)
     }
 
     fun answererUsed() {
         main.removeCallbacks(unloadAnswerer)
-        main.postDelayed(unloadAnswerer, ANSWER_IDLE_MS)
+        main.postDelayed(unloadAnswerer, MemoryPolicy.answerIdleMs)
     }
 
     fun answererBusy() = main.removeCallbacks(unloadAnswerer)
