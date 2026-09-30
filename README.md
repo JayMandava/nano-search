@@ -32,6 +32,11 @@ in Settings, and "Clear and rebuild" empties the index.
 Some custom Android builds switch off network access for apps that were installed before they declared the INTERNET permission. If a download
 never starts, open App info > Mobile data and Wi-Fi and allow network access for Nano Search.
 
+## Install
+
+Download the APK from the [latest release](https://github.com/JayMandava/nano-search/releases/latest), check it against `SHA256SUMS.txt`, allow "Install unknown apps" for your browser or file manager, and open it.
+Release APKs are signed with the project's key (the certificate fingerprint is in each release's notes), so updates install over each other.
+
 ## Requirements
 
 - Android 13 (API 33) or newer, arm64.
@@ -50,6 +55,8 @@ echo "sdk.dir=/path/to/Android/sdk" > local.properties    # add cmake.dir=... if
 ./gradlew assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
+
+`./gradlew assembleRelease` makes the shrunk release build. It is signed with the keystore named in `keystore.properties` (path in the `NANO_KEYSTORE_PROPERTIES` environment variable, or `~/.nano-search-keystore/keystore.properties`), and with the debug key if there is none.
 
 On first launch a short setup tour asks what the app may read, offers the recommended models and helps you make it the default home app.
 
