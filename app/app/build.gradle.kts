@@ -14,8 +14,8 @@ android {
         applicationId = "ai.nanosearch.launcher"
         minSdk = 33
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.2"
+        versionCode = 3
+        versionName = "0.3.0"
 
         ndk {
             abiFilters += "arm64-v8a"
@@ -41,11 +41,40 @@ android {
         }
     }
 
-    buildTypes {
-        release {
-            isMinifyEnabled = false
+    // Release signing: a keystore.properties file (storeFile, storePassword, keyAlias, keyPassword) kept outside the repository, found through
+    // the NANO_KEYSTORE_PROPERTIES environment variable or ~/.nano-search-keystore/keystore.properties. Without one, release builds are signed
+    // with the debug key so that anyone can still build them.
+    val keystoreProps = Properties()
+    val keystoreFile = (System.getenv("NANO_KEYSTORE_PROPERTIES") ?: "${System.getProperty("user.home")}/.nano-search-keystore/keystore.properties").let { file(it) }
+    if (keystoreFile.exists()) keystoreFile.inputStream().use { stream -> keystoreProps.load(stream) }
+    signingConfigs {
+        if (keystoreProps.containsKey("storeFile")) {
+            create("release") {
+                storeFile = file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
         }
     }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+        }
+        // The release build (shrunk, optimised) signed with the debug key, so it can be installed over a debug install to test the shrinking.
+        create("minified") {
+            initWith(getByName("release"))
+            isDebuggable = true // so adb run-as can read its files during testing; the shrinking is the same
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += "release"
+        }
+    }
+
+    lint { checkReleaseBuilds = false }
 
     buildFeatures { compose = true }
 
