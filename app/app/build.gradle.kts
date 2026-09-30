@@ -121,6 +121,8 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.activity:activity-compose:1.10.1")
+    // Swipeable home pages (plain Views, so the launcher's existing screens keep working).
+    implementation("androidx.viewpager:viewpager:1.0.0")
     // Runs the image-and-text matching model (MobileCLIP) that powers "photos of a beach" style search.
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.22.0")
 }

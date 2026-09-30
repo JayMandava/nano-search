@@ -1,11 +1,16 @@
 package ai.nanosearch.launcher
 
+import ai.nanosearch.launcher.ui.MenuItem
+import ai.nanosearch.launcher.ui.Overlays
+import ai.nanosearch.launcher.ui.PageDots
 import ai.nanosearch.launcher.ui.Palette
+import ai.nanosearch.launcher.ui.PickApp
 import android.Manifest
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
 import android.app.Activity
-import android.app.AlertDialog
+import android.app.ActivityOptions
+import android.appwidget.AppWidgetHost
 import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
@@ -52,6 +57,8 @@ import android.widget.ScrollView
 import android.widget.TextClock
 import android.widget.TextView
 import android.widget.Toast
+import androidx.viewpager.widget.PagerAdapter
+import androidx.viewpager.widget.ViewPager
 import java.io.File
 import java.util.concurrent.Executors
 
@@ -73,9 +80,13 @@ class MainActivity : Activity() {
     private lateinit var drawer: DragLayout
     private lateinit var searchLayer: LinearLayout
     private lateinit var homeContent: LinearLayout
-    private lateinit var widgetScroll: ScrollView
     private lateinit var dockRow: LinearLayout
-    private lateinit var widgets: HomeWidgets
+    private lateinit var pager: ViewPager
+    private lateinit var dots: PageDots
+    private var pages: List<HomePage> = emptyList()
+    private val widgetHost by lazy { AppWidgetHost(this, HomeWidgets.HOST_ID) }
+    private lateinit var overlayHost: FrameLayout
+    private lateinit var overlays: Overlays
     // search
     private lateinit var input: EditText
     private lateinit var mic: ImageView
@@ -143,18 +154,20 @@ class MainActivity : Activity() {
         builtThemeKey = themeKey
         index = SearchIndex(this)
 
+        overlayHost = FrameLayout(this)
+        overlays = Overlays(this, overlayHost, pal)
         home = buildHome()
         drawer = buildDrawer()
         drawer.translationY = screenH
         drawer.visibility = View.INVISIBLE
         searchLayer = buildSearchLayer()
-        widgets = HomeWidgets(this, homeContent.getTag(R.id.widget_box) as LinearLayout)
         voice = buildVoice()
 
         val root = FrameLayout(this).apply {
             addView(home, FrameLayout.LayoutParams(-1, -1))
             addView(drawer, FrameLayout.LayoutParams(-1, -1))
             addView(searchLayer, FrameLayout.LayoutParams(-1, -2))
+            addView(overlayHost, FrameLayout.LayoutParams(-1, -1)) // menus and sheets, above everything
             // targetSdk 35 is edge-to-edge: keep content clear of the system bars and the keyboard.
             setOnApplyWindowInsetsListener { _, insets ->
                 val sys = insets.getInsets(WindowInsets.Type.systemBars())
@@ -167,7 +180,6 @@ class MainActivity : Activity() {
             }
         }
         setContentView(root)
-        widgets.restore()
         if (savedInstanceState == null) consumeDebugExtras(intent) // never on recreation (rotation replays the launch intent)
     }
 
@@ -402,59 +414,116 @@ class MainActivity : Activity() {
             setTextColor(0xEEFFFFFF.toInt())
             setShadowLayer(6f, 0f, 1f, 0x66000000)
         }
-        val widgetBox = LinearLayout(this@MainActivity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(8), dp(16), dp(8))
-        }
-        widgetScroll = PassThroughScrollView(this@MainActivity).apply {
-            isVerticalScrollBarEnabled = false
-            overScrollMode = View.OVER_SCROLL_NEVER
-            addView(widgetBox)
-        }
         dockRow = LinearLayout(this@MainActivity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
             background = round(pal.dock, 36)
             setPadding(dp(8), dp(10), dp(8), dp(10))
         }
+        pager = ViewPager(this@MainActivity).apply {
+            setPageTransformer(false) { page, pos -> page.alpha = 1f - kotlin.math.min(kotlin.math.abs(pos), 1f) * 0.5f }
+            addOnPageChangeListener(object : ViewPager.SimpleOnPageChangeListener() {
+                override fun onPageScrolled(position: Int, positionOffset: Float, positionOffsetPixels: Int) = dots.setPosition(position + positionOffset)
+            })
+        }
+        dots = PageDots(this@MainActivity, Color.WHITE)
+        clockBlock = LinearLayout(this@MainActivity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(28), dp(4), dp(28), dp(8))
+            addView(clock)
+            addView(date)
+            visibility = if (prefs.getBoolean("showClock", true)) View.VISIBLE else View.GONE
+            var lx = 0f; var ly = 0f
+            setOnTouchListener { _, e -> if (e.actionMasked == android.view.MotionEvent.ACTION_DOWN) { lx = e.rawX; ly = e.rawY }; false }
+            setOnLongClickListener {
+                overlays.popup(lx, ly, ly, listOf(listOf(MenuItem(R.drawable.ic_menu_remove, "Remove clock") { setClockShown(false) })))
+                true
+            }
+        }
         homeContent = LinearLayout(this@MainActivity).apply {
             orientation = LinearLayout.VERTICAL
-            setTag(R.id.widget_box, widgetBox)
-            clockBlock = LinearLayout(this@MainActivity).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(dp(28), dp(4), dp(28), dp(8))
-                addView(clock)
-                addView(date)
-                visibility = if (prefs.getBoolean("showClock", true)) View.VISIBLE else View.GONE
-                setOnLongClickListener {
-                    AlertDialog.Builder(this@MainActivity).setTitle("Clock")
-                        .setItems(arrayOf("Remove clock")) { _, _ -> setClockShown(false) }.show()
-                    true
-                }
-            }
-            addView(clockBlock, LinearLayout.LayoutParams(-1, -2))
-            addView(widgetScroll, LinearLayout.LayoutParams(-1, 0, 1f))
+            addView(pager, LinearLayout.LayoutParams(-1, 0, 1f))
+            addView(dots, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.CENTER_HORIZONTAL })
             // swipe-up handle
             addView(View(this@MainActivity).apply { background = round(0x99FFFFFF.toInt(), 2) },
-                LinearLayout.LayoutParams(dp(36), dp(4)).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(6); bottomMargin = dp(12) })
+                LinearLayout.LayoutParams(dp(36), dp(4)).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(2); bottomMargin = dp(12) })
             addView(dockRow, LinearLayout.LayoutParams(-1, -2).apply { setMargins(dp(16), 0, dp(16), dp(16)) })
         }
         addView(homeContent, FrameLayout.LayoutParams(-1, -1))
         rebuildDock()
+        buildPages(0)
 
-        // Long-press empty home space for widgets and wallpaper; tap it to put the keyboard away.
+        // Long-press any empty home space for the home menu; tap it to put the keyboard away.
+        var homeX = 0f; var homeY = 0f
+        setOnTouchListener { _, e -> if (e.actionMasked == android.view.MotionEvent.ACTION_DOWN) { homeX = e.rawX; homeY = e.rawY }; false }
         isLongClickable = true
-        setOnLongClickListener { showHomeMenu(); true }
+        setOnLongClickListener { showHomeMenu(homeX, homeY); true }
         setOnClickListener { if (input.hasFocus()) { hideKeyboard(); input.clearFocus() } }
 
-        // Swipe up opens the drawer, unless the widgets can still scroll that way.
-        canStart = { !widgetScroll.canScrollVertically(1) }
-        onDrag = { dy -> drawer.visibility = View.VISIBLE; drawer.translationY = (screenH - dy).coerceIn(0f, screenH) }
+        // Swipe up opens the drawer, unless the page's content can still scroll that way.
+        canStart = { !currentPage().scroll.canScrollVertically(1) }
+        onDrag = { dy -> drawer.visibility = View.VISIBLE; drawer.translationY = (screenH - dy).coerceIn(0f, screenH); applyDrawerProgress() }
         onRelease = { vy, dragged ->
             if (dragged) {
                 if (vy < -800f || drawer.translationY < screenH * 0.65f) openDrawer() else closeDrawer(clear = false)
             }
         }
+    }
+
+    // ---- home pages
+
+    private fun currentPage(): HomePage = pages[pager.currentItem.coerceIn(0, pages.size - 1)]
+
+    private fun pageIds(): List<String> = prefs.getString("pages", "0")!!.split(',').filter { it.isNotBlank() }.ifEmpty { listOf("0") }
+
+    /** (Re)builds every page from what is saved. The clock rides at the top of whichever page is first. */
+    private fun buildPages(showIndex: Int) {
+        (clockBlock.parent as? ViewGroup)?.removeView(clockBlock)
+        pages = pageIds().map { id ->
+            HomePage(this, id, widgetHost, overlays, pal,
+                onEmptyLongPress = { x, y -> showHomeMenu(x, y) },
+                launch = { cn, v -> launchComponent(cn, v) },
+                appInfo = { cn -> showAppInfo(cn.packageName) },
+            ).also { it.restore() }
+        }
+        pages.first().root.addView(clockBlock, 0, LinearLayout.LayoutParams(-1, -2))
+        pager.adapter = object : PagerAdapter() {
+            override fun getCount() = pages.size
+            override fun isViewFromObject(view: View, obj: Any) = view === obj
+            override fun instantiateItem(container: ViewGroup, position: Int): Any = pages[position].root.also { container.addView(it) }
+            override fun destroyItem(container: ViewGroup, position: Int, obj: Any) = container.removeView(obj as View)
+            override fun getItemPosition(obj: Any) = POSITION_NONE
+        }
+        pager.offscreenPageLimit = pages.size.coerceAtLeast(1)
+        dots.setCount(pages.size)
+        pager.setCurrentItem(showIndex.coerceIn(0, pages.size - 1), false)
+        dots.setPosition(pager.currentItem.toFloat())
+    }
+
+    private fun addPage() {
+        if (pages.size >= MAX_PAGES) return
+        val seq = prefs.getInt("pageSeq", 1) + 1
+        prefs.edit().putInt("pageSeq", seq).putString("pages", (pageIds() + "p$seq").joinToString(",")).apply()
+        buildPages(pages.size)
+        pager.setCurrentItem(pages.size - 1, true)
+    }
+
+    private fun removeCurrentPage() {
+        if (pages.size <= 1) return
+        val page = currentPage()
+        val doRemove = {
+            val at = pager.currentItem
+            page.clear()
+            prefs.edit().putString("pages", (pageIds() - page.id).joinToString(",")).apply()
+            buildPages((at - 1).coerceAtLeast(0))
+        }
+        if (page.itemCount == 0) doRemove() else overlays.listSheet(
+            "Remove this page?",
+            listOf(
+                MenuItem(R.drawable.ic_menu_delete, "Remove page and its ${page.itemCount} item" + if (page.itemCount == 1) "" else "s", destructive = true) { doRemove() },
+                MenuItem(R.drawable.ic_menu_remove, "Keep it") {},
+            ),
+        )
     }
 
     // ---- dock: four slots, each long-pressable to change
@@ -472,28 +541,58 @@ class MainActivity : Activity() {
         return saved
     }
 
+    /** One dock slot: how to launch it, its icon and its component (null for an unresolved default). */
+    private class DockEntry(val launch: Intent, val icon: Drawable, val component: ComponentName?)
+
+    private fun dockEntry(slot: Int, saved: String): DockEntry? {
+        val custom = ComponentName.unflattenFromString(saved)
+        if (custom != null && runCatching { packageManager.getActivityInfo(custom, 0) }.isSuccess) {
+            return DockEntry(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(custom), packageManager.getActivityIcon(custom), custom)
+        }
+        val i = defaultDock[slot]
+        val ri = packageManager.resolveActivity(i, PackageManager.MATCH_DEFAULT_ONLY) ?: return null
+        return DockEntry(i, ri.loadIcon(packageManager), ri.activityInfo?.let { ComponentName(it.packageName, it.name) })
+    }
+
     private fun rebuildDock() {
         if (!::dockRow.isInitialized) return
         dockRow.removeAllViews()
         val saved = dockSaved()
         for (slot in 0 until DOCK_SLOTS) {
-            val custom = ComponentName.unflattenFromString(saved[slot])
-            val launch: Intent
-            val icon: Drawable
-            if (custom != null && runCatching { packageManager.getActivityInfo(custom, 0) }.isSuccess) {
-                launch = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(custom)
-                icon = packageManager.getActivityIcon(custom)
-            } else {
-                val i = defaultDock[slot]
-                val ri = packageManager.resolveActivity(i, PackageManager.MATCH_DEFAULT_ONLY)
-                launch = i
-                icon = ri?.loadIcon(packageManager) ?: continue
-            }
+            if (saved[slot] == DOCK_EMPTY) { dockRow.addView(emptyDockSlot(slot), LinearLayout.LayoutParams(0, dp(56), 1f)); continue }
+            val entry = dockEntry(slot, saved[slot]) ?: continue
             dockRow.addView(ImageView(this).apply {
-                setImageDrawable(icon)
-                setOnClickListener { runCatching { startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } }
-                setOnLongClickListener { chooseApp("Dock slot ${slot + 1}") { setDock(slot, it) }; true }
+                setImageDrawable(entry.icon)
+                setOnClickListener { v -> launchIntent(entry.launch, v) }
+                setOnLongClickListener { v ->
+                    val pkg = entry.component?.packageName
+                    overlays.popupFor(v, listOf(listOf(
+                        MenuItem(R.drawable.ic_menu_info, "App info") { if (pkg != null) showAppInfo(pkg) },
+                        MenuItem(R.drawable.ic_menu_swap, "Change app") { chooseApp("Dock slot ${slot + 1}") { setDock(slot, it) } },
+                        MenuItem(R.drawable.ic_menu_remove, "Remove from dock") { setDock(slot, DOCK_EMPTY) },
+                    )))
+                    true
+                }
             }, LinearLayout.LayoutParams(0, dp(56), 1f))
+        }
+    }
+
+    /** A removed dock icon leaves a quiet "+" you can tap to put an app there. */
+    private fun emptyDockSlot(slot: Int): View = FrameLayout(this).apply {
+        addView(ImageView(this@MainActivity).apply {
+            setImageResource(R.drawable.ic_menu_add)
+            setColorFilter(Color.WHITE)
+            alpha = 0.8f
+            setPadding(dp(14), dp(14), dp(14), dp(14))
+            background = round(0x33FFFFFF, 28)
+        }, FrameLayout.LayoutParams(dp(48), dp(48), Gravity.CENTER))
+        setOnClickListener { chooseApp("Add to dock") { setDock(slot, it) } }
+        setOnLongClickListener { v ->
+            overlays.popupFor(v, listOf(listOf(
+                MenuItem(R.drawable.ic_menu_add, "Add app") { chooseApp("Add to dock") { setDock(slot, it) } },
+                MenuItem(R.drawable.ic_menu_home, "Reset dock") { prefs.edit().remove("dock").apply(); rebuildDock() },
+            )))
+            true
         }
     }
 
@@ -504,12 +603,10 @@ class MainActivity : Activity() {
         rebuildDock()
     }
 
-    /** A plain list of every installed launcher app; [onPick] gets the chosen component string. */
+    /** A searchable sheet of every installed launcher app; [onPick] gets the chosen component string. */
     private fun chooseApp(title: String, onPick: (String) -> Unit) {
-        val all = Indexers.apps(this).sortedBy { it.title.lowercase() }
-        AlertDialog.Builder(this).setTitle(title)
-            .setItems(all.map { it.title }.toTypedArray()) { _, i -> onPick(all[i].key) }
-            .setNegativeButton("Cancel", null).show()
+        val apps = Indexers.apps(this).sortedBy { it.title.lowercase() }.map { PickApp(it.title, it.key, runCatching { packageManager.getActivityIcon(ComponentName.unflattenFromString(it.key)!!) }.getOrNull()) }
+        overlays.appPicker(title, apps) { onPick(it.key) }
     }
 
     private fun setClockShown(shown: Boolean) {
@@ -517,50 +614,54 @@ class MainActivity : Activity() {
         clockBlock.visibility = if (shown) View.VISIBLE else View.GONE
     }
 
-    private fun showHomeMenu() {
+    private fun openSettings() = startActivity(Intent(this, SettingsActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+
+    private fun showAppInfo(pkg: String) {
+        runCatching { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$pkg")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+    }
+
+    /** The menu for long-pressing empty home space, in the order Android's own launchers use. */
+    private fun showHomeMenu(x: Float, y: Float) {
         val clockShown = clockBlock.visibility == View.VISIBLE
-        val items = arrayOf("Add widget", if (clockShown) "Remove clock" else "Add clock", "Change wallpaper", "Reset dock", "Settings")
-        AlertDialog.Builder(this).setItems(items) { _, which ->
-            when (which) {
-                0 -> widgets.pick()
-                1 -> setClockShown(!clockShown)
-                2 -> changeWallpaper()
-                3 -> { prefs.edit().remove("dock").apply(); rebuildDock() }
-                4 -> startActivity(Intent(this, SettingsActivity::class.java))
-            }
-        }.show()
+        val groups = mutableListOf(
+            listOf(
+                MenuItem(R.drawable.ic_menu_wallpaper, "Wallpaper & style") { changeWallpaper() },
+                MenuItem(R.drawable.ic_menu_widgets, "Widgets") { currentPage().widgets.pick() },
+                MenuItem(R.drawable.ic_menu_apps, "Apps list") { openDrawer() },
+                MenuItem(R.drawable.ic_menu_clock, if (clockShown) "Remove clock" else "Add clock") { setClockShown(!clockShown) },
+            ),
+            buildList {
+                if (pages.size < MAX_PAGES) add(MenuItem(R.drawable.ic_menu_page_add, "Add page") { addPage() })
+                if (pages.size > 1) add(MenuItem(R.drawable.ic_menu_delete, "Remove this page", destructive = true) { removeCurrentPage() })
+            },
+            listOf(
+                MenuItem(R.drawable.ic_menu_home, "Reset dock") { prefs.edit().remove("dock").apply(); rebuildDock() },
+                MenuItem(R.drawable.ic_kind_setting, "Home settings") { openSettings() },
+            ),
+        )
+        overlays.popup(x, y, y, groups.filter { it.isNotEmpty() })
     }
 
     /** The system wallpaper apps are offered, but the simplest path is a plain photo picker that sets the wallpaper directly. */
     private fun changeWallpaper() {
-        AlertDialog.Builder(this).setTitle("Wallpaper")
-            .setItems(arrayOf("Choose a photo", "Wallpaper & style", "Live wallpapers", "Use default wallpaper")) { _, which ->
-                try {
-                    when (which) {
-                        0 -> startActivityForResult(Intent(Intent.ACTION_GET_CONTENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE), REQ_PHOTO)
-                        1 -> startActivity(Intent(Intent.ACTION_SET_WALLPAPER).setPackage("com.android.wallpaper"))
-                        2 -> startActivity(Intent(android.app.WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER))
-                        3 -> io.execute { runCatching { android.app.WallpaperManager.getInstance(this).clear(android.app.WallpaperManager.FLAG_SYSTEM or android.app.WallpaperManager.FLAG_LOCK) } }
-                    }
-                } catch (e: Exception) {
-                    Toast.makeText(this, "That option isn't available on this phone", Toast.LENGTH_SHORT).show()
-                }
-            }.show()
+        fun tryStart(block: () -> Unit) = try { block() } catch (e: Exception) { Toast.makeText(this, "That option isn't available on this phone", Toast.LENGTH_SHORT).show() }
+        overlays.listSheet("Wallpaper", listOf(
+            MenuItem(R.drawable.ic_menu_wallpaper, "Choose a photo") { tryStart { startActivityForResult(Intent(Intent.ACTION_GET_CONTENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE), REQ_PHOTO) } },
+            MenuItem(R.drawable.ic_menu_wallpaper, "Wallpaper & style") { tryStart { startActivity(Intent(Intent.ACTION_SET_WALLPAPER).setPackage("com.android.wallpaper")) } },
+            MenuItem(R.drawable.ic_menu_apps, "Live wallpapers") { tryStart { startActivity(Intent(android.app.WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)) } },
+            MenuItem(R.drawable.ic_menu_home, "Use default wallpaper") { io.execute { runCatching { android.app.WallpaperManager.getInstance(this).clear(android.app.WallpaperManager.FLAG_SYSTEM or android.app.WallpaperManager.FLAG_LOCK) } } },
+        ))
     }
 
     /** Home screen, lock screen, or both: they are separate wallpapers on Android, and setting one leaves the other alone. */
     private fun chooseWallpaperTarget(uri: Uri) {
-        AlertDialog.Builder(this).setTitle("Set wallpaper on")
-            .setItems(arrayOf("Home and lock screen", "Home screen", "Lock screen")) { _, which ->
-                setWallpaperFrom(uri, when (which) {
-                    1 -> android.app.WallpaperManager.FLAG_SYSTEM
-                    2 -> android.app.WallpaperManager.FLAG_LOCK
-                    else -> android.app.WallpaperManager.FLAG_SYSTEM or android.app.WallpaperManager.FLAG_LOCK
-                })
-            }.setNegativeButton("Cancel", null).show()
+        overlays.listSheet("Set wallpaper on", listOf(
+            MenuItem(R.drawable.ic_menu_home, "Home and lock screen") { setWallpaperFrom(uri, android.app.WallpaperManager.FLAG_SYSTEM or android.app.WallpaperManager.FLAG_LOCK) },
+            MenuItem(R.drawable.ic_menu_apps, "Home screen") { setWallpaperFrom(uri, android.app.WallpaperManager.FLAG_SYSTEM) },
+            MenuItem(R.drawable.ic_menu_wallpaper, "Lock screen") { setWallpaperFrom(uri, android.app.WallpaperManager.FLAG_LOCK) },
+        ))
     }
 
-    /** Crops the chosen photo to the screen's shape (centered) and sets it as the wallpaper for [which] (home, lock, or both). */
     private fun setWallpaperFrom(uri: Uri, which: Int = android.app.WallpaperManager.FLAG_SYSTEM or android.app.WallpaperManager.FLAG_LOCK) {
         io.execute {
             val msg = runCatching {
@@ -594,8 +695,8 @@ class MainActivity : Activity() {
             selector = android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)
             clipToPadding = false
             setPadding(dp(8), dp(8), dp(8), dp(24))
-            setOnItemClickListener { _, _, position, _ -> open(apps.getItem(position)) }
-            setOnItemLongClickListener { _, _, position, _ -> appMenu(apps.getItem(position)); true }
+            setOnItemClickListener { _, view, position, _ -> open(apps.getItem(position), view) }
+            setOnItemLongClickListener { _, view, position, _ -> appMenu(apps.getItem(position), view); true }
         }
         banner = TextView(this@MainActivity).apply {
             text = "Turn on message, calendar and file search  ›"
@@ -612,7 +713,7 @@ class MainActivity : Activity() {
 
         // Pull down to close, but only when the app grid is scrolled to the top.
         canStart = { !grid.canScrollVertically(-1) }
-        onDrag = { dy -> drawer.translationY = dy.coerceIn(0f, screenH) }
+        onDrag = { dy -> drawer.translationY = dy.coerceIn(0f, screenH); applyDrawerProgress() }
         onRelease = { vy, dragged ->
             if (dragged) {
                 if (vy > 800f || drawer.translationY > screenH * 0.3f) closeDrawer(clear = false) else openDrawer()
@@ -620,18 +721,27 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun appMenu(item: Item) {
-        val pkg = ComponentName.unflattenFromString(item.key)?.packageName ?: return
-        AlertDialog.Builder(this).setTitle(item.title)
-            .setItems(arrayOf("App info", "Uninstall", "Add to dock")) { _, which ->
-                when (which) {
-                    0 -> runCatching { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$pkg"))) }
-                    1 -> runCatching { startActivity(Intent(Intent.ACTION_DELETE, Uri.parse("package:$pkg"))) }
-                    2 -> AlertDialog.Builder(this).setTitle("Add ${item.title} to")
-                        .setItems(Array(DOCK_SLOTS) { "Dock slot ${it + 1}" }) { _, slot -> setDock(slot, item.key) }.show()
-                }
-            }.show()
+    private fun appMenu(item: Item, anchor: View) {
+        val cn = ComponentName.unflattenFromString(item.key) ?: return
+        val pkg = cn.packageName
+        overlays.popupFor(anchor, listOf(listOf(
+            MenuItem(R.drawable.ic_menu_info, "App info") { showAppInfo(pkg) },
+            MenuItem(R.drawable.ic_menu_add, "Add to home") { currentPage().addShortcut(item.key); closeDrawer(clear = true); Toast.makeText(this, "${item.title} added to home", Toast.LENGTH_SHORT).show() },
+            MenuItem(R.drawable.ic_menu_apps, "Add to dock") {
+                overlays.listSheet("Add ${item.title} to the dock", List(DOCK_SLOTS) { slot -> MenuItem(R.drawable.ic_menu_add, "Dock slot ${slot + 1}") { setDock(slot, item.key) } })
+            },
+            MenuItem(R.drawable.ic_menu_delete, "Uninstall", destructive = true) { runCatching { startActivity(Intent(Intent.ACTION_DELETE, Uri.parse("package:$pkg"))) } },
+        )))
     }
+
+    /** Launches an app from an icon the user touched, growing the app's window out of that icon. */
+    private fun launchIntent(intent: Intent, from: View) {
+        val options = ActivityOptions.makeScaleUpAnimation(from, 0, 0, from.width, from.height).toBundle()
+        runCatching { startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), options) }
+    }
+
+    private fun launchComponent(cn: ComponentName, from: View) =
+        launchIntent(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(cn), from)
 
     // ---------------------------------------------------------------- lifecycle
 
@@ -644,12 +754,13 @@ class MainActivity : Activity() {
             addDataScheme("package")
         }
         registerReceiver(packageReceiver, filter)
-        widgets.start()
+        widgetHost.startListening()
     }
 
     override fun onStop() {
         unregisterReceiver(packageReceiver)
-        widgets.stop()
+        overlays.dismissAll()
+        runCatching { widgetHost.stopListening() }
         voice.release()
         super.onStop()
     }
@@ -678,7 +789,7 @@ class MainActivity : Activity() {
         // The user may have chosen, downloaded or removed a voice model in Settings.
         if (voiceFile != models.whisper || (voice is VoiceInput && models.whisper.exists())) { voice.release(); voice = buildVoice() }
         // First run: the setup tour asks for permissions itself, with reasons.
-        if (SetupActivity.needed(this)) startActivity(Intent(this, SetupActivity::class.java)) else requestAccessOnce()
+        if (SetupActivity.needed(this)) startActivity(Intent(this, SetupActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) else requestAccessOnce()
         refreshIndex(heavy = false)
         search()
         updateBanner()
@@ -707,7 +818,7 @@ class MainActivity : Activity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        // Home pressed while already home: back to the plain home screen.
+        // Home pressed while already home: back to the plain home screen, menus closed and the first page showing.
         resetUi()
         consumeDebugExtras(intent)
     }
@@ -715,10 +826,12 @@ class MainActivity : Activity() {
     @Deprecated("Launcher: back never leaves home")
     override fun onBackPressed() {
         when {
+            overlays.isShowing -> overlays.dismissAll()
             card.visibility == View.VISIBLE -> hideAnswer()
             input.text.isNotEmpty() -> input.setText("")
             input.hasFocus() -> { hideKeyboard(); input.clearFocus() }
             drawerOpen -> closeDrawer(clear = true)
+            pager.currentItem != 0 -> pager.setCurrentItem(0, true)
         }
     }
 
@@ -728,7 +841,7 @@ class MainActivity : Activity() {
             if (resultCode == RESULT_OK) data?.data?.let { chooseWallpaperTarget(it) }
             return
         }
-        if (!widgets.onActivityResult(requestCode, resultCode, data)) super.onActivityResult(requestCode, resultCode, data)
+        if (!HomeWidgets.dispatch(requestCode, resultCode, data)) super.onActivityResult(requestCode, resultCode, data)
     }
 
     // ---------------------------------------------------------------- home <-> drawer
@@ -742,13 +855,28 @@ class MainActivity : Activity() {
         )
     }
 
+    /** As the drawer rises the home screen behind it eases back and fades, as in Launcher3. */
+    private fun applyDrawerProgress() {
+        val p = (1f - drawer.translationY / screenH).coerceIn(0f, 1f)
+        homeContent.scaleX = 1f - 0.03f * p
+        homeContent.scaleY = 1f - 0.03f * p
+        homeContent.alpha = 1f - 0.85f * p
+    }
+
+    private fun animateDrawer(to: Float, durationMs: Long, end: () -> Unit) {
+        ObjectAnimator.ofFloat(drawer, View.TRANSLATION_Y, drawer.translationY, to).apply {
+            duration = durationMs
+            interpolator = DecelerateInterpolator(1.7f)
+            addUpdateListener { applyDrawerProgress() }
+            addListener(object : android.animation.AnimatorListenerAdapter() { override fun onAnimationEnd(a: android.animation.Animator) = end() })
+        }.start()
+    }
+
     private fun openDrawer() {
         drawerOpen = true
         updateBars(true)
         drawer.visibility = View.VISIBLE
-        drawer.animate().translationY(0f).setDuration(200).setInterpolator(DecelerateInterpolator())
-            .withEndAction { if (drawerOpen) home.visibility = View.INVISIBLE } // nothing ghosts through the drawer
-            .start()
+        animateDrawer(0f, 420) { if (drawerOpen) home.visibility = View.INVISIBLE } // nothing ghosts through the drawer
     }
 
     private fun closeDrawer(clear: Boolean) {
@@ -757,12 +885,13 @@ class MainActivity : Activity() {
         home.visibility = View.VISIBLE
         hideKeyboard()
         if (clear) input.setText("")
-        drawer.animate().translationY(screenH).setDuration(180).setInterpolator(DecelerateInterpolator())
-            .withEndAction { drawer.visibility = View.INVISIBLE }.start()
+        animateDrawer(screenH, 300) { if (!drawerOpen) { drawer.visibility = View.INVISIBLE; applyDrawerProgress() } }
     }
 
     /** Back to a clean home screen: no query, no answer, drawer shut, keyboard away. */
     private fun resetUi() {
+        overlays.dismissAll()
+        if (::pager.isInitialized && pager.currentItem != 0) pager.setCurrentItem(0, true)
         input.setText("")
         input.clearFocus()
         hideAnswer()
@@ -1108,7 +1237,7 @@ class MainActivity : Activity() {
 
     // ---------------------------------------------------------------- opening results
 
-    private fun open(item: Item) {
+    private fun open(item: Item, from: View? = null) {
         val intent = when (item.kind) {
             "app" -> Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
                 .setComponent(ComponentName.unflattenFromString(item.key))
@@ -1126,7 +1255,8 @@ class MainActivity : Activity() {
             else -> return
         }
         try {
-            startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            val options = from?.let { ActivityOptions.makeScaleUpAnimation(it, 0, 0, it.width, it.height).toBundle() }
+            startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), options)
             resetUi()
         } catch (e: Exception) {
             Log.w(TAG, "cannot open ${item.kind} ${item.title}: $e") // e.g. an app uninstalled since indexing
@@ -1349,6 +1479,8 @@ class MainActivity : Activity() {
 
     private companion object {
         const val TAG = "nanosearch"
+        const val DOCK_EMPTY = "-"
+        const val MAX_PAGES = 6
         const val PARSE_DEBOUNCE_MS = 450L
         const val SEMANTIC_DEBOUNCE_MS = 550L
         const val HEAVY_REFRESH_MS = 10 * 60_000L

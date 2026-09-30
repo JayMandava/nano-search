@@ -15,7 +15,7 @@ class Palette private constructor(
     val bar: Int, val dock: Int,
     /** The results panel and the drawer cover the wallpaper almost completely. */
     val panel: Int, val drawer: Int,
-    val card: Int, val container: Int, val outline: Int,
+    val card: Int, val container: Int, val outline: Int, val error: Int, val scrim: Int,
 ) {
     companion object {
         private fun withAlpha(c: Color, a: Float) = c.copy(alpha = a).toArgb()
@@ -31,6 +31,7 @@ class Palette private constructor(
                 bar = withAlpha(s.surfaceContainerHigh, 0.92f), dock = withAlpha(s.surfaceContainer, 0.78f),
                 panel = withAlpha(s.surface, 0.97f), drawer = withAlpha(s.surface, 0.96f),
                 card = s.surfaceContainerHigh.toArgb(), container = s.surfaceContainerHighest.toArgb(), outline = withAlpha(s.onSurface, 0.12f),
+                error = s.error.toArgb(), scrim = withAlpha(s.scrim, 0.45f),
             )
         }
     }
