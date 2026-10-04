@@ -136,7 +136,7 @@ class WallpaperScreen(
             addView(thumbColumn(lockImg, lockCaption, colW, thumbH), LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(12) })
         }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
 
-        // The lock screen follows the home wallpaper unless it has one of its own. Turning this off asks for a lock photo; turning it on drops that photo.
+        // The lock screen follows the home wallpaper unless it has one of its own. Turning this off gives it its own copy (tap the lock preview to choose another photo); turning it on drops that copy.
         var programmatic = false
         val sameSwitch = Switch(activity).apply {
             text = "Same wallpaper on the lock screen"
@@ -147,9 +147,20 @@ class WallpaperScreen(
             setOnCheckedChangeListener { v, on ->
                 if (programmatic) return@setOnCheckedChangeListener
                 if (!on) {
-                    programmatic = true; (v as Switch).isChecked = true; programmatic = false // it only really turns off once a lock photo is set
-                    pendingTarget = Target.LOCK
-                    pickPhoto()
+                    io.execute {
+                        val copied = runCatching { copyHomeToLock() }.onFailure { Log.w(TAG, "cannot copy the home wallpaper: $it") }.getOrDefault(false)
+                        activity.runOnUiThread {
+                            if (layer == null) return@runOnUiThread
+                            if (copied) showOverview()
+                            else {
+                                // a live wallpaper has no image to copy: the switch stays on and the lock screen needs a photo
+                                programmatic = true; (v as Switch).isChecked = true; programmatic = false
+                                Toast.makeText(activity, "Choose a photo for the lock screen", Toast.LENGTH_SHORT).show()
+                                pendingTarget = Target.LOCK
+                                pickPhoto()
+                            }
+                        }
+                    }
                 } else {
                     io.execute { runCatching { wm.clear(WallpaperManager.FLAG_LOCK) } }
                     activity.runOnUiThread { showOverview() }
@@ -335,6 +346,24 @@ class WallpaperScreen(
                     wm.setBitmap(cut(lockRegion, screenW, screenH), null, true, WallpaperManager.FLAG_LOCK)
                 }
         }
+    }
+
+    /** Makes the lock screen independent by giving it a copy of what the home wallpaper shows (its middle, in the screen's shape). False if home has no image, as with a live wallpaper. */
+    private fun copyHomeToLock(): Boolean {
+        val pfd = wm.getWallpaperFile(WallpaperManager.FLAG_SYSTEM) ?: return false
+        val bmp = pfd.use { f ->
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFileDescriptor(f.fileDescriptor, null, bounds)
+            var sample = 1
+            while (max(bounds.outWidth, bounds.outHeight) / sample > 3200) sample *= 2
+            BitmapFactory.decodeFileDescriptor(f.fileDescriptor, null, BitmapFactory.Options().apply { inSampleSize = sample })
+        } ?: return false
+        val ratio = screenW.toFloat() / screenH
+        val w = min(bmp.width, (bmp.height * ratio).roundToInt())
+        val h = min(bmp.height, (bmp.width / ratio).roundToInt())
+        val cut = Bitmap.createBitmap(bmp, (bmp.width - w) / 2, (bmp.height - h) / 2, w, h)
+        wm.setBitmap(Bitmap.createScaledBitmap(cut, screenW, screenH, true), null, true, WallpaperManager.FLAG_LOCK)
+        return true
     }
 
     /** Decodes the photo at a size that is plenty for the screen, upright according to its EXIF orientation. */
