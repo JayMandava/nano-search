@@ -13,6 +13,8 @@ import android.app.Activity
 import android.app.ActivityOptions
 import android.appwidget.AppWidgetHost
 import android.content.BroadcastReceiver
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -24,10 +26,12 @@ import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.provider.CalendarContract
 import android.provider.ContactsContract
 import android.provider.MediaStore
@@ -39,6 +43,7 @@ import android.util.LruCache
 import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
@@ -100,7 +105,8 @@ class MainActivity : Activity() {
     // answer card
     private lateinit var card: LinearLayout
     private lateinit var cardProgress: ProgressBar
-    private lateinit var cardText: TextView
+    private lateinit var thread: LinearLayout
+    private lateinit var wallpaperScreen: WallpaperScreen
     private lateinit var cardPulse: TextView
     private lateinit var cardScroll: ScrollView
     private lateinit var pulse: ObjectAnimator
@@ -126,6 +132,16 @@ class MainActivity : Activity() {
     private var searchSeq = 0
     private var parseSeq = 0
     private var askSeq = 0
+
+    /** The open chat: while it is open every message continues it, until the user closes it with the card's ✕ or back. */
+    private class ChatTurn(val q: String, var a: String = "")
+    private val chat = ArrayList<ChatTurn>()
+    private var chatOpen = false
+
+    /** True from the moment a question is sent until its answer is finished, stopped or abandoned; while it is, Enter is ignored and the mic button is Stop. */
+    private var busy = false
+    private var stopSeq = -1
+    private var micPhase = 0
     private var action = "search" // what tapping a contact does; set by the model's reading of the query
     private var lastParse: Pair<String, Parsed?>? = null
 
@@ -157,6 +173,13 @@ class MainActivity : Activity() {
 
         overlayHost = FrameLayout(this)
         overlays = Overlays(this, overlayHost, pal)
+        wallpaperScreen = WallpaperScreen(
+            this, overlayHost, pal,
+            pageCount = { pageIds().size },
+            pickPhoto = { tryStart { startActivityForResult(Intent(Intent.ACTION_GET_CONTENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE), REQ_PHOTO) } },
+            openSystemApp = { tryStart { startActivity(Intent(Intent.ACTION_SET_WALLPAPER).setPackage("com.android.wallpaper")) } },
+            openLive = { tryStart { startActivity(Intent(android.app.WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)) } },
+        )
         home = buildHome()
         drawer = buildDrawer()
         drawer.translationY = screenH
@@ -200,6 +223,7 @@ class MainActivity : Activity() {
             }
             i.removeExtra("wallpaper_uri"); i.removeExtra("wallpaper_which"); setWallpaperFrom(Uri.parse(it), which)
         }
+        i.getStringExtra("wallpaper_crop")?.let { i.removeExtra("wallpaper_crop"); wallpaperScreen.startCrop(Uri.parse(it)) }
         if (i.hasExtra("wallpaper_backup")) { i.removeExtra("wallpaper_backup"); backupWallpapers() }
         if (i.hasExtra("wallpaper_restore")) { i.removeExtra("wallpaper_restore"); restoreWallpapers() }
         i.getStringExtra("whisper_wav")?.let { i.removeExtra("whisper_wav"); transcribeWav(it) }
@@ -222,6 +246,7 @@ class MainActivity : Activity() {
 
     private fun restoreWallpapers() = io.execute {
         val wm = android.app.WallpaperManager.getInstance(this)
+        runCatching { wm.suggestDesiredDimensions(resources.displayMetrics.widthPixels, resources.displayMetrics.heightPixels) } // a wide test wallpaper may have changed it
         val home = File(filesDir, "wallpaper_backup_home")
         val lock = File(filesDir, "wallpaper_backup_lock")
         val both = android.app.WallpaperManager.FLAG_SYSTEM or android.app.WallpaperManager.FLAG_LOCK
@@ -300,7 +325,7 @@ class MainActivity : Activity() {
             background = round(pal.bar, 28)
             imageTintList = android.content.res.ColorStateList.valueOf(pal.onVariant)
             contentDescription = "Voice search"
-            setOnClickListener { toggleVoice() }
+            setOnClickListener { if (busy) stopAnswer() else toggleVoice() }
         }
         micPulse = ObjectAnimator.ofFloat(mic, "alpha", 0.35f, 1f).apply {
             duration = 600
@@ -351,11 +376,7 @@ class MainActivity : Activity() {
             isIndeterminate = true
             indeterminateTintList = android.content.res.ColorStateList.valueOf(pal.primary)
         }
-        cardText = TextView(this).apply {
-            setTextColor(pal.onSurface)
-            textSize = 17f
-            setLineSpacing(0f, 1.2f)
-        }
+        thread = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         cardPulse = TextView(this).apply {
             text = "✦"
             textSize = 22f
@@ -370,15 +391,16 @@ class MainActivity : Activity() {
         }
         cardScroll = MaxHeightScrollView(this, (screenH * 0.45f).toInt()).apply {
             visibility = View.GONE
+            isFocusable = false // typing must stay in the search bar
             setPadding(dp(20), dp(16), dp(52), dp(16)) // right padding keeps text clear of the close button
-            addView(cardText)
+            addView(thread)
         }
         val close = TextView(this).apply {
             text = "✕"
             setTextColor(pal.onVariant)
             textSize = 16f
             gravity = Gravity.CENTER
-            setOnClickListener { hideAnswer() }
+            setOnClickListener { endChat() }
         }
         val body = FrameLayout(this).apply {
             addView(LinearLayout(this@MainActivity).apply {
@@ -424,7 +446,7 @@ class MainActivity : Activity() {
         pager = ViewPager(this@MainActivity).apply {
             setPageTransformer(false) { page, pos -> page.alpha = 1f - kotlin.math.min(kotlin.math.abs(pos), 1f) * 0.5f }
             addOnPageChangeListener(object : ViewPager.SimpleOnPageChangeListener() {
-                override fun onPageScrolled(position: Int, positionOffset: Float, positionOffsetPixels: Int) = dots.setPosition(position + positionOffset)
+                override fun onPageScrolled(position: Int, positionOffset: Float, positionOffsetPixels: Int) { dots.setPosition(position + positionOffset); slideWallpaper(position + positionOffset) }
             })
         }
         dots = PageDots(this@MainActivity, Color.WHITE)
@@ -469,6 +491,20 @@ class MainActivity : Activity() {
                 if (vy < -800f || drawer.translationY < screenH * 0.65f) openDrawer() else closeDrawer(clear = false)
             }
         }
+
+        // Swipe down pulls the notification panel, unless something on screen is using the gesture.
+        canPullDown = { !searchActive && !drawerOpen && !overlays.isShowing && !currentPage().scroll.canScrollVertically(-1) }
+        onPullDown = { expandNotifications() }
+    }
+
+    /** The system has no public call for this; the hidden one needs the EXPAND_STATUS_BAR permission, which the manifest declares. */
+    private fun expandNotifications() {
+        try {
+            val bar = getSystemService("statusbar") ?: return
+            bar.javaClass.getMethod("expandNotificationsPanel").invoke(bar)
+        } catch (e: Exception) {
+            Log.w(TAG, "cannot open the notification panel: $e")
+        }
     }
 
     // ---- home pages
@@ -499,6 +535,17 @@ class MainActivity : Activity() {
         dots.setCount(pages.size)
         pager.setCurrentItem(showIndex.coerceIn(0, pages.size - 1), false)
         dots.setPosition(pager.currentItem.toFloat())
+        slideWallpaper(pager.currentItem.toFloat())
+    }
+
+    /** A wallpaper wider than the screen slides as the home pages are swiped; one page, or a wallpaper the width of the screen, stays put. */
+    private fun slideWallpaper(page: Float) {
+        val n = pageIds().size
+        runCatching {
+            val wm = android.app.WallpaperManager.getInstance(this)
+            wm.setWallpaperOffsetSteps(if (n > 1) 1f / (n - 1) else 1f, 1f)
+            wm.setWallpaperOffsets(pager.windowToken ?: return, if (n > 1) (page / (n - 1)).coerceIn(0f, 1f) else 0.5f, 0.5f)
+        }
     }
 
     private fun addPage() {
@@ -644,25 +691,10 @@ class MainActivity : Activity() {
         overlays.popup(x, y, y, groups.filter { it.isNotEmpty() })
     }
 
-    /** The system wallpaper apps are offered, but the simplest path is a plain photo picker that sets the wallpaper directly. */
-    private fun changeWallpaper() {
-        fun tryStart(block: () -> Unit) = try { block() } catch (e: Exception) { Toast.makeText(this, "That option isn't available on this phone", Toast.LENGTH_SHORT).show() }
-        overlays.listSheet("Wallpaper", listOf(
-            MenuItem(R.drawable.ic_menu_wallpaper, "Choose a photo") { tryStart { startActivityForResult(Intent(Intent.ACTION_GET_CONTENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE), REQ_PHOTO) } },
-            MenuItem(R.drawable.ic_menu_wallpaper, "Wallpaper & style") { tryStart { startActivity(Intent(Intent.ACTION_SET_WALLPAPER).setPackage("com.android.wallpaper")) } },
-            MenuItem(R.drawable.ic_menu_apps, "Live wallpapers") { tryStart { startActivity(Intent(android.app.WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)) } },
-            MenuItem(R.drawable.ic_menu_home, "Use default wallpaper") { io.execute { runCatching { android.app.WallpaperManager.getInstance(this).clear(android.app.WallpaperManager.FLAG_SYSTEM or android.app.WallpaperManager.FLAG_LOCK) } } },
-        ))
-    }
+    private fun tryStart(block: () -> Unit) = try { block() } catch (e: Exception) { Toast.makeText(this, "That option isn't available on this phone", Toast.LENGTH_SHORT).show() }
 
-    /** Home screen, lock screen, or both: they are separate wallpapers on Android, and setting one leaves the other alone. */
-    private fun chooseWallpaperTarget(uri: Uri) {
-        overlays.listSheet("Set wallpaper on", listOf(
-            MenuItem(R.drawable.ic_menu_home, "Home and lock screen") { setWallpaperFrom(uri, android.app.WallpaperManager.FLAG_SYSTEM or android.app.WallpaperManager.FLAG_LOCK) },
-            MenuItem(R.drawable.ic_menu_apps, "Home screen") { setWallpaperFrom(uri, android.app.WallpaperManager.FLAG_SYSTEM) },
-            MenuItem(R.drawable.ic_menu_wallpaper, "Lock screen") { setWallpaperFrom(uri, android.app.WallpaperManager.FLAG_LOCK) },
-        ))
-    }
+    /** The wallpaper screen: what is set now, the ways to change it, and a crop step for photos. */
+    private fun changeWallpaper() = wallpaperScreen.show()
 
     private fun setWallpaperFrom(uri: Uri, which: Int = android.app.WallpaperManager.FLAG_SYSTEM or android.app.WallpaperManager.FLAG_LOCK) {
         io.execute {
@@ -820,7 +852,8 @@ class MainActivity : Activity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        // Home pressed while already home: back to the plain home screen, menus closed and the first page showing.
+        // Home pressed (from this screen or from another app): the chat is over, and the screen goes back to plain home with menus closed and the first page showing.
+        if (chatOpen) endChat()
         resetUi()
         consumeDebugExtras(intent)
     }
@@ -828,8 +861,9 @@ class MainActivity : Activity() {
     @Deprecated("Launcher: back never leaves home")
     override fun onBackPressed() {
         when {
+            wallpaperScreen.isShowing -> wallpaperScreen.back()
             overlays.isShowing -> overlays.dismissAll()
-            card.visibility == View.VISIBLE -> hideAnswer()
+            card.visibility == View.VISIBLE -> endChat()
             input.text.isNotEmpty() -> input.setText("")
             input.hasFocus() -> { hideKeyboard(); input.clearFocus() }
             drawerOpen -> closeDrawer(clear = true)
@@ -840,7 +874,7 @@ class MainActivity : Activity() {
     @Deprecated("Widget picker/configure results")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (requestCode == REQ_PHOTO) {
-            if (resultCode == RESULT_OK) data?.data?.let { chooseWallpaperTarget(it) }
+            if (resultCode == RESULT_OK) data?.data?.let { wallpaperScreen.startCrop(it) }
             return
         }
         if (!HomeWidgets.dispatch(requestCode, resultCode, data)) super.onActivityResult(requestCode, resultCode, data)
@@ -893,6 +927,7 @@ class MainActivity : Activity() {
     /** Back to a clean home screen: no query, no answer, drawer shut, keyboard away. */
     private fun resetUi() {
         overlays.dismissAll()
+        wallpaperScreen.dismiss()
         if (::pager.isInitialized && pager.currentItem != 0) pager.setCurrentItem(0, true)
         input.setText("")
         input.clearFocus()
@@ -912,9 +947,9 @@ class MainActivity : Activity() {
         parseSeq++
         hideAnswer()
         val q = input.text.toString()
-        setSearchActive(q.isNotBlank())
+        setSearchActive(q.isNotBlank() || chatOpen)
         // Photo requests ("photos from Goa last September") are understood by rules and answered instantly; a model would only blur them.
-        if (q.isNotBlank() && looksNatural(q) && parser.available && PhotoQuery.parse(q) == null) ui.postDelayed(parseRunnable, PARSE_DEBOUNCE_MS)
+        if (q.isNotBlank() && looksNatural(q) && parser.available && PhotoQuery.parse(q) == null && !isFollowUp(q)) ui.postDelayed(parseRunnable, PARSE_DEBOUNCE_MS)
         search()
     }
 
@@ -961,7 +996,7 @@ class MainActivity : Activity() {
             val found = if (query.isBlank()) emptyList() else index.search(query, limit = 60, semantic = semantic)
             ui.post {
                 if (seq != searchSeq) return@post
-                if (drawerApps != null) apps.set(drawerApps) else results.set(withAsk(query, found))
+                if (drawerApps != null) { apps.set(drawerApps); results.set(emptyList()) } else results.set(withAsk(query, found))
             }
         }
     }
@@ -1001,32 +1036,59 @@ class MainActivity : Activity() {
 
     // ---------------------------------------------------------------- enter: act or answer
 
+    /** In an open chat everything typed is a message, except commands ("call mom"), which act as usual. */
+    private fun inChat(q: String) = chatOpen && answerer.available && q.trim().substringBefore(' ').lowercase() !in VERBS
+
+    private fun isFollowUp(q: String) = inChat(q)
+
+    private var lastSubmit = "" to 0L
+
     private fun submit() {
         val q = input.text.toString().trim()
         if (q.isEmpty()) return
+        // One answer at a time: the next question waits until this one is finished (or stopped with the mic button).
+        if (busy) { input.performHapticFeedback(HapticFeedbackConstants.REJECT); return }
+        // One press of Enter can arrive twice (as an editor action and as a key event); the second would cancel the first answer.
+        val now = SystemClock.elapsedRealtime()
+        if (lastSubmit.first == q && now - lastSubmit.second < 600) return
+        lastSubmit = q to now
         // "photos from Goa": answered instantly from the photo index, so there is nothing for a model to do.
         if (PhotoQuery.parse(q) != null && (results.firstResult()?.kind == "photo" || results.firstResult()?.kind == "phototext")) { hideKeyboard(); return }
         val natural = looksNatural(q)
         val question = looksLikeQuestion(q)
         val canParse = parser.available
 
-        // A plain name: no model needed, just open the best match.
+        val chatTurn = inChat(q)
+
+        // A plain name: no model needed, just open the best match. In a chat only an exact name does, so "and Pune" stays a message.
         if (!natural && !question) {
             val top = results.firstResult()
-            if (top != null) { open(top); return }
+            if (top != null && (!chatTurn || top.title.equals(q, ignoreCase = true))) { open(top); return }
         }
         if (!answerer.available && !canParse) return
 
         val seq = ++askSeq
+        busy = true
+        stopSeq = -1
+        updateBusyUi()
+        if (chatTurn) {
+            chat.add(ChatTurn(q))
+            input.setText("") // like any chat: the message moves into the thread and the bar is ready for the next one
+            showWorking(hideKb = false) // and the keyboard stays up
+            input.requestFocus()
+            (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).restartInput(input) // the keyboard keeps typing into the cleared bar
+            llm.execute { try { answerWith(q, emptyList(), seq, followUp = true) } finally { finishAsk(seq) } }
+            return
+        }
         showWorking()
-        llm.execute {
+        llm.execute { try {
             var parsed: Parsed? = null
             if (!question && canParse) {
                 parsed = lastParse?.takeIf { it.first == q }?.second ?: parser.parse(q).parsed
                 Services.parserUsed()
             }
             val found = if (parsed != null && parsed.text.isNotBlank()) index.search(parsed.text, kinds = kindsFor(parsed.kind)) else retrieve(q)
-            if (seq != askSeq) return@execute
+            if (seq != askSeq || stopSeq == seq) return@execute
             val act = parsed?.action
             if (parsed != null && found.isNotEmpty() && (act == "open" || act == "call" || act == "message")) {
                 ui.post { action = act!!; hideAnswer(); open(found.first()) }
@@ -1041,7 +1103,7 @@ class MainActivity : Activity() {
                 return@execute
             }
             answerWith(q, found, seq)
-        }
+        } finally { finishAsk(seq) } }
     }
 
     /** Whole-query match first; otherwise pool matches for each meaningful word. */
@@ -1055,15 +1117,17 @@ class MainActivity : Activity() {
         return pooled.values.take(8)
     }
 
-    private fun answerWith(question: String, found: List<Item>, seq: Int) {
+    private fun answerWith(question: String, found: List<Item>, seq: Int, followUp: Boolean = false) {
+        if (stopSeq == seq) return
+        if (!followUp) ui.post { if (seq == askSeq) beginChat(question) }
         Services.answererBusy()
         if (!MemoryPolicy.keepBoth) parser.unload() // memory budget: on phones without RAM to spare the two models are never resident together
         val shown = StringBuilder()
         val t0 = System.nanoTime()
-        val out = answerer.answer(question, found) { piece ->
+        val out = answerer.answer(question, found, followUp) { piece ->
             shown.append(piece)
             ui.post { if (seq == askSeq) showAnswerText(Answerer.clean(shown.toString())) }
-            seq == askSeq
+            seq == askSeq && stopSeq != seq
         }
         Log.i(TAG, "answer '$question' in ${(System.nanoTime() - t0) / 1_000_000}ms ${answerer.stats()}")
         Services.answererUsed()
@@ -1074,30 +1138,143 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun showWorking() {
-        cardPulse.visibility = View.VISIBLE
-        pulse.start()
-        cardScroll.visibility = View.GONE
-        cardText.text = ""
+    private fun showWorking(hideKb: Boolean = true) {
+        val history = chatOpen && chat.size > 1
+        cardPulse.visibility = if (history) View.GONE else View.VISIBLE
+        if (history) pulse.cancel() else pulse.start()
+        cardScroll.visibility = if (history) View.VISIBLE else View.GONE
+        if (history) renderChat() else if (!chatOpen) thread.removeAllViews()
         cardProgress.visibility = View.VISIBLE
         card.visibility = View.VISIBLE
         divider.visibility = View.VISIBLE
         setSearchActive(true)
-        hideKeyboard()
+        if (hideKb) hideKeyboard()
     }
 
     private fun showAnswerText(text: String) {
         cardPulse.visibility = View.GONE
         pulse.cancel()
         cardScroll.visibility = View.VISIBLE
-        cardText.text = text
+        if (chatOpen && chat.isNotEmpty()) { chat.last().a = text; renderChat() }
     }
 
+    /** The first answer opens a chat: the question moves into the thread and the bar is cleared for the next message. */
+    private fun beginChat(question: String) {
+        chat.clear()
+        chat.add(ChatTurn(question))
+        chatOpen = true
+        refreshHint()
+        input.setText("")
+    }
+
+    /** The thread: each question in a dimmer bold line, its answer under it, newest at the bottom. Long-press any of them to copy. */
+    private fun renderChat() {
+        while (thread.childCount < chat.size * 2) {
+            val question = thread.childCount % 2 == 0
+            thread.addView(threadText(question), LinearLayout.LayoutParams(-1, -2).apply { if (question && thread.childCount > 0) topMargin = dp(18) })
+        }
+        while (thread.childCount > chat.size * 2) thread.removeViewAt(thread.childCount - 1)
+        chat.forEachIndexed { i, t ->
+            setIfChanged(thread.getChildAt(2 * i) as TextView, t.q)
+            setIfChanged(thread.getChildAt(2 * i + 1) as TextView, t.a.ifEmpty { PENDING })
+        }
+        cardScroll.post { cardScroll.scrollTo(0, 1_000_000) } // clamps to the bottom (Int.MAX_VALUE overflows the clamp); fullScroll() would take focus from the bar
+    }
+
+    private fun setIfChanged(tv: TextView, text: String) { if (tv.text.toString() != text) tv.text = text }
+
+    private fun threadText(question: Boolean) = TextView(this).apply {
+        if (question) {
+            setTextColor(pal.onVariant)
+            textSize = 15f
+            typeface = Typeface.DEFAULT_BOLD
+        } else {
+            setTextColor(pal.onSurface)
+            textSize = 17f
+            setLineSpacing(0f, 1.2f)
+        }
+        setOnLongClickListener { v ->
+            val text = (v as TextView).text.toString()
+            if (text != PENDING) {
+                v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                overlays.popupFor(v, listOf(listOf(MenuItem(R.drawable.ic_menu_copy, "Copy") { copyToClipboard(text) })))
+            }
+            true
+        }
+    }
+
+    private fun copyToClipboard(text: String) {
+        (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("NanoSearch", text))
+        if (Build.VERSION.SDK_INT < 33) Toast.makeText(this, "Copied", Toast.LENGTH_SHORT).show() // newer Android confirms it itself
+    }
+
+    /** Hides the card unless a chat is open: other paths ask for this when they have something else to show. */
     private fun hideAnswer() {
+        if (!chatOpen) closeCard()
+    }
+
+    private fun closeCard() {
         askSeq++
+        busy = false
+        updateBusyUi()
         pulse.cancel()
         card.visibility = View.GONE
         divider.visibility = View.GONE
+    }
+
+    /** The input hint follows what the bar is doing: listening, waiting for an answer, chatting, or plain search. */
+    private fun refreshHint() {
+        input.hint = when {
+            micPhase == 1 -> "Listening…"
+            busy -> "Answering…"
+            chatOpen -> CHAT_HINT
+            else -> "Search"
+        }
+    }
+
+    /** The mic button is Stop while an answer is being written. */
+    private fun updateBusyUi() {
+        mic.setImageResource(if (busy) R.drawable.ic_stop else R.drawable.ic_mic)
+        mic.contentDescription = if (busy) "Stop" else "Voice search"
+        mic.alpha = if (busy && stopSeq == askSeq) 0.4f else 1f // dimmed once Stop has been pressed, until the answer winds down
+        refreshHint()
+    }
+
+    private fun stopAnswer() {
+        if (!busy || stopSeq == askSeq) return
+        stopSeq = askSeq
+        mic.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+        updateBusyUi()
+    }
+
+    /** Runs when the work for question [seq] ends, however it ends. */
+    private fun finishAsk(seq: Int) {
+        ui.post {
+            if (seq != askSeq) return@post // the card was closed meanwhile; that already cleared the state
+            val stopped = stopSeq == seq
+            busy = false
+            updateBusyUi()
+            if (stopped) tidyAfterStop()
+        }
+    }
+
+    /** What is left on screen after Stop: a partial answer stays as it is; a turn that never got a word is taken back. */
+    private fun tidyAfterStop() {
+        cardProgress.visibility = View.INVISIBLE
+        pulse.cancel()
+        if (!chatOpen || chat.isEmpty()) { closeCard(); return }
+        if (chat.last().a.isEmpty()) chat.removeAt(chat.size - 1)
+        if (chat.isEmpty()) endChat() else renderChat()
+    }
+
+    /** The ✕ and back: the chat is over and the model forgets it. */
+    private fun endChat() {
+        chatOpen = false
+        chat.clear()
+        closeCard()
+        refreshHint()
+        setSearchActive(input.text.isNotBlank())
+        llm.execute { answerer.endConversation() }
     }
 
     // ---------------------------------------------------------------- voice
@@ -1138,7 +1315,8 @@ class MainActivity : Activity() {
             interpolator = android.view.animation.OvershootInterpolator(2.2f)
             addUpdateListener { shape.cornerRadius = it.animatedValue as Float }
         }.start()
-        input.hint = if (phase == 1) "Listening…" else "Search"
+        micPhase = phase
+        refreshHint()
         if (phase != 0) micPulse.start() else { micPulse.cancel(); mic.alpha = 1f }
     }
 
@@ -1492,6 +1670,8 @@ class MainActivity : Activity() {
         const val DOCK_EMPTY = "-"
         const val MAX_PAGES = 6
         const val PARSE_DEBOUNCE_MS = 450L
+        const val CHAT_HINT = "Message…"
+        const val PENDING = "…"
         const val SEMANTIC_DEBOUNCE_MS = 550L
         const val HEAVY_REFRESH_MS = 10 * 60_000L
         const val DOCK_SLOTS = 4

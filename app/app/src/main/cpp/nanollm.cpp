@@ -226,18 +226,20 @@ NANO_JNI(setPrefix)(JNIEnv *env, jobject, jlong h, jstring text, jstring cachePa
 
 // Returns the generated text (valid UTF-8) or null on failure. listener may be null;
 // otherwise listener.onToken(String): Boolean is called per piece and returns false to stop.
-JNIEXPORT jstring JNICALL
-NANO_JNI(complete)(JNIEnv *env, jobject, jlong h, jstring suffix, jstring grammar,
-                                               jint maxTokens, jobject listener) {
-    auto *e = (Engine *) h;
+// Shared by complete() and chat(). With reset the sequence is rewound to the cached prefix; without it the
+// new text simply continues after whatever the context already holds (an ongoing conversation).
+static jstring runComplete(JNIEnv *env, Engine *e, jstring suffix, jstring grammar, jint maxTokens,
+                           jobject listener, bool reset) {
     pin(e->cpuMask);
     auto t0 = Clock::now();
 
-    llama_memory_clear(llama_get_memory(e->ctx), false);
-    if (!e->prefixState.empty()) {
-        if (llama_state_seq_set_data(e->ctx, e->prefixState.data(), e->prefixState.size(), 0) == 0) {
-            LOGE("prefix state restore failed");
-            return nullptr;
+    if (reset) {
+        llama_memory_clear(llama_get_memory(e->ctx), false);
+        if (!e->prefixState.empty()) {
+            if (llama_state_seq_set_data(e->ctx, e->prefixState.data(), e->prefixState.size(), 0) == 0) {
+                LOGE("prefix state restore failed");
+                return nullptr;
+            }
         }
     }
 
@@ -245,6 +247,10 @@ NANO_JNI(complete)(JNIEnv *env, jobject, jlong h, jstring suffix, jstring gramma
     std::string suf(sx);
     env->ReleaseStringUTFChars(suffix, sx);
     auto toks = tokenize(e->vocab, suf, false);
+    if (!reset) {
+        int used = llama_memory_seq_pos_max(llama_get_memory(e->ctx), 0) + 1;
+        if (used + (int) toks.size() + maxTokens > (int) llama_n_ctx(e->ctx)) { LOGE("context full"); return nullptr; }
+    }
     if (toks.empty() || !decodeAll(e, toks)) return nullptr;
     e->promptTokens = (int) toks.size();
     e->promptMs = msSince(t0);
@@ -283,7 +289,13 @@ NANO_JNI(complete)(JNIEnv *env, jobject, jlong h, jstring suffix, jstring gramma
                 jstring js = env->NewStringUTF(piece.c_str());
                 jboolean cont = env->CallBooleanMethod(listener, onToken, js);
                 env->DeleteLocalRef(js);
-                if (!cont) { n++; break; }
+                if (!cont) {
+                    // Stopped by the caller: still take this last token into the context, so the context and the text the caller saw stay identical.
+                    n++;
+                    llama_batch last = llama_batch_get_one(&tok, 1);
+                    llama_decode(e->ctx, last);
+                    break;
+                }
             }
         }
         n++;
@@ -299,6 +311,25 @@ NANO_JNI(complete)(JNIEnv *env, jobject, jlong h, jstring suffix, jstring gramma
     e->genMs = msSince(t1);
     if (gs) llama_sampler_free(gs);
     return env->NewStringUTF(out.c_str());
+}
+
+JNIEXPORT jstring JNICALL
+NANO_JNI(complete)(JNIEnv *env, jobject, jlong h, jstring suffix, jstring grammar,
+                                               jint maxTokens, jobject listener) {
+    return runComplete(env, (Engine *) h, suffix, grammar, maxTokens, listener, true);
+}
+
+// Conversation turn: reset=false continues from the tokens already in the context. Returns null if they would not fit.
+JNIEXPORT jstring JNICALL
+NANO_JNI(chat)(JNIEnv *env, jobject, jlong h, jstring suffix, jint maxTokens, jobject listener, jboolean reset) {
+    return runComplete(env, (Engine *) h, suffix, nullptr, maxTokens, listener, reset == JNI_TRUE);
+}
+
+// Tokens currently held in the context (prefix plus conversation so far).
+JNIEXPORT jint JNICALL
+NANO_JNI(kvUsed)(JNIEnv *, jobject, jlong h) {
+    auto *e = (Engine *) h;
+    return llama_memory_seq_pos_max(llama_get_memory(e->ctx), 0) + 1;
 }
 
 JNIEXPORT jstring JNICALL

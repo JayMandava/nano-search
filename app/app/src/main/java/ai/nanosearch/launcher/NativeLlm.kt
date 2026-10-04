@@ -7,6 +7,10 @@ interface LlmNative {
     /** Returns the prefix token count, or -1 on failure. A non-null [cachePath] is read if present and written if not. */
     fun setPrefix(handle: Long, text: String, cachePath: String?): Int
     fun complete(handle: Long, suffix: String, grammar: String?, maxTokens: Int, listener: NativeLlm.TokenListener?): String?
+    /** One conversation turn. With [reset] the context is rewound to the cached prefix; without it the text continues what is already there. Null if it does not fit. */
+    fun chat(handle: Long, suffix: String, maxTokens: Int, listener: NativeLlm.TokenListener?, reset: Boolean): String?
+    /** Tokens currently in the context. */
+    fun kvUsed(handle: Long): Int
     fun stats(handle: Long): String
     fun free(handle: Long)
 }
@@ -21,6 +25,8 @@ class NativeLlm : LlmNative {
     external override fun load(path: String, threads: Int, nCtx: Int, cpuMask: Long, gpuLayers: Int): Long
     external override fun setPrefix(handle: Long, text: String, cachePath: String?): Int
     external override fun complete(handle: Long, suffix: String, grammar: String?, maxTokens: Int, listener: TokenListener?): String?
+    external override fun chat(handle: Long, suffix: String, maxTokens: Int, listener: TokenListener?, reset: Boolean): String?
+    external override fun kvUsed(handle: Long): Int
     external override fun stats(handle: Long): String
     external override fun free(handle: Long)
 
@@ -39,6 +45,8 @@ class NativeLlmGpu : LlmNative {
     external override fun load(path: String, threads: Int, nCtx: Int, cpuMask: Long, gpuLayers: Int): Long
     external override fun setPrefix(handle: Long, text: String, cachePath: String?): Int
     external override fun complete(handle: Long, suffix: String, grammar: String?, maxTokens: Int, listener: NativeLlm.TokenListener?): String?
+    external override fun chat(handle: Long, suffix: String, maxTokens: Int, listener: NativeLlm.TokenListener?, reset: Boolean): String?
+    external override fun kvUsed(handle: Long): Int
     external override fun stats(handle: Long): String
     external override fun free(handle: Long)
 

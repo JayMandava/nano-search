@@ -73,6 +73,20 @@ class LlmEngine(
         return GpuSupport.guarded { native.complete(handle, suffix, grammar, maxTokens, listener) }?.also { GpuSupport.markVerified() }
     }
 
+    /** One conversation turn; see [LlmNative.chat]. Returns null on failure or if the text does not fit in what is left of the context. */
+    @Synchronized
+    fun chat(suffix: String, maxTokens: Int, reset: Boolean, listener: NativeLlm.TokenListener? = null): String? {
+        if (handle == 0L) return null
+        if (!onGpu || GpuSupport.verified) return native.chat(handle, suffix, maxTokens, listener, reset)
+        return GpuSupport.guarded { native.chat(handle, suffix, maxTokens, listener, reset) }?.also { GpuSupport.markVerified() }
+    }
+
+    /** Tokens held in the context right now, prefix included; 0 when unloaded. */
+    @Synchronized
+    fun kvUsed(): Int = if (handle == 0L) 0 else native.kvUsed(handle)
+
+    val contextSize get() = nCtx
+
     @Synchronized
     fun stats(): String = if (handle == 0L) "unloaded" else native.stats(handle)
 

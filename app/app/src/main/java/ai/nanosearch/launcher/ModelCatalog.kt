@@ -17,6 +17,9 @@ enum class ChatFormat(private val sysOpen: String, private val userOpen: String,
     /** Everything before the user's words: identical on every request, so it is processed once and cached. */
     fun prefix(system: String) = sysOpen + system + userOpen
 
+    /** A whole user turn that follows an earlier answer: closes that answer, opens the user's turn, and ends with the cue for the reply. */
+    fun turn(userText: String, skipThinking: Boolean) = userOpen + userText + suffix(skipThinking)
+
     /** Everything after them. [skipThinking] closes Qwen's reasoning block up front so it answers at once. */
     fun suffix(skipThinking: Boolean) = userClose + if (skipThinking) "<think>\n\n</think>\n\n" else reply
 }
