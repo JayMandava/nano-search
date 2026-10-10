@@ -147,6 +147,7 @@ class MainActivity : Activity() {
 
     private val packageReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
+            refreshIcons()
             refreshIndex(heavy = false)
             rebuildDock()
         }
@@ -779,8 +780,15 @@ class MainActivity : Activity() {
 
     // ---------------------------------------------------------------- lifecycle
 
+    /** Apps can be updated while the launcher is not looking (the receiver below only listens on screen), so its cached icons are dropped on every return too. */
+    private fun refreshIcons() {
+        results.clearIcons()
+        apps.clearIcons()
+    }
+
     override fun onStart() {
         super.onStart()
+        refreshIcons()
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_PACKAGE_ADDED)
             addAction(Intent.ACTION_PACKAGE_REMOVED)
@@ -1509,6 +1517,9 @@ class MainActivity : Activity() {
         private var items: List<Item> = emptyList()
         private val icons = LruCache<String, Drawable>(128)
 
+        /** Forget the pictures held so far, so an app that was updated shows its new icon. */
+        fun clearIcons() { icons.evictAll(); notifyDataSetChanged() }
+
         fun set(new: List<Item>) {
             items = new
             notifyDataSetChanged()
@@ -1612,6 +1623,9 @@ class MainActivity : Activity() {
     private inner class AppGridAdapter : BaseAdapter() {
         private var items: List<Item> = emptyList()
         private val icons = LruCache<String, Drawable>(256)
+
+        /** Forget the pictures held so far, so an app that was updated shows its new icon. */
+        fun clearIcons() { icons.evictAll(); notifyDataSetChanged() }
 
         fun set(new: List<Item>) {
             items = new
