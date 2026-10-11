@@ -1,5 +1,7 @@
 package ai.nanosearch.launcher.ui
 
+import ai.nanosearch.launcher.NText
+import ai.nanosearch.launcher.NEdit
 import android.app.Activity
 import android.content.Context
 import android.content.res.ColorStateList
@@ -149,7 +151,7 @@ class Overlays(private val activity: Activity, private val host: FrameLayout, pr
             setPadding(dp(16), 0, dp(20), 0)
             background = RippleDrawable(ColorStateList.valueOf(pal.outline), bg, mask)
             addView(ImageView(activity).apply { setImageResource(item.icon); setColorFilter(ink) }, LinearLayout.LayoutParams(dp(20), dp(20)))
-            addView(TextView(activity).apply {
+            addView(NText(activity).apply {
                 text = item.label
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
                 setTextColor(ink)
@@ -198,7 +200,7 @@ class Overlays(private val activity: Activity, private val host: FrameLayout, pr
             gravity = Gravity.CENTER_HORIZONTAL
             setPadding(dp(24), dp(12), dp(24), if (title != null) dp(8) else dp(4))
             addView(View(activity).apply { background = GradientDrawable().apply { setColor(pal.onVariant); alpha = 110; cornerRadius = dpf(2) } }, LinearLayout.LayoutParams(dp(32), dp(4)))
-            if (title != null) addView(TextView(activity).apply {
+            if (title != null) addView(NText(activity).apply {
                 text = title
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
                 setTextColor(pal.onSurface)
@@ -259,14 +261,14 @@ class Overlays(private val activity: Activity, private val host: FrameLayout, pr
                 return (convertView as? LinearLayout) ?: LinearLayout(activity).apply {
                     orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(24), dp(8), dp(24), dp(8))
                     addView(ImageView(activity), LinearLayout.LayoutParams(dp(40), dp(40)))
-                    addView(TextView(activity).apply { setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f); setTextColor(pal.onSurface); setPadding(dp(16), 0, 0, 0); maxLines = 1 }, LinearLayout.LayoutParams(-2, -2))
+                    addView(NText(activity).apply { setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f); setTextColor(pal.onSurface); setPadding(dp(16), 0, 0, 0); maxLines = 1 }, LinearLayout.LayoutParams(-2, -2))
                 }.also { }.apply {
                     (getChildAt(0) as ImageView).setImageDrawable(a.icon)
                     (getChildAt(1) as TextView).text = a.title
                 }
             }
         }
-        val search = EditText(activity).apply {
+        val search = NEdit(activity).apply {
             hint = "Search apps"
             setHintTextColor(pal.onVariant); setTextColor(pal.onSurface)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)

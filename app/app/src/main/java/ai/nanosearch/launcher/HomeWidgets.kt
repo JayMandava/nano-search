@@ -116,7 +116,7 @@ class HomeWidgets(
                     background = GradientDrawable().apply { setColor(pal.container); cornerRadius = dp(pal.radius(16)).toFloat() }
                     setPadding(dp(6), dp(6), dp(6), dp(6))
                 }, LinearLayout.LayoutParams(dp(88), dp(64)))
-                row.addView(TextView(activity).apply {
+                row.addView(NText(activity).apply {
                     text = info?.loadLabel(activity.packageManager) ?: (entry as BuiltinWidget).label
                     textSize = 16f
                     setTextColor(pal.onSurface)
@@ -213,14 +213,14 @@ class HomeWidgets(
         val border = View(activity).apply {
             background = GradientDrawable().apply { setStroke(dp(2), pal.primary); cornerRadius = dp(pal.radius(12)).toFloat() }
         }
-        val handle = TextView(activity).apply {
+        val handle = NText(activity).apply {
             text = "⤡"
             textSize = 18f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
             background = GradientDrawable().apply { setColor(pal.primary); shape = GradientDrawable.OVAL }
         }
-        val done = TextView(activity).apply {
+        val done = NText(activity).apply {
             text = "Done"
             textSize = 14f
             setTextColor(Color.WHITE)

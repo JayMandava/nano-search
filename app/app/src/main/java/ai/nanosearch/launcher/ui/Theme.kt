@@ -9,6 +9,12 @@ import android.content.res.Configuration
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MotionScheme
+import androidx.compose.material3.Typography
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -60,8 +66,28 @@ fun nanoColorScheme(context: Context): ColorScheme {
     }
 }
 
-/** Material 3 Expressive: springy motion, colours from the wallpaper (or the Nano Search violet), light, dark or system. */
+/** Classic text: Source Sans 3 at each weight. */
+private fun classicTypography(context: Context): Typography {
+    fun f(w: Int) = Font("SourceSans3.ttf", context.assets, FontWeight(w), variationSettings = FontVariation.Settings(FontVariation.weight(w)))
+    val family = FontFamily(f(300), f(400), f(500), f(600), f(700))
+    val base = Typography()
+    fun TextStyle.sans() = copy(fontFamily = family)
+    return Typography(
+        displayLarge = base.displayLarge.sans(), displayMedium = base.displayMedium.sans(), displaySmall = base.displaySmall.sans(),
+        headlineLarge = base.headlineLarge.sans(), headlineMedium = base.headlineMedium.sans(), headlineSmall = base.headlineSmall.sans(),
+        titleLarge = base.titleLarge.sans(), titleMedium = base.titleMedium.sans(), titleSmall = base.titleSmall.sans(),
+        bodyLarge = base.bodyLarge.sans(), bodyMedium = base.bodyMedium.sans(), bodySmall = base.bodySmall.sans(),
+        labelLarge = base.labelLarge.sans(), labelMedium = base.labelMedium.sans(), labelSmall = base.labelSmall.sans(),
+    )
+}
+
+/** Material 3 Expressive: springy motion, colours from the wallpaper (or the Nano Search violet), light, dark or system. In Classic, flat colours and its own typeface. */
 @Composable
 fun NanoTheme(content: @Composable () -> Unit) {
-    MaterialExpressiveTheme(colorScheme = nanoColorScheme(LocalContext.current), motionScheme = MotionScheme.expressive(), content = content)
+    val context = LocalContext.current
+    if (AppSettings.isClassic(context)) {
+        MaterialExpressiveTheme(colorScheme = nanoColorScheme(context), typography = classicTypography(context), motionScheme = MotionScheme.expressive(), content = content)
+    } else {
+        MaterialExpressiveTheme(colorScheme = nanoColorScheme(context), motionScheme = MotionScheme.expressive(), content = content)
+    }
 }

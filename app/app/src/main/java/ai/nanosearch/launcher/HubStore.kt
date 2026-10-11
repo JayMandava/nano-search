@@ -43,6 +43,30 @@ object HubStore {
 
     // Texts, missed calls and events come from the phone's own databases, so "dismissing" one only means the Hub stops listing it; the Messages app and the call log are untouched.
     private fun prefs(c: Context) = c.getSharedPreferences("nano", Context.MODE_PRIVATE)
+
+    // Pinned items stay at the top. Snoozed items from the phone's databases are hidden until a time; a snoozed notification is handed back to Android, which posts it again then.
+    fun pinned(c: Context): Set<String> = prefs(c).getString("hub_pinned", "")!!.split('\u0001').filter { it.isNotBlank() }.toSet()
+    fun togglePin(c: Context, id: String) {
+        val now = pinned(c)
+        prefs(c).edit().putString("hub_pinned", (if (id in now) now - id else now + id).toList().takeLast(100).joinToString("\u0001")).apply()
+    }
+
+    private fun snoozeMap(c: Context): Map<String, Long> =
+        prefs(c).getString("hub_snoozed", "")!!.split('\u0001').filter { it.contains('@') }.associate { it.substringBeforeLast('@') to (it.substringAfterLast('@').toLongOrNull() ?: 0L) }
+    fun snoozedIds(c: Context): Set<String> { val now = System.currentTimeMillis(); return snoozeMap(c).filterValues { it > now }.keys }
+    fun snoozeItem(c: Context, id: String, untilMs: Long) {
+        val live = snoozeMap(c).filterValues { it > System.currentTimeMillis() } + (id to untilMs)
+        prefs(c).edit().putString("hub_snoozed", live.entries.toList().takeLast(200).joinToString("\u0001") { "${it.key}@${it.value}" }).apply()
+    }
+    fun snoozeNotification(key: String, ms: Long) { service?.snoozeNotification(key, ms) }
+
+    /** Apps the user chose to leave out of the Hub (their notifications still reach the shade). */
+    fun mutedApps(c: Context): Set<String> = prefs(c).getString("hub_muted", "")!!.split('\u0001').filter { it.isNotBlank() }.toSet()
+    fun toggleMuted(c: Context, pkg: String) {
+        val now = mutedApps(c)
+        prefs(c).edit().putString("hub_muted", (if (pkg in now) now - pkg else now + pkg).joinToString("\u0001")).apply()
+    }
+
     fun dismissedIds(c: Context): Set<String> = prefs(c).getString("hub_dismissed", "")!!.split('\u0001').filter { it.isNotBlank() }.toSet()
     fun markDismissed(c: Context, ids: Collection<String>) {
         val all = (dismissedIds(c) + ids).toList().takeLast(600) // the oldest forgotten first, so the list never grows without end

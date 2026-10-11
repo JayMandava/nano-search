@@ -166,7 +166,7 @@ class MainActivity : Activity() {
 
     /** Material 3 colours for everything the launcher paints itself; rebuilt if the user changes the theme in Settings. */
     private val pal by lazy { Palette.of(this) }
-    private val themeKey get() = AppSettings.themeMode(this) + AppSettings.dynamicColor(this) + AppSettings.style(this) + AppSettings.hub(this) + AppSettings.dots(this) + AppSettings.frames(this) + resources.configuration.uiMode
+    private val themeKey get() = AppSettings.themeMode(this) + AppSettings.dynamicColor(this) + AppSettings.style(this) + AppSettings.hub(this) + AppSettings.dots(this) + AppSettings.frames(this) + AppSettings.fullScreen(this) + resources.configuration.uiMode
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
     /** A flat full-width bar with a hairline along its top edge (the Classic dock). */
@@ -197,7 +197,6 @@ class MainActivity : Activity() {
 
         overlayHost = FrameLayout(this)
         overlays = Overlays(this, overlayHost, pal)
-        hubScreen = HubScreen(this, overlayHost, pal, { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); hubScreen.dismiss(false) }) { shown -> updateBars(shown || drawerOpen || (::resultsPanel.isInitialized && resultsPanel.visibility == View.VISIBLE)) }
         wallpaperScreen = WallpaperScreen(
             this, overlayHost, pal,
             pageCount = { pageIds().size + pageOffset },
@@ -206,6 +205,9 @@ class MainActivity : Activity() {
             openLive = { tryStart { startActivity(Intent(android.app.WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)) } },
             openLockClock = if (LockClock.available(this)) ({ showLockClockSheet() }) else null,
         )
+        hubScreen = HubScreen(this, overlayHost, pal, { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); hubScreen.dismiss(false) },
+            { shown -> updateBars(shown || drawerOpen || (::resultsPanel.isInitialized && resultsPanel.visibility == View.VISIBLE)) },
+            { anchor, groups -> overlays.popupFor(anchor, groups) })
         home = buildHome()
         drawer = buildDrawer()
         drawer.translationY = screenH
@@ -221,8 +223,8 @@ class MainActivity : Activity() {
             addView(overlayHost, FrameLayout.LayoutParams(-1, -1)) // menus and sheets, above everything
             // targetSdk 35 is edge-to-edge: keep content clear of the system bars and the keyboard.
             setOnApplyWindowInsetsListener { _, insets ->
-                val sys = insets.getInsets(WindowInsets.Type.systemBars())
-                val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.ime())
+                val sys = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
+                val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout() or WindowInsets.Type.ime())
                 val barSpace = dp(BAR_SPACE_DP)
                 searchLayer.setPadding(bars.left, sys.top, bars.right, bars.bottom)
                 navBottom = sys.bottom
@@ -243,6 +245,7 @@ class MainActivity : Activity() {
     private fun consumeDebugExtras(i: Intent) {
         i.getStringExtra("fakenote")?.let { i.removeExtra("fakenote"); val p = it.split('|'); if (p.size >= 3) HubStore.debugInject(p[0], p[1], p[2]) }
         if (i.hasExtra("hub")) { i.removeExtra("hub"); ui.postDelayed({ openHub() }, 600) }
+        i.getStringExtra("fullscreen")?.let { i.removeExtra("fullscreen"); AppSettings.setFullScreen(this, it == "on"); recreate() }
         i.getStringExtra("style")?.let { i.removeExtra("style"); AppSettings.setStyle(this, it); recreate() }
         if (i.hasExtra("bench")) { i.removeExtra("bench"); runBench() }
         if (i.hasExtra("tune")) { i.removeExtra("tune"); CpuTuner.run(this, force = true, dryRunWith = CpuPlan.candidates + CpuPlan.Plan((1L shl CpuPlan.coreCount) - 1, 6, "all cores, 6 threads", "all")) }
@@ -327,7 +330,7 @@ class MainActivity : Activity() {
     // ---- top search bar + results (shared by home and drawer)
 
     private fun buildSearchLayer(): LinearLayout {
-        input = EditText(this).apply {
+        input = NEdit(this).apply {
             hint = "Search"
             setHintTextColor(pal.onVariant)
             setTextColor(pal.onSurface)
@@ -369,7 +372,7 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
             addView(input, LinearLayout.LayoutParams(0, dp(56), 1f))
             if (AppSettings.hub(this@MainActivity)) {
-                hubBadge = TextView(context).apply {
+                hubBadge = NText(context).apply {
                     textSize = 10f; setTextColor(pal.onPrimary); gravity = Gravity.CENTER; typeface = Typeface.DEFAULT_BOLD; minWidth = dp(18)
                     background = GradientDrawable().apply { setColor(pal.primary); cornerRadius = dp(9).toFloat() }; setPadding(dp(4), 0, dp(4), 0); visibility = View.GONE
                 }
@@ -425,7 +428,7 @@ class MainActivity : Activity() {
             indeterminateTintList = android.content.res.ColorStateList.valueOf(pal.primary)
         }
         thread = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        cardPulse = TextView(this).apply {
+        cardPulse = NText(this).apply {
             text = "✦"
             textSize = 22f
             setTextColor(pal.primary)
@@ -443,7 +446,7 @@ class MainActivity : Activity() {
             setPadding(dp(20), dp(16), dp(52), dp(16)) // right padding keeps text clear of the close button
             addView(thread)
         }
-        val close = TextView(this).apply {
+        val close = NText(this).apply {
             text = "✕"
             setTextColor(pal.onVariant)
             textSize = 16f
@@ -516,7 +519,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             addView(pager, LinearLayout.LayoutParams(-1, 0, 1f))
             if (pal.classic) {
-                pageLabel = TextView(this@MainActivity).apply { textSize = 12f; setTextColor(pal.onVariant); gravity = Gravity.CENTER; setShadowLayer(6f, 0f, 1f, 0x99000000.toInt()); letterSpacing = 0.06f }
+                pageLabel = NText(this@MainActivity).apply { textSize = 12f; setTextColor(pal.onVariant); gravity = Gravity.CENTER; setShadowLayer(6f, 0f, 1f, 0x99000000.toInt()); letterSpacing = 0.06f }
                 addView(pageLabel, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.CENTER_HORIZONTAL })
             }
             addView(dots, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.CENTER_HORIZONTAL })
@@ -544,6 +547,9 @@ class MainActivity : Activity() {
                 if (vy < -800f || drawer.translationY < screenH * 0.65f) openDrawer() else closeDrawer(clear = false)
             }
         }
+
+        // BB10-style: a swipe up and to the left from the bottom of the screen opens the Hub.
+        if (AppSettings.hub(this@MainActivity)) onSwipeUpLeft = { performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK); openHub() }
 
         // Swipe down pulls the notification panel, unless something on screen is using the gesture.
         canPullDown = { !searchActive && !drawerOpen && !overlays.isShowing && !hubScreen.isShowing && !activeScroll().canScrollVertically(-1) }
@@ -578,14 +584,25 @@ class MainActivity : Activity() {
         hubScreen.show()
     }
 
-    /** A thin strip along the left edge: drag it to the right to pull the Hub in. It asks Android not to treat that edge as the Back gesture. */
+    /** A thin strip along the left edge: drag it to the right and the Hub follows the finger (a peek); let go past a third of the way, or with a flick, and it stays. It asks Android not to treat that edge as the Back gesture. */
     @android.annotation.SuppressLint("ClickableViewAccessibility")
     private fun hubEdgeStrip(): View = View(this).apply {
-        var startX = 0f; var opened = false
+        var startX = 0f; var tracker: android.view.VelocityTracker? = null
+        val slop = android.view.ViewConfiguration.get(this@MainActivity).scaledTouchSlop
         setOnTouchListener { _, e ->
+            val width = resources.displayMetrics.widthPixels * 0.9f
             when (e.actionMasked) {
-                android.view.MotionEvent.ACTION_DOWN -> { startX = e.rawX; opened = false }
-                android.view.MotionEvent.ACTION_MOVE -> if (!opened && e.rawX - startX > dp(44)) { opened = true; performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK); openHub() }
+                android.view.MotionEvent.ACTION_DOWN -> { startX = e.rawX; tracker?.recycle(); tracker = android.view.VelocityTracker.obtain().also { it.addMovement(e) } }
+                android.view.MotionEvent.ACTION_MOVE -> {
+                    tracker?.addMovement(e)
+                    val dx = e.rawX - startX
+                    if (!hubScreen.isPeeking && !hubScreen.isShowing && dx > slop * 2) { resetUi(); hubScreen.beginPeek() }
+                    if (hubScreen.isPeeking) hubScreen.peek(dx / width)
+                }
+                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                    tracker?.computeCurrentVelocity(1000); val vx = tracker?.xVelocity ?: 0f; tracker?.recycle(); tracker = null
+                    if (hubScreen.isPeeking) hubScreen.endPeek(e.actionMasked == android.view.MotionEvent.ACTION_UP && ((e.rawX - startX) > width * 0.33f || vx > 900f))
+                }
             }
             true
         }
@@ -610,7 +627,7 @@ class MainActivity : Activity() {
     /** The count shown on an app's icon: nothing when the dots are off or the app has no notifications. */
     private fun dotCount(pkg: String?) = if (pkg == null || !AppSettings.dots(this)) 0 else HubStore.countFor(pkg)
 
-    private fun badgeView(count: Int): TextView = TextView(this).apply {
+    private fun badgeView(count: Int): TextView = NText(this).apply {
         text = if (count > 9) "9+" else count.toString(); textSize = 10f; setTextColor(pal.onPrimary); gravity = Gravity.CENTER; typeface = Typeface.DEFAULT_BOLD
         minWidth = dp(18); setPadding(dp(4), 0, dp(4), 0)
         background = GradientDrawable().apply { setColor(pal.primary); cornerRadius = dp(9).toFloat(); setStroke(dp(1), pal.dock) }
@@ -783,7 +800,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             addView(ImageView(context).apply { setImageDrawable(icon) }, LinearLayout.LayoutParams(dp(42), dp(42)))
-            addView(TextView(context).apply {
+            addView(NText(context).apply {
                 text = label; textSize = 11f; setTextColor(pal.onVariant); maxLines = 1; gravity = Gravity.CENTER; ellipsize = TextUtils.TruncateAt.END
             }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(2) })
         }
@@ -896,7 +913,7 @@ class MainActivity : Activity() {
             setOnItemClickListener { _, view, position, _ -> open(apps.getItem(position), view) }
             setOnItemLongClickListener { _, view, position, _ -> appMenu(apps.getItem(position), view); true }
         }
-        banner = TextView(this@MainActivity).apply {
+        banner = NText(this@MainActivity).apply {
             text = "Turn on message, calendar and file search  ›"
             setTextColor(pal.onPrimaryContainer)
             textSize = 13f
@@ -908,7 +925,7 @@ class MainActivity : Activity() {
         }
         addView(grid, FrameLayout.LayoutParams(-1, -1))
         addView(banner, FrameLayout.LayoutParams(-1, dp(38), Gravity.TOP).apply { setMargins(dp(16), dp(4), dp(16), 0) })
-        drawerEmpty = TextView(this@MainActivity).apply { textSize = 15f; setTextColor(pal.onVariant); gravity = Gravity.CENTER; visibility = View.GONE }
+        drawerEmpty = NText(this@MainActivity).apply { textSize = 15f; setTextColor(pal.onVariant); gravity = Gravity.CENTER; visibility = View.GONE }
         addView(drawerEmpty, FrameLayout.LayoutParams(-1, -2, Gravity.CENTER))
         if (pal.classic) {
             grid.setPadding(dp(8), dp(8), dp(8), dp(24) + dp(56))
@@ -933,7 +950,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             background = flatBar(pal.dock or 0xFF000000.toInt(), pal.outline)
             for ((key, label, icon) in tabs) {
-                val tab = TextView(context).apply {
+                val tab = NText(context).apply {
                     text = label; textSize = 11f; gravity = Gravity.CENTER; compoundDrawablePadding = dp(2); setPadding(0, dp(6), 0, dp(4))
                     setCompoundDrawablesRelativeWithIntrinsicBounds(null, getDrawable(icon)!!.mutate().apply { setBounds(0, 0, dp(22), dp(22)) }, null, null)
                     setOnClickListener { drawerTab = key; styleTabs(); search() }
@@ -1042,8 +1059,23 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Full screen: hide both system bars; a swipe from the top or bottom edge brings them back for a moment. */
+    private fun applyFullScreen() {
+        val c = window.insetsController ?: return
+        if (AppSettings.fullScreen(this)) {
+            c.systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            c.hide(WindowInsets.Type.systemBars())
+        } else c.show(WindowInsets.Type.systemBars())
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) applyFullScreen()
+    }
+
     override fun onResume() {
         super.onResume()
+        applyFullScreen()
         // The theme may have been changed in Settings: repaint everything with the new colours.
         if (builtThemeKey != themeKey) { recreate(); return }
         // The user may have chosen, downloaded or removed a voice model in Settings.
@@ -1425,7 +1457,7 @@ class MainActivity : Activity() {
 
     private fun setIfChanged(tv: TextView, text: String) { if (tv.text.toString() != text) tv.text = text }
 
-    private fun threadText(question: Boolean) = TextView(this).apply {
+    private fun threadText(question: Boolean) = NText(this).apply {
         if (question) {
             setTextColor(pal.onVariant)
             textSize = 15f
@@ -1822,11 +1854,11 @@ class MainActivity : Activity() {
                     override fun getOutline(view: View, outline: android.graphics.Outline) = outline.setRoundRect(0, 0, view.width, view.height, dp(10).toFloat())
                 }
             }
-            val glyph = TextView(this@MainActivity).apply { gravity = Gravity.CENTER; textSize = 18f; setTextColor(Color.WHITE) }
-            val title = TextView(this@MainActivity).apply {
+            val glyph = NText(this@MainActivity).apply { gravity = Gravity.CENTER; textSize = 18f; setTextColor(Color.WHITE) }
+            val title = NText(this@MainActivity).apply {
                 textSize = 17f; setTextColor(pal.onSurface); maxLines = 1; ellipsize = TextUtils.TruncateAt.END
             }
-            val sub = TextView(this@MainActivity).apply {
+            val sub = NText(this@MainActivity).apply {
                 textSize = 14f; setTextColor(pal.onVariant); maxLines = 1; ellipsize = TextUtils.TruncateAt.END
             }
             val texts = LinearLayout(this@MainActivity).apply {
@@ -1887,7 +1919,7 @@ class MainActivity : Activity() {
                     addView(ImageView(context), FrameLayout.LayoutParams(-1, -1))
                     addView(badgeView(0).also { it.visibility = View.GONE }, FrameLayout.LayoutParams(-2, dp(18), Gravity.TOP or Gravity.END))
                 }, LinearLayout.LayoutParams(dp(54), dp(54)))
-                addView(TextView(context).apply {
+                addView(NText(context).apply {
                     textSize = 12f; setTextColor(pal.onSurface); maxLines = 1; gravity = Gravity.CENTER
                     ellipsize = TextUtils.TruncateAt.END
                 }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })

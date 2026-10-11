@@ -20,6 +20,8 @@ class DragLayout(context: Context, private val up: Boolean) : FrameLayout(contex
     /** Only for the home screen ([up] = true): called when a mostly-downward swipe is let go after a decent pull or a quick flick. */
     var onPullDown: (() -> Unit)? = null
     var canPullDown: () -> Boolean = { true }
+    /** Home only: a clear swipe up and to the left that starts in the bottom fifth of the screen. */
+    var onSwipeUpLeft: (() -> Unit)? = null
 
     private val slop = ViewConfiguration.get(context).scaledTouchSlop
     private val pullDistance = 96 * context.resources.displayMetrics.density
@@ -28,6 +30,35 @@ class DragLayout(context: Context, private val up: Boolean) : FrameLayout(contex
     private var dragging = false
     private var pulling = false
     private var tracker: VelocityTracker? = null
+
+    /** True once the diagonal swipe has fired: the rest of that gesture must not also drag the drawer. */
+    private var fired = false
+
+    private var swipeX = 0f
+    private var swipeY = 0f
+    private var watching = false
+
+    /** Seen before any child: a swipe up and to the left that starts in the bottom fifth fires [onSwipeUpLeft], cancels what the children were doing, and takes the rest of that gesture. */
+    override fun dispatchTouchEvent(e: MotionEvent): Boolean {
+        val cb = onSwipeUpLeft
+        if (up && cb != null) {
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> { fired = false; swipeX = e.rawX; swipeY = e.rawY; watching = e.rawY > resources.displayMetrics.heightPixels * 0.8f }
+                MotionEvent.ACTION_MOVE -> if (watching && !fired) {
+                    val dx = e.rawX - swipeX; val dy = e.rawY - swipeY
+                    if (Math.hypot(dx.toDouble(), dy.toDouble()) > slop * 4) {
+                        if (dx < 0 && dy < 0 && -dx > -dy * 0.6f) {
+                            fired = true
+                            MotionEvent.obtain(e).also { it.action = MotionEvent.ACTION_CANCEL; super.dispatchTouchEvent(it); it.recycle() }
+                            cb()
+                        } else watching = false // straight up (the drawer) or anything else: leave it to the normal handling
+                    }
+                }
+            }
+            if (fired) { if (e.actionMasked == MotionEvent.ACTION_UP || e.actionMasked == MotionEvent.ACTION_CANCEL) fired = false; return true }
+        }
+        return super.dispatchTouchEvent(e)
+    }
 
     private fun distance(e: MotionEvent) = if (up) downY - e.rawY else e.rawY - downY
 
@@ -38,6 +69,7 @@ class DragLayout(context: Context, private val up: Boolean) : FrameLayout(contex
                 downY = e.rawY
                 dragging = false
                 pulling = false
+                fired = false
                 tracker?.recycle()
                 tracker = VelocityTracker.obtain().also { it.addMovement(e) }
             }

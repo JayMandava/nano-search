@@ -101,6 +101,8 @@ private fun SettingsScreen(onBack: () -> Unit) {
             item { Header("Appearance") }
             item { StyleCard() }
             item { AppearanceCard() }
+            item { Header("Screen") }
+            item { FullScreenCard() }
             item { Header("Hub and badges") }
             item { HubCard(tick) }
             item { Header("Search can read") }
@@ -164,6 +166,22 @@ internal fun DefaultHomeCard(tick: Int) {
     }
 }
 
+/** Hides the status bar and the navigation bar on the home screen. */
+@Composable
+private fun FullScreenCard() {
+    val context = LocalContext.current
+    var on by remember { mutableStateOf(AppSettings.fullScreen(context)) }
+    Card(shape = RoundedCornerShape(24.dp)) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Full screen", style = MaterialTheme.typography.bodyLarge)
+                Text("Hide the status bar and the navigation bar. Swipe from the top for the notification shade, or from the bottom for the navigation bar; they hide again by themselves.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Switch(checked = on, onCheckedChange = { on = it; AppSettings.setFullScreen(context, it) })
+        }
+    }
+}
+
 /** The Hub, the dots on icons and Active Frames. Classic turns them on by default; each is a switch of its own. */
 @Composable
 private fun HubCard(tick: Int) {
@@ -194,6 +212,14 @@ private fun HubCard(tick: Int) {
                     Text("Your recent apps as live tiles, on a page to the left of home.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(checked = frames, onCheckedChange = { frames = it; AppSettings.setFrames(context, it) })
+            }
+            var sounds by remember { mutableStateOf(AppSettings.hubSounds(context)) }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Hub sounds", style = MaterialTheme.typography.bodyLarge)
+                    Text("A soft tick when the Hub opens and when you dismiss or clear things. The haptic tick is always on.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(checked = sounds, onCheckedChange = { sounds = it; AppSettings.setHubSounds(context, it) })
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {

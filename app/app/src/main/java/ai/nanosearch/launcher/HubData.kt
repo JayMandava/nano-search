@@ -73,9 +73,15 @@ object HubData {
         }
         val gone = HubStore.dismissedIds(context)
         out.removeAll { it.note == null && it.id in gone }
-        // Upcoming events first (soonest first), then everything else newest first.
-        val (future, past) = out.partition { it.kind == "event" && it.whenMs > now }
-        return future.sortedBy { it.whenMs } + past.sortedByDescending { it.whenMs }
+        val asleep = HubStore.snoozedIds(context)
+        out.removeAll { it.id in asleep }
+        val muted = HubStore.mutedApps(context)
+        out.removeAll { it.pkg != null && it.pkg in muted }
+        // Pinned items first, then upcoming events (soonest first), then everything else newest first.
+        val pins = HubStore.pinned(context)
+        val (pinned, rest) = out.partition { it.id in pins }
+        val (future, past) = rest.partition { it.kind == "event" && it.whenMs > now }
+        return pinned.sortedByDescending { it.whenMs } + future.sortedBy { it.whenMs } + past.sortedByDescending { it.whenMs }
     }
 
     private fun contactName(context: Context, number: String): String? {
@@ -84,5 +90,16 @@ object HubData {
             context.contentResolver.query(Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(number)), arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME), null, null, null)
                 ?.use { if (it.moveToFirst()) it.getString(0) else null }
         }.getOrNull()
+    }
+
+    private val URGENT = Regex("\\b(urgent|asap|important|now|call me|emergency|otp|code|deadline|today|tonight|reminder|meeting|payment due|due)\\b|\\?\\s*$", RegexOption.IGNORE_CASE)
+
+    /** Whether an item looks like it needs attention: pinned, a missed call, a person writing to you (not a sender id or a number) or wording that asks for a reply. Done on the phone with plain rules. */
+    fun isPriority(context: Context, item: Item): Boolean {
+        if (item.id in HubStore.pinned(context)) return true
+        if (item.kind == "call" || item.kind == "event") return item.kind == "call"
+        if (item.kind != "message") return false
+        val person = item.title.any { it.isLowerCase() } && !item.title.any { it.isDigit() } // "Priya", not "AX-ARWINF-S" or a number
+        return person || URGENT.containsMatchIn(item.body)
     }
 }

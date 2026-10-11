@@ -100,7 +100,7 @@ class HomePage(
                 gravity = Gravity.CENTER_HORIZONTAL
                 setPadding(dp(2), dp(10), dp(2), dp(10))
                 addView(ImageView(activity).apply { setImageDrawable(icon) }, LinearLayout.LayoutParams(dp(56), dp(56)))
-                addView(TextView(activity).apply {
+                addView(NText(activity).apply {
                     text = label
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
                     setTextColor(Color.WHITE)

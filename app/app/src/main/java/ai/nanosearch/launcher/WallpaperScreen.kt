@@ -423,7 +423,7 @@ class WallpaperScreen(
         content?.addView(v, FrameLayout.LayoutParams(-1, -1))
     }
 
-    private fun label(text: String, sp: Float, color: Int, bold: Boolean = false) = TextView(activity).apply {
+    private fun label(text: String, sp: Float, color: Int, bold: Boolean = false) = NText(activity).apply {
         this.text = text
         textSize = sp
         setTextColor(color)

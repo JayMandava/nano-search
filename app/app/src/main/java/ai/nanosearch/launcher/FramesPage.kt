@@ -40,9 +40,9 @@ class FramesPage(
     fun refresh() {
         column.removeAllViews()
         val frames = collect()
-        column.addView(TextView(activity).apply { text = "Active Frames"; textSize = 13f; setTextColor(pal.onVariant); setPadding(dp(4), dp(8), 0, dp(10)); letterSpacing = 0.06f; typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) })
+        column.addView(NText(activity).apply { text = "Active Frames"; textSize = 13f; setTextColor(pal.onVariant); setPadding(dp(4), dp(8), 0, dp(10)); letterSpacing = 0.06f; typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) })
         if (frames.isEmpty()) {
-            column.addView(TextView(activity).apply { text = "Apps you open show up here, with what they are saying right now."; textSize = 15f; setTextColor(pal.onVariant); setPadding(dp(4), dp(8), dp(4), 0) })
+            column.addView(NText(activity).apply { text = "Apps you open show up here, with what they are saying right now."; textSize = 15f; setTextColor(pal.onVariant); setPadding(dp(4), dp(8), dp(4), 0) })
             return
         }
         for (i in frames.indices step 2) {
@@ -85,23 +85,23 @@ class FramesPage(
         val head = LinearLayout(activity).apply {
             gravity = Gravity.CENTER_VERTICAL
             addView(ImageView(activity).apply { setImageDrawable(AppIcons.get(activity, f.cn)) }, LinearLayout.LayoutParams(dp(34), dp(34)))
-            addView(TextView(activity).apply { text = f.label; textSize = 14f; setTextColor(pal.onSurface); maxLines = 1; ellipsize = TextUtils.TruncateAt.END; typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) },
+            addView(NText(activity).apply { text = f.label; textSize = 14f; setTextColor(pal.onSurface); maxLines = 1; ellipsize = TextUtils.TruncateAt.END; typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) },
                 LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(8) })
-            if (count > 0 && AppSettings.dots(activity)) addView(TextView(activity).apply {
+            if (count > 0 && AppSettings.dots(activity)) addView(NText(activity).apply {
                 text = if (count > 9) "9+" else count.toString(); textSize = 10f; setTextColor(pal.onPrimary); gravity = Gravity.CENTER; typeface = Typeface.DEFAULT_BOLD; minWidth = dp(18); setPadding(dp(4), 0, dp(4), 0)
                 background = GradientDrawable().apply { setColor(pal.primary); cornerRadius = dp(9).toFloat() }
             }, LinearLayout.LayoutParams(-2, dp(18)))
         }
         box.addView(head, LinearLayout.LayoutParams(-1, -2))
         val line = f.note?.let { n -> listOf(n.title, n.body).filter { it.isNotBlank() }.joinToString("\n") } ?: ""
-        box.addView(TextView(activity).apply {
+        box.addView(NText(activity).apply {
             text = if (line.isNotBlank()) line else "Nothing new"
             textSize = 13f; setTextColor(if (line.isNotBlank()) pal.onSurface else pal.onVariant); maxLines = 3; ellipsize = TextUtils.TruncateAt.END
         }, LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = dp(8) })
         val whenText = (f.note?.whenMs ?: f.openedAt).takeIf { it > 0 }?.let {
             if (System.currentTimeMillis() - it < 60_000L) "just now" else DateUtils.getRelativeTimeSpanString(it, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS, DateUtils.FORMAT_ABBREV_RELATIVE).toString()
         }
-        box.addView(TextView(activity).apply { text = if (f.note != null) whenText.orEmpty() else if (whenText != null) "Opened $whenText" else ""; textSize = 11f; setTextColor(pal.onVariant) }, LinearLayout.LayoutParams(-1, -2))
+        box.addView(NText(activity).apply { text = if (f.note != null) whenText.orEmpty() else if (whenText != null) "Opened $whenText" else ""; textSize = 11f; setTextColor(pal.onVariant) }, LinearLayout.LayoutParams(-1, -2))
         return box
     }
 }

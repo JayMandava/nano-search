@@ -49,4 +49,12 @@ object AppSettings {
     /** Active Frames: the apps you used last, as live tiles on the first home page. */
     fun frames(c: Context) = feature(c, "frames")
     fun setFrames(c: Context, on: Boolean) = setFeature(c, "frames", on)
+
+    /** Full screen: the status bar and navigation bar are hidden and slide in when you swipe from the top or bottom edge. */
+    fun fullScreen(c: Context) = prefs(c).getBoolean("fullScreen", false)
+    fun setFullScreen(c: Context, on: Boolean) = prefs(c).edit().putBoolean("fullScreen", on).apply()
+
+    /** A soft tick when the Hub opens, an item is dismissed or the list is cleared. Haptics are always on; this adds the sound. */
+    fun hubSounds(c: Context) = prefs(c).getBoolean("hubSounds", false)
+    fun setHubSounds(c: Context, on: Boolean) = prefs(c).edit().putBoolean("hubSounds", on).apply()
 }
