@@ -173,7 +173,7 @@ private fun FullScreenCard() {
     var on by remember { mutableStateOf(AppSettings.fullScreen(context)) }
     Card(shape = RoundedCornerShape(24.dp)) {
         Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f).padding(end = 16.dp)) {
                 Text("Full screen", style = MaterialTheme.typography.bodyLarge)
                 Text("Hide the status bar and the navigation bar. Swipe from the top for the notification shade, or from the bottom for the navigation bar; they hide again by themselves.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -193,21 +193,21 @@ private fun HubCard(tick: Int) {
     Card(shape = RoundedCornerShape(24.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
+                Column(Modifier.weight(1f).padding(end = 16.dp)) {
                     Text("Hub", style = MaterialTheme.typography.bodyLarge)
                     Text("One list for texts, missed calls, events and notifications. Swipe in from the left edge, or tap the Hub button by the search bar.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(checked = hub, onCheckedChange = { hub = it; AppSettings.setHub(context, it); (context as? android.app.Activity)?.recreate() })
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
+                Column(Modifier.weight(1f).padding(end = 16.dp)) {
                     Text("Dots on icons", style = MaterialTheme.typography.bodyLarge)
                     Text("A small count on an app's icon while it has notifications.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(checked = dots, onCheckedChange = { dots = it; AppSettings.setDots(context, it) })
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
+                Column(Modifier.weight(1f).padding(end = 16.dp)) {
                     Text("Active Frames", style = MaterialTheme.typography.bodyLarge)
                     Text("Your recent apps as live tiles, on a page to the left of home.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -215,14 +215,14 @@ private fun HubCard(tick: Int) {
             }
             var sounds by remember { mutableStateOf(AppSettings.hubSounds(context)) }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
+                Column(Modifier.weight(1f).padding(end = 16.dp)) {
                     Text("Hub sounds", style = MaterialTheme.typography.bodyLarge)
                     Text("A soft tick when the Hub opens and when you dismiss or clear things. The haptic tick is always on.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(checked = sounds, onCheckedChange = { sounds = it; AppSettings.setHubSounds(context, it) })
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
+                Column(Modifier.weight(1f).padding(end = 16.dp)) {
                     Text("Notification access", style = MaterialTheme.typography.bodyLarge)
                     Text(
                         if (allowed) "Allowed. Notifications stay in memory on this phone; nothing is saved or sent anywhere."
@@ -282,7 +282,7 @@ private fun AppearanceCard() {
                 }
             }
             if (!AppSettings.isClassic(context)) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
+                Column(Modifier.weight(1f).padding(end = 16.dp)) {
                     Text("Colours from wallpaper", style = MaterialTheme.typography.bodyLarge)
                     Text("Material You. Off uses the Nano Search violet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
