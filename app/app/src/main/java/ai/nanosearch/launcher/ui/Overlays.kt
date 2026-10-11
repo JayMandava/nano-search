@@ -178,7 +178,7 @@ class Overlays(private val activity: Activity, private val host: FrameLayout, pr
         (activity.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(v.windowToken, 0)
     }
 
-    private fun bottomInset(): Int = host.rootWindowInsets?.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.ime())?.bottom ?: 0
+    private fun bottomInset(): Int = maxOf(host.rootWindowInsets?.getInsetsIgnoringVisibility(WindowInsets.Type.systemBars())?.bottom ?: 0, host.rootWindowInsets?.getInsets(WindowInsets.Type.ime())?.bottom ?: 0)
 
     /** A rounded-top sheet sliding up from the bottom with a drag handle and a title; [content] fills the rest. Swipe down, tap outside or Back closes it. */
     fun sheet(title: String?, content: View, maxHeightFraction: Float = 0.7f) {

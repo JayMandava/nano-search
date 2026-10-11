@@ -78,7 +78,8 @@ class HubScreen(
     /** Builds the Hub offscreen. [peeking] true leaves it at the edge for the caller to drag in. */
     private fun build() {
         if (layer != null) return
-        val bars = host.rootWindowInsets?.getInsets(WindowInsets.Type.systemBars())
+        // the size the bars have when shown, even in full screen, so the header stays clear of the status bar when it slides in over the Hub
+        val bars = host.rootWindowInsets?.getInsetsIgnoringVisibility(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
         val top = bars?.top ?: dp(24); val bottom = bars?.bottom ?: dp(24)
         val screenW = activity.resources.displayMetrics.widthPixels
         val width = (screenW * 0.9f).toInt()

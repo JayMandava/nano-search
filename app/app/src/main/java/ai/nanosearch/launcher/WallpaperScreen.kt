@@ -106,7 +106,7 @@ class WallpaperScreen(
     }
 
     private fun insets(): Pair<Int, Int> {
-        val i = host.rootWindowInsets?.getInsets(WindowInsets.Type.systemBars())
+        val i = host.rootWindowInsets?.getInsetsIgnoringVisibility(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
         return (i?.top ?: dp(24)) to (i?.bottom ?: dp(24))
     }
 
