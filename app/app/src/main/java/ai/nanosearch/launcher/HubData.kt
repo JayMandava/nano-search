@@ -71,6 +71,8 @@ object HubData {
                 }
             }
         }
+        val gone = HubStore.dismissedIds(context)
+        out.removeAll { it.note == null && it.id in gone }
         // Upcoming events first (soonest first), then everything else newest first.
         val (future, past) = out.partition { it.kind == "event" && it.whenMs > now }
         return future.sortedBy { it.whenMs } + past.sortedByDescending { it.whenMs }

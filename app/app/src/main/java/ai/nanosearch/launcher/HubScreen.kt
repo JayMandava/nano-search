@@ -14,6 +14,9 @@ import android.text.TextUtils
 import android.text.format.DateFormat
 import android.util.LruCache
 import android.view.Gravity
+import android.view.MotionEvent
+import android.view.VelocityTracker
+import android.view.ViewConfiguration
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
@@ -75,8 +78,8 @@ class HubScreen(
 
         title = TextView(activity).apply { text = "Hub"; textSize = 26f; setTextColor(pal.onSurface); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) }
         clearButton = TextView(activity).apply {
-            text = "Clear"; textSize = 14f; setTextColor(pal.primary); gravity = Gravity.CENTER; setPadding(dp(12), 0, dp(12), 0)
-            setOnClickListener { HubStore.dismissAll() }
+            text = "Clear all"; textSize = 14f; setTextColor(pal.primary); gravity = Gravity.CENTER; setPadding(dp(12), 0, dp(12), 0)
+            setOnClickListener { clearAll() }
         }
         val close = TextView(activity).apply { text = "✕"; textSize = 18f; setTextColor(pal.onVariant); gravity = Gravity.CENTER; setOnClickListener { dismiss() } }
         val header = LinearLayout(activity).apply {
@@ -175,7 +178,7 @@ class HubScreen(
     private fun refreshList() {
         val unread = items.count { it.unread && (it.kind == "message" || it.kind == "call") }
         title?.text = if (unread > 0) "Hub  ·  $unread" else "Hub"
-        clearButton?.visibility = if (items.any { it.note?.clearable == true }) View.VISIBLE else View.GONE
+        clearButton?.visibility = if (items.isNotEmpty()) View.VISIBLE else View.GONE
         rows.notifyDataSetChanged()
     }
 
@@ -266,7 +269,9 @@ class HubScreen(
         p.send.setOnClickListener { sendReply(item, p.replyField.text.toString()) }
         p.replyField.setOnEditorActionListener { _, id, _ -> if (id == EditorInfo.IME_ACTION_SEND) { sendReply(item, p.replyField.text.toString()); true } else false }
         if (replyingHere) p.replyField.post { p.replyField.requestFocus(); (activity.getSystemService(Activity.INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(p.replyField, 0) }
+        row.translationX = 0f; row.alpha = 1f
         row.setOnClickListener { open(item) }
+        row.setOnTouchListener(SwipeToDismiss(item))
     }
 
     private fun bindIcon(view: ImageView, item: HubData.Item) {
@@ -295,6 +300,59 @@ class HubScreen(
             mins < 60 -> "${mins}m"
             mins < 24 * 60 -> "${mins / 60}h"
             else -> DateFormat.format("d MMM", cal).toString()
+        }
+    }
+
+    /** Takes one item off the list: a notification is cleared from the shade, anything else is just remembered as dismissed. */
+    private fun dismissItem(item: HubData.Item) {
+        val note = item.note
+        if (note != null) HubStore.dismiss(note.key) else HubStore.markDismissed(activity, listOf(item.id))
+        items = items.filter { it.id != item.id }
+        refreshList()
+    }
+
+    private fun clearAll() {
+        HubStore.dismissAll()
+        HubStore.markDismissed(activity, items.filter { it.note == null }.map { it.id })
+        items = emptyList()
+        replying = null
+        refreshList()
+    }
+
+    /** Drag a row sideways to dismiss it: it follows the finger and fades, then goes if it was dragged far enough or flicked. */
+    private inner class SwipeToDismiss(private val item: HubData.Item) : View.OnTouchListener {
+        private val slop = ViewConfiguration.get(activity).scaledTouchSlop
+        private var downX = 0f; private var downY = 0f
+        private var swiping = false
+        private var tracker: VelocityTracker? = null
+
+        override fun onTouch(v: View, e: MotionEvent): Boolean {
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> { downX = e.rawX; downY = e.rawY; swiping = false; tracker?.recycle(); tracker = VelocityTracker.obtain().also { it.addMovement(e) } }
+                MotionEvent.ACTION_MOVE -> {
+                    tracker?.addMovement(e)
+                    val dx = e.rawX - downX; val dy = e.rawY - downY
+                    if (!swiping && Math.abs(dx) > slop * 2 && Math.abs(dx) > Math.abs(dy) * 1.6f) { swiping = true; v.parent?.requestDisallowInterceptTouchEvent(true); v.isPressed = false }
+                    if (swiping) { v.translationX = dx; v.alpha = (1f - Math.abs(dx) / v.width).coerceIn(0.1f, 1f); return true }
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    val was = swiping
+                    swiping = false
+                    tracker?.computeCurrentVelocity(1000)
+                    val vx = tracker?.xVelocity ?: 0f
+                    tracker?.recycle(); tracker = null
+                    if (was) {
+                        val dx = v.translationX
+                        val away = e.actionMasked == MotionEvent.ACTION_UP && (Math.abs(dx) > v.width / 3f || Math.abs(vx) > 1400f && dx * vx > 0)
+                        if (away) {
+                            val to = if (dx >= 0) v.width.toFloat() else -v.width.toFloat()
+                            v.animate().translationX(to).alpha(0f).setDuration(160).withEndAction { dismissItem(item) }.start()
+                        } else v.animate().translationX(0f).alpha(1f).setDuration(160).start()
+                        return true
+                    }
+                }
+            }
+            return false
         }
     }
 

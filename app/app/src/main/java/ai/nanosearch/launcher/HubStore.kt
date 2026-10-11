@@ -40,6 +40,14 @@ object HubStore {
         context.getSystemService(NotificationManager::class.java).isNotificationListenerAccessGranted(ComponentName(context, NotificationHub::class.java))
 
     fun dismiss(key: String) { service?.cancelNotification(key) }
+
+    // Texts, missed calls and events come from the phone's own databases, so "dismissing" one only means the Hub stops listing it; the Messages app and the call log are untouched.
+    private fun prefs(c: Context) = c.getSharedPreferences("nano", Context.MODE_PRIVATE)
+    fun dismissedIds(c: Context): Set<String> = prefs(c).getString("hub_dismissed", "")!!.split('\u0001').filter { it.isNotBlank() }.toSet()
+    fun markDismissed(c: Context, ids: Collection<String>) {
+        val all = (dismissedIds(c) + ids).toList().takeLast(600) // the oldest forgotten first, so the list never grows without end
+        prefs(c).edit().putString("hub_dismissed", all.joinToString("\u0001")).apply()
+    }
     fun dismissAll() { service?.cancelAllNotifications() }
 
     internal fun reset(context: Context, all: Array<StatusBarNotification>?) {
