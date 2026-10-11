@@ -37,7 +37,11 @@ import java.util.concurrent.Executors
  * apps that allow it, and dismissing. It slides in over the home screen from the left and is closed by tapping the dimmed strip, the close
  * button or Back.
  */
-class HubScreen(private val activity: Activity, private val host: FrameLayout, private val pal: Palette, private val openAccess: () -> Unit) {
+class HubScreen(
+    private val activity: Activity, private val host: FrameLayout, private val pal: Palette, private val openAccess: () -> Unit,
+    /** Told when the Hub appears and goes, so the system bars can match its colours. */
+    private val onShown: (Boolean) -> Unit = {},
+) {
     private val density = activity.resources.displayMetrics.density
     private fun dp(v: Int) = (v * density).toInt()
     private val pm = activity.packageManager
@@ -128,6 +132,7 @@ class HubScreen(private val activity: Activity, private val host: FrameLayout, p
         p.animate().translationX(0f).setDuration(260).setInterpolator(DecelerateInterpolator(1.6f)).start()
         scrim.animate().alpha(1f).setDuration(260).start()
         HubStore.listen(changed)
+        onShown(true)
         reload()
     }
 
@@ -135,6 +140,7 @@ class HubScreen(private val activity: Activity, private val host: FrameLayout, p
         val l = layer ?: return
         val p = panel
         layer = null; panel = null; listView = null
+        onShown(false)
         HubStore.unlisten(changed)
         hideKeyboard(l)
         if (!animate || p == null) { host.removeView(l); return }

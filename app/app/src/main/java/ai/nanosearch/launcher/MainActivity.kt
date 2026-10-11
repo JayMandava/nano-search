@@ -197,7 +197,7 @@ class MainActivity : Activity() {
 
         overlayHost = FrameLayout(this)
         overlays = Overlays(this, overlayHost, pal)
-        hubScreen = HubScreen(this, overlayHost, pal) { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); hubScreen.dismiss(false) }
+        hubScreen = HubScreen(this, overlayHost, pal, { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); hubScreen.dismiss(false) }) { shown -> updateBars(shown || drawerOpen || (::resultsPanel.isInitialized && resultsPanel.visibility == View.VISIBLE)) }
         wallpaperScreen = WallpaperScreen(
             this, overlayHost, pal,
             pageCount = { pageIds().size + pageOffset },
@@ -998,6 +998,11 @@ class MainActivity : Activity() {
         widgetHost.startListening()
         HubStore.listen(notificationsChanged)
         notificationsChanged()
+    }
+
+    override fun onDestroy() {
+        if (::hubScreen.isInitialized) hubScreen.dismiss(false) // stops it listening to notifications once this screen is gone
+        super.onDestroy()
     }
 
     override fun onStop() {
