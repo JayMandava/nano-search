@@ -905,11 +905,12 @@ class MainActivity : Activity() {
         grid = GridView(this@MainActivity).apply {
             numColumns = 4
             adapter = apps
-            verticalSpacing = dp(14)
+            verticalSpacing = dp(if (pal.classic) 10 else 14)
+            if (pal.classic) horizontalSpacing = dp(10)
             stretchMode = GridView.STRETCH_COLUMN_WIDTH
             selector = android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)
             clipToPadding = false
-            setPadding(dp(8), dp(8), dp(8), dp(24))
+            setPadding(dp(if (pal.classic) 12 else 8), dp(8), dp(if (pal.classic) 12 else 8), dp(24))
             setOnItemClickListener { _, view, position, _ -> open(apps.getItem(position), view) }
             setOnItemLongClickListener { _, view, position, _ -> appMenu(apps.getItem(position), view); true }
         }
@@ -1906,7 +1907,12 @@ class MainActivity : Activity() {
             val cell = (convertView as? LinearLayout) ?: LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER_HORIZONTAL
-                setPadding(dp(2), dp(4), dp(2), dp(4))
+                if (pal.classic) {
+                    // a boxed tile with the name on a darker strip along its foot, as in BlackBerry 10's later icon style
+                    setPadding(0, dp(10), 0, 0)
+                    background = GradientDrawable().apply { setColor(0x38000000); cornerRadius = dp(pal.radius(14)).toFloat(); setStroke(dp(1), 0x26FFFFFF) }
+                    clipToOutline = true
+                } else setPadding(dp(2), dp(4), dp(2), dp(4))
                 // pressed: grow a little, as in Android's launchers (a state animator follows the list's own pressed state)
                 stateListAnimator = android.animation.StateListAnimator().apply {
                     fun scaled(v: Float) = ObjectAnimator.ofPropertyValuesHolder(
@@ -1920,9 +1926,10 @@ class MainActivity : Activity() {
                     addView(badgeView(0).also { it.visibility = View.GONE }, FrameLayout.LayoutParams(-2, dp(18), Gravity.TOP or Gravity.END))
                 }, LinearLayout.LayoutParams(dp(54), dp(54)))
                 addView(NText(context).apply {
-                    textSize = 12f; setTextColor(pal.onSurface); maxLines = 1; gravity = Gravity.CENTER
+                    textSize = 12f; setTextColor(if (pal.classic) 0xFFF1F3F4.toInt() else pal.onSurface); maxLines = 1; gravity = Gravity.CENTER
                     ellipsize = TextUtils.TruncateAt.END
-                }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
+                    if (pal.classic) { setBackgroundColor(0x80000000.toInt()); setPadding(dp(4), dp(4), dp(4), dp(4)) } else setShadowLayer(0f, 0f, 0f, 0)
+                }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(if (pal.classic) 8 else 4) })
             }
             val item = items[position]
             (cell.getChildAt(1) as TextView).text = item.title

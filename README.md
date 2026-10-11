@@ -23,6 +23,8 @@ answers questions, and listens when you speak. Small language models run entirel
 - **Classic style (optional):** a second look for the whole launcher, chosen in Settings > Appearance. Flat charcoal and white with one blue accent,
   squarer corners, a labelled dock bar, and an original set of glossy drawn icons (a handset, an envelope, a camera, a calendar page that shows today's date).
   Apps without a drawn icon keep their own, set on a matching dark tile. Modern, the default, is unchanged.
+- **Translucent drawer in Classic:** the wallpaper shows through the app drawer, and each app sits in a boxed tile with its name on a darker strip along the foot, in the manner of the later
+  BlackBerry 10 icon style.
 - **Hub:** one list for texts, missed calls, upcoming events and the notifications of your other apps, with filters, replying in place where an app allows it,
   and dismissing. Swipe in from the left edge or tap the Hub button by the search bar. It uses Android's notification access, which you grant yourself;
   notifications are held in memory only and are never saved or sent anywhere. Texts, calls and events work without it.
