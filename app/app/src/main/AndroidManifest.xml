@@ -51,6 +51,17 @@
             </intent-filter>
         </activity>
 
+        <!-- Feeds the Hub and the icon dots. Does nothing until the user allows it in Settings > Notification access; keeps notifications in memory only. -->
+        <service
+            android:name=".NotificationHub"
+            android:exported="true"
+            android:label="Nano Search"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
         <activity
             android:name=".SetupActivity"
             android:taskAffinity="ai.nanosearch.launcher.settings"

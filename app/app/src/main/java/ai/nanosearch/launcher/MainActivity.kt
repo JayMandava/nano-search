@@ -93,6 +93,9 @@ class MainActivity : Activity() {
     private val widgetHost by lazy { AppWidgetHost(this, HomeWidgets.HOST_ID) }
     private lateinit var overlayHost: FrameLayout
     private lateinit var overlays: Overlays
+    private lateinit var hubScreen: HubScreen
+    private var hubButton: ImageView? = null
+    private var hubBadge: TextView? = null
     // search
     private lateinit var input: EditText
     private lateinit var mic: ImageView
@@ -187,6 +190,7 @@ class MainActivity : Activity() {
 
         overlayHost = FrameLayout(this)
         overlays = Overlays(this, overlayHost, pal)
+        hubScreen = HubScreen(this, overlayHost, pal) { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); hubScreen.dismiss(false) }
         wallpaperScreen = WallpaperScreen(
             this, overlayHost, pal,
             pageCount = { pageIds().size },
@@ -205,6 +209,7 @@ class MainActivity : Activity() {
             addView(home, FrameLayout.LayoutParams(-1, -1))
             addView(drawer, FrameLayout.LayoutParams(-1, -1))
             addView(searchLayer, FrameLayout.LayoutParams(-1, -2))
+            if (AppSettings.hub(this@MainActivity)) addView(hubEdgeStrip(), FrameLayout.LayoutParams(dp(24), -1, Gravity.START))
             addView(overlayHost, FrameLayout.LayoutParams(-1, -1)) // menus and sheets, above everything
             // targetSdk 35 is edge-to-edge: keep content clear of the system bars and the keyboard.
             setOnApplyWindowInsetsListener { _, insets ->
@@ -228,6 +233,8 @@ class MainActivity : Activity() {
      * can never run it again against files that are gone.
      */
     private fun consumeDebugExtras(i: Intent) {
+        i.getStringExtra("fakenote")?.let { i.removeExtra("fakenote"); val p = it.split('|'); if (p.size >= 3) HubStore.debugInject(p[0], p[1], p[2]) }
+        if (i.hasExtra("hub")) { i.removeExtra("hub"); ui.postDelayed({ openHub() }, 600) }
         i.getStringExtra("style")?.let { i.removeExtra("style"); AppSettings.setStyle(this, it); recreate() }
         if (i.hasExtra("bench")) { i.removeExtra("bench"); runBench() }
         if (i.hasExtra("tune")) { i.removeExtra("tune"); CpuTuner.run(this, force = true, dryRunWith = CpuPlan.candidates + CpuPlan.Plan((1L shl CpuPlan.coreCount) - 1, 6, "all cores, 6 threads", "all")) }
@@ -353,6 +360,22 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             addView(input, LinearLayout.LayoutParams(0, dp(56), 1f))
+            if (AppSettings.hub(this@MainActivity)) {
+                hubBadge = TextView(context).apply {
+                    textSize = 10f; setTextColor(pal.onPrimary); gravity = Gravity.CENTER; typeface = Typeface.DEFAULT_BOLD; minWidth = dp(18)
+                    background = GradientDrawable().apply { setColor(pal.primary); cornerRadius = dp(9).toFloat() }; setPadding(dp(4), 0, dp(4), 0); visibility = View.GONE
+                }
+                hubButton = ImageView(context).apply {
+                    setImageResource(R.drawable.ic_hub); scaleType = ImageView.ScaleType.CENTER_INSIDE; setPadding(dp(15), dp(15), dp(15), dp(15))
+                    background = round(pal.bar, 28).also { if (pal.classic) it.setStroke(dp(1), pal.outline) }
+                    imageTintList = android.content.res.ColorStateList.valueOf(pal.onVariant); contentDescription = "Hub"
+                    setOnClickListener { openHub() }
+                }
+                addView(FrameLayout(context).apply {
+                    addView(hubButton, FrameLayout.LayoutParams(-1, -1))
+                    addView(hubBadge, FrameLayout.LayoutParams(-2, dp(18), Gravity.TOP or Gravity.END).apply { topMargin = dp(2); marginEnd = dp(2) })
+                }, LinearLayout.LayoutParams(dp(56), dp(56)).apply { leftMargin = dp(8) })
+            }
             addView(mic, LinearLayout.LayoutParams(dp(56), dp(56)).apply { leftMargin = dp(8) })
         }
 
@@ -524,6 +547,51 @@ class MainActivity : Activity() {
         }
     }
 
+    // ---- the Hub and notification dots
+
+    private fun openHub() {
+        if (hubScreen.isShowing) return
+        resetUi()
+        hubScreen.show()
+    }
+
+    /** A thin strip along the left edge: drag it to the right to pull the Hub in. It asks Android not to treat that edge as the Back gesture. */
+    @android.annotation.SuppressLint("ClickableViewAccessibility")
+    private fun hubEdgeStrip(): View = View(this).apply {
+        var startX = 0f; var opened = false
+        setOnTouchListener { _, e ->
+            when (e.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> { startX = e.rawX; opened = false }
+                android.view.MotionEvent.ACTION_MOVE -> if (!opened && e.rawX - startX > dp(44)) { opened = true; performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK); openHub() }
+            }
+            true
+        }
+        addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+            val h = v.height
+            v.systemGestureExclusionRects = listOf(android.graphics.Rect(0, h / 5, v.width, minOf(h, h / 5 + dp(200))))
+        }
+    }
+
+    private val notificationsChanged: () -> Unit = {
+        rebuildDock()
+        apps.notifyDataSetChanged()
+        updateHubBadge()
+    }
+
+    private fun updateHubBadge() {
+        val n = HubStore.count(setOf("message", "call", "app", "event"))
+        hubBadge?.let { it.text = if (n > 9) "9+" else n.toString(); it.visibility = if (n > 0) View.VISIBLE else View.GONE }
+    }
+
+    /** The count shown on an app's icon: nothing when the dots are off or the app has no notifications. */
+    private fun dotCount(pkg: String?) = if (pkg == null || !AppSettings.dots(this)) 0 else HubStore.countFor(pkg)
+
+    private fun badgeView(count: Int): TextView = TextView(this).apply {
+        text = if (count > 9) "9+" else count.toString(); textSize = 10f; setTextColor(pal.onPrimary); gravity = Gravity.CENTER; typeface = Typeface.DEFAULT_BOLD
+        minWidth = dp(18); setPadding(dp(4), 0, dp(4), 0)
+        background = GradientDrawable().apply { setColor(pal.primary); cornerRadius = dp(9).toFloat(); setStroke(dp(1), pal.dock) }
+    }
+
     // ---- home pages
 
     private fun currentPage(): HomePage = pages[pager.currentItem.coerceIn(0, pages.size - 1)]
@@ -626,7 +694,7 @@ class MainActivity : Activity() {
         for (slot in 0 until DOCK_SLOTS) {
             if (saved[slot] == DOCK_EMPTY) { dockRow.addView(emptyDockSlot(slot), LinearLayout.LayoutParams(0, dp(56), 1f)); continue }
             val entry = dockEntry(slot, saved[slot]) ?: continue
-            val show = dockCell(entry.icon, entry.label)
+            val show = dockCell(entry.icon, entry.label, entry.component?.packageName)
             show.apply {
                 pressScale()
                 setOnClickListener { v -> launchIntent(entry.launch, v) }
@@ -645,7 +713,17 @@ class MainActivity : Activity() {
     }
 
     /** A dock icon: just the picture in Modern, the picture with its name underneath in Classic. */
-    private fun dockCell(icon: Drawable, label: String): View =
+    private fun dockCell(icon: Drawable, label: String, pkg: String?): View {
+        val content = dockContent(icon, label)
+        val count = dotCount(pkg)
+        if (count == 0) return content
+        return FrameLayout(this).apply {
+            addView(content, FrameLayout.LayoutParams(-1, -1))
+            addView(badgeView(count), FrameLayout.LayoutParams(-2, dp(18), Gravity.TOP or Gravity.END).apply { topMargin = dp(if (pal.classic) 2 else 0); marginEnd = dp(if (pal.classic) 12 else 6) })
+        }
+    }
+
+    private fun dockContent(icon: Drawable, label: String): View =
         if (!pal.classic) ImageView(this).apply { setImageDrawable(icon) }
         else LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -707,6 +785,7 @@ class MainActivity : Activity() {
                 MenuItem(R.drawable.ic_menu_wallpaper, "Wallpaper & style") { changeWallpaper() },
                 MenuItem(R.drawable.ic_menu_widgets, "Widgets") { currentPage().widgets.pick() },
                 MenuItem(R.drawable.ic_menu_apps, "Apps list") { openDrawer() },
+                *(if (AppSettings.hub(this)) arrayOf(MenuItem(R.drawable.ic_hub, "Hub") { openHub() }) else emptyArray()),
                 MenuItem(R.drawable.ic_menu_clock, if (clockShown) "Remove clock" else "Add clock") { setClockShown(!clockShown) },
             ),
             buildList {
@@ -826,10 +905,13 @@ class MainActivity : Activity() {
         }
         registerReceiver(packageReceiver, filter)
         widgetHost.startListening()
+        HubStore.listen(notificationsChanged)
+        notificationsChanged()
     }
 
     override fun onStop() {
         unregisterReceiver(packageReceiver)
+        HubStore.unlisten(notificationsChanged)
         overlays.dismissAll()
         runCatching { widgetHost.stopListening() }
         voice.release()
@@ -898,6 +980,7 @@ class MainActivity : Activity() {
     @Deprecated("Launcher: back never leaves home")
     override fun onBackPressed() {
         when {
+            hubScreen.isShowing -> hubScreen.back()
             wallpaperScreen.isShowing -> wallpaperScreen.back()
             overlays.isShowing -> overlays.dismissAll()
             card.visibility == View.VISIBLE -> endChat()
@@ -965,6 +1048,7 @@ class MainActivity : Activity() {
     private fun resetUi() {
         overlays.dismissAll()
         wallpaperScreen.dismiss()
+        if (::hubScreen.isInitialized) hubScreen.dismiss(false)
         if (::pager.isInitialized && pager.currentItem != 0) pager.setCurrentItem(0, true)
         input.setText("")
         input.clearFocus()
@@ -1678,7 +1762,10 @@ class MainActivity : Activity() {
                     addState(intArrayOf(android.R.attr.state_pressed), scaled(1.08f))
                     addState(intArrayOf(), scaled(1f))
                 }
-                addView(ImageView(context), LinearLayout.LayoutParams(dp(54), dp(54)))
+                addView(FrameLayout(context).apply {
+                    addView(ImageView(context), FrameLayout.LayoutParams(-1, -1))
+                    addView(badgeView(0).also { it.visibility = View.GONE }, FrameLayout.LayoutParams(-2, dp(18), Gravity.TOP or Gravity.END))
+                }, LinearLayout.LayoutParams(dp(54), dp(54)))
                 addView(TextView(context).apply {
                     textSize = 12f; setTextColor(pal.onSurface); maxLines = 1; gravity = Gravity.CENTER
                     ellipsize = TextUtils.TruncateAt.END
@@ -1686,10 +1773,13 @@ class MainActivity : Activity() {
             }
             val item = items[position]
             (cell.getChildAt(1) as TextView).text = item.title
-            (cell.getChildAt(0) as ImageView).setImageDrawable(
+            val iconBox = cell.getChildAt(0) as FrameLayout
+            (iconBox.getChildAt(0) as ImageView).setImageDrawable(
                 icons.get(item.key) ?: runCatching { packageManager.getActivityIcon(ComponentName.unflattenFromString(item.key)!!) }
                     .getOrNull()?.also { icons.put(item.key, it) }
             )
+            val dots = dotCount(ComponentName.unflattenFromString(item.key)?.packageName)
+            (iconBox.getChildAt(1) as TextView).apply { visibility = if (dots > 0) View.VISIBLE else View.GONE; if (dots > 0) text = if (dots > 9) "9+" else dots.toString() }
             return cell
         }
     }

@@ -101,6 +101,8 @@ private fun SettingsScreen(onBack: () -> Unit) {
             item { Header("Appearance") }
             item { StyleCard() }
             item { AppearanceCard() }
+            item { Header("Hub and badges") }
+            item { HubCard(tick) }
             item { Header("Search can read") }
             items(AppSettings.SOURCES, key = { it.kind }) { SourceRow(it, tick) }
             item { FilesRow(tick) }
@@ -157,6 +159,52 @@ internal fun DefaultHomeCard(tick: Int) {
                 }) { Text("Set as default") }
             } else {
                 TextButton(onClick = { context.startActivity(Intent(Settings.ACTION_HOME_SETTINGS)) }, contentPadding = PaddingValues(0.dp)) { Text("Change in system settings") }
+            }
+        }
+    }
+}
+
+/** The Hub, the dots on icons and Active Frames. Classic turns them on by default; each is a switch of its own. */
+@Composable
+private fun HubCard(tick: Int) {
+    val context = LocalContext.current
+    var hub by remember { mutableStateOf(AppSettings.hub(context)) }
+    var dots by remember { mutableStateOf(AppSettings.dots(context)) }
+    var frames by remember { mutableStateOf(AppSettings.frames(context)) }
+    val allowed = remember(tick) { HubStore.allowed(context) }
+    Card(shape = RoundedCornerShape(24.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Hub", style = MaterialTheme.typography.bodyLarge)
+                    Text("One list for texts, missed calls, events and notifications. Swipe in from the left edge, or tap the Hub button by the search bar.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(checked = hub, onCheckedChange = { hub = it; AppSettings.setHub(context, it); (context as? android.app.Activity)?.recreate() })
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Dots on icons", style = MaterialTheme.typography.bodyLarge)
+                    Text("A small count on an app's icon while it has notifications.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(checked = dots, onCheckedChange = { dots = it; AppSettings.setDots(context, it) })
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Active Frames", style = MaterialTheme.typography.bodyLarge)
+                    Text("Your recent apps as live tiles on the first home page.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(checked = frames, onCheckedChange = { frames = it; AppSettings.setFrames(context, it) })
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Notification access", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        if (allowed) "Allowed. Notifications stay in memory on this phone; nothing is saved or sent anywhere."
+                        else "Needed to show other apps' notifications in the Hub and on icons. Texts, missed calls and events work without it.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                FilledTonalButton(onClick = { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }) { Text(if (allowed) "Manage" else "Allow") }
             }
         }
     }
