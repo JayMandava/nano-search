@@ -32,6 +32,13 @@ Numbers below were measured on a mid-range 2023 phone (8 GB RAM, CPU only). Othe
 - **Dismissing in the Hub.** A notification is cleared from the shade. A text, missed call or event comes from the phone's databases, so dismissing it only stops the Hub listing it (the id is remembered, the last 600);
   the Messages app and call log are untouched. Clear all does both.
 
+- **Peek and gestures.** `HubScreen` can be built offscreen and driven by a finger (`beginPeek`, `peek`, `endPeek`); the left-edge strip feeds it the drag and decides on release by distance or velocity. A swipe up and to the left from the bottom
+  fifth of home is recognised in `DragLayout.dispatchTouchEvent`, before the children see the touch (a child had been taking the gesture), which cancels them and opens the Hub; a straight swipe up still opens the drawer.
+- **Row actions.** Pins are remembered by item id. Snoozing a notification hands it back to Android (`snoozeNotification`), which posts it again later; texts, calls and events are hidden until the time. "Priority" is plain rules in `HubData.isPriority`.
+  `HubFeedback` makes the optional tick tones on the spot (a 70 ms decaying sine), so there are no sound files.
+- **Typeface.** Classic uses Source Sans 3, a variable font, through `NText` and `NEdit` (a TextView and an EditText that map any requested weight onto the font's weight axis) and a Compose typography for Settings.
+- **Full screen.** `WindowInsetsController` hides the system bars with swipe-to-reveal; the layout takes the display cutout as an inset so the search bar clears a camera hole when the status bar is gone.
+
 ## Search
 
 1. **Instant path (no model).** One SQLite FTS4 index holds every kind of item (Android's SQLite has no FTS5). Queries match titles first, then

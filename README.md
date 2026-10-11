@@ -30,6 +30,10 @@ answers questions, and listens when you speak. Small language models run entirel
   and, in Classic, All / Recent / Favourites tabs in the drawer and named home pages. Each is its own switch, and Classic turns them on by default.
 - **Classic wallpapers:** eight original wallpapers drawn on the spot at your screen's size (blue and violet light ribbons, woven carbon, brushed steel, aurora, embers, graphite and a pale
   glacier for the light theme), in the wallpaper screen, with the usual crop and Home / Lock / Both choice. Swipe any Hub item away, or tap Clear all.
+- **Peek, snooze and pin:** drag the Hub in from the left edge and it follows your finger; let go early and it slides back, or past a third and it stays. A swipe up and to the left from the bottom of home opens
+  it too. Press and hold a row to pin it, snooze it for an hour or until the morning, show only that app, or hide that app from the Hub. A Priority view picks out missed calls, texts from real people and wording that asks for a reply,
+  using plain rules on the phone. An optional soft tick (and a haptic one) marks opening, dismissing and clearing.
+- **Full screen:** an optional mode that hides the status bar and navigation bar; a swipe from the top or bottom edge brings them back for a moment.
 - **Type to search:** with a hardware keyboard, start typing anywhere on home and the keys go to the search bar.
 - **Material 3 Expressive design:** colours from your wallpaper (or a fixed accent), light, dark or system, and an adaptive icon.
 
@@ -109,3 +113,5 @@ Nano Search is licensed under the [Apache License 2.0](LICENSE). The models it d
 - [Vulkan-Headers](https://github.com/KhronosGroup/Vulkan-Headers) and [SPIRV-Headers](https://github.com/KhronosGroup/SPIRV-Headers) are used to build the optional GPU backend.
 - Place names come from [GeoNames](https://www.geonames.org), licensed CC BY 4.0.
 - Models are the work of their authors under the licences in the table above.
+
+The Classic style uses the Source Sans 3 typeface (SIL Open Font License, copyright Adobe), bundled with its licence.
