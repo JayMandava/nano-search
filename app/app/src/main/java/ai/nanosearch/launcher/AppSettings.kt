@@ -28,4 +28,25 @@ object AppSettings {
     /** Colours taken from the wallpaper (Material You) when true, the Nano Search violet when false. */
     fun dynamicColor(c: Context) = prefs(c).getBoolean("dynamicColor", true)
     fun setDynamicColor(c: Context, on: Boolean) = prefs(c).edit().putBoolean("dynamicColor", on).apply()
+
+    /** "modern" (Material 3 Expressive, the default) or "classic": flat and dark with a blue accent, glossy drawn icons and a Hub. */
+    fun style(c: Context) = prefs(c).getString("style", "modern") ?: "modern"
+    fun isClassic(c: Context) = style(c) == "classic"
+    fun setStyle(c: Context, style: String) = prefs(c).edit().putString("style", style).apply()
+
+    // Features that Classic turns on by default but that work in either style. Once the user touches one, their choice wins.
+    private fun feature(c: Context, key: String) = if (prefs(c).contains(key)) prefs(c).getBoolean(key, false) else isClassic(c)
+    private fun setFeature(c: Context, key: String, on: Boolean) = prefs(c).edit().putBoolean(key, on).apply()
+
+    /** The Hub: one list for messages, missed calls, events and notifications. */
+    fun hub(c: Context) = feature(c, "hub")
+    fun setHub(c: Context, on: Boolean) = setFeature(c, "hub", on)
+
+    /** A small dot or count on an app's icon while it has notifications. */
+    fun dots(c: Context) = feature(c, "dots")
+    fun setDots(c: Context, on: Boolean) = setFeature(c, "dots", on)
+
+    /** Active Frames: the apps you used last, as live tiles on the first home page. */
+    fun frames(c: Context) = feature(c, "frames")
+    fun setFrames(c: Context, on: Boolean) = setFeature(c, "frames", on)
 }

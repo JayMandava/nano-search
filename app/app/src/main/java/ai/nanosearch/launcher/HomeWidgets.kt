@@ -113,7 +113,7 @@ class HomeWidgets(
                 row.addView(ImageView(activity).apply {
                     setImageDrawable(preview)
                     scaleType = ImageView.ScaleType.FIT_CENTER
-                    background = GradientDrawable().apply { setColor(pal.container); cornerRadius = dp(16).toFloat() }
+                    background = GradientDrawable().apply { setColor(pal.container); cornerRadius = dp(pal.radius(16)).toFloat() }
                     setPadding(dp(6), dp(6), dp(6), dp(6))
                 }, LinearLayout.LayoutParams(dp(88), dp(64)))
                 row.addView(TextView(activity).apply {
@@ -211,7 +211,7 @@ class HomeWidgets(
     private fun startResize(key: Any, minW: Int, minH: Int, frame: LongPressFrame, onSize: (Int, Int) -> Unit) {
         frame.longPressEnabled = false
         val border = View(activity).apply {
-            background = GradientDrawable().apply { setStroke(dp(2), pal.primary); cornerRadius = dp(12).toFloat() }
+            background = GradientDrawable().apply { setStroke(dp(2), pal.primary); cornerRadius = dp(pal.radius(12)).toFloat() }
         }
         val handle = TextView(activity).apply {
             text = "⤡"
@@ -226,7 +226,7 @@ class HomeWidgets(
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
             setPadding(dp(14), dp(6), dp(14), dp(6))
-            background = GradientDrawable().apply { setColor(pal.primary); cornerRadius = dp(16).toFloat() }
+            background = GradientDrawable().apply { setColor(pal.primary); cornerRadius = dp(pal.radius(16)).toFloat() }
         }
         fun finish() {
             frame.removeView(border); frame.removeView(handle); frame.removeView(done)

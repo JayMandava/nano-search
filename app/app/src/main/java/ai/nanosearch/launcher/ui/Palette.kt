@@ -16,22 +16,28 @@ class Palette private constructor(
     /** The results panel and the drawer cover the wallpaper almost completely. */
     val panel: Int, val drawer: Int,
     val card: Int, val container: Int, val outline: Int, val error: Int, val scrim: Int,
+    /** The Classic style: flat surfaces and small corners. */
+    val classic: Boolean,
 ) {
+    /** A corner radius in dp for the current style: Modern is as given, Classic is much squarer. */
+    fun radius(dp: Int) = if (classic) maxOf(2, dp / 6) else dp
+
     companion object {
         private fun withAlpha(c: Color, a: Float) = c.copy(alpha = a).toArgb()
 
         fun of(context: Context): Palette {
             val s = nanoColorScheme(context)
+            val classic = ai.nanosearch.launcher.AppSettings.isClassic(context)
             return Palette(
                 s.onSurface.toArgb(), s.onSurfaceVariant.toArgb(), s.primary.toArgb(), s.onPrimary.toArgb(),
                 s.primaryContainer.toArgb(), s.onPrimaryContainer.toArgb(),
                 s.secondaryContainer.toArgb(), s.onSecondaryContainer.toArgb(),
                 s.tertiaryContainer.toArgb(), s.onTertiaryContainer.toArgb(),
                 s.errorContainer.toArgb(), s.onErrorContainer.toArgb(),
-                bar = withAlpha(s.surfaceContainerHigh, 0.92f), dock = withAlpha(s.surfaceContainer, 0.78f),
-                panel = withAlpha(s.surface, 0.97f), drawer = withAlpha(s.surface, 0.96f),
+                bar = withAlpha(s.surfaceContainerHigh, if (classic) 0.97f else 0.92f), dock = withAlpha(s.surfaceContainer, if (classic) 0.97f else 0.78f),
+                panel = withAlpha(s.surface, 0.98f), drawer = withAlpha(s.surface, if (classic) 0.99f else 0.96f),
                 card = s.surfaceContainerHigh.toArgb(), container = s.surfaceContainerHighest.toArgb(), outline = withAlpha(s.onSurface, 0.12f),
-                error = s.error.toArgb(), scrim = withAlpha(s.scrim, 0.45f),
+                error = s.error.toArgb(), scrim = withAlpha(s.scrim, 0.45f), classic = classic,
             )
         }
     }

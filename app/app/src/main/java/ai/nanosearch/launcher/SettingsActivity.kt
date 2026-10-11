@@ -99,6 +99,7 @@ private fun SettingsScreen(onBack: () -> Unit) {
             item { DefaultHomeCard(tick) }
             item { ModelsRow() }
             item { Header("Appearance") }
+            item { StyleCard() }
             item { AppearanceCard() }
             item { Header("Search can read") }
             items(AppSettings.SOURCES, key = { it.kind }) { SourceRow(it, tick) }
@@ -157,6 +158,33 @@ internal fun DefaultHomeCard(tick: Int) {
             } else {
                 TextButton(onClick = { context.startActivity(Intent(Settings.ACTION_HOME_SETTINGS)) }, contentPadding = PaddingValues(0.dp)) { Text("Change in system settings") }
             }
+        }
+    }
+}
+
+/** Modern is the Material 3 Expressive launcher; Classic is the flat, dark one with a blue accent, drawn icons and the Hub. */
+@Composable
+private fun StyleCard() {
+    val context = LocalContext.current
+    var style by remember { mutableStateOf(AppSettings.style(context)) }
+    Card(shape = RoundedCornerShape(24.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Style", style = MaterialTheme.typography.titleSmall)
+            val options = listOf("modern" to "Modern", "classic" to "Classic")
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                options.forEachIndexed { i, (key, label) ->
+                    SegmentedButton(
+                        selected = style == key,
+                        onClick = { style = key; AppSettings.setStyle(context, key); (context as? android.app.Activity)?.recreate() },
+                        shape = SegmentedButtonDefaults.itemShape(i, options.size),
+                    ) { Text(label) }
+                }
+            }
+            Text(
+                if (style == "classic") "Flat and dark with one blue accent, a labelled bar for the dock, and the Hub, notification dots and Active Frames on by default. Each can be switched off below."
+                else "Material 3 Expressive: rounded shapes and colours from your wallpaper.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

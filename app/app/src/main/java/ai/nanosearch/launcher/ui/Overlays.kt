@@ -133,9 +133,9 @@ class Overlays(private val activity: Activity, private val host: FrameLayout, pr
     }
 
     private fun cornerRadii(i: Int, n: Int, outer: Int, inner: Int): FloatArray {
-        if (n == 1) return FloatArray(8) { dpf(100) } // a lone row is a full pill
-        val top = if (i == 0) dpf(outer) else dpf(inner)
-        val bottom = if (i == n - 1) dpf(outer) else dpf(inner)
+        if (n == 1) return FloatArray(8) { dpf(if (pal.classic) pal.radius(28) else 100) } // a lone row is a full pill
+        val top = if (i == 0) dpf(pal.radius(outer)) else dpf(pal.radius(inner))
+        val bottom = if (i == n - 1) dpf(pal.radius(outer)) else dpf(pal.radius(inner))
         return floatArrayOf(top, top, top, top, bottom, bottom, bottom, bottom)
     }
 
@@ -188,7 +188,7 @@ class Overlays(private val activity: Activity, private val host: FrameLayout, pr
 
         val sheet = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            background = GradientDrawable().apply { setColor(pal.card); cornerRadii = floatArrayOf(dpf(28), dpf(28), dpf(28), dpf(28), 0f, 0f, 0f, 0f) }
+            background = GradientDrawable().apply { setColor(pal.card); cornerRadii = floatArrayOf(dpf(pal.radius(28)), dpf(pal.radius(28)), dpf(pal.radius(28)), dpf(pal.radius(28)), 0f, 0f, 0f, 0f) }
             elevation = dpf(16)
             setPadding(0, 0, 0, bottomInset())
             isClickable = true
@@ -271,7 +271,7 @@ class Overlays(private val activity: Activity, private val host: FrameLayout, pr
             setHintTextColor(pal.onVariant); setTextColor(pal.onSurface)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
             setSingleLine()
-            background = GradientDrawable().apply { setColor(pal.container); cornerRadius = dpf(28) }
+            background = GradientDrawable().apply { setColor(pal.container); cornerRadius = dpf(pal.radius(28)) }
             setPadding(dp(20), 0, dp(20), 0)
             addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) = Unit

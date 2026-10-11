@@ -395,7 +395,7 @@ class WallpaperScreen(
         if (bold) typeface = Typeface.DEFAULT_BOLD
     }
 
-    private fun round(color: Int, radiusDp: Int) = GradientDrawable().apply { setColor(color); cornerRadius = dp(radiusDp).toFloat() }
+    private fun round(color: Int, radiusDp: Int) = GradientDrawable().apply { setColor(color); cornerRadius = dp(pal.radius(radiusDp)).toFloat() }
 
     private fun row(icon: Int, text: String, onClick: () -> Unit) = LinearLayout(activity).apply {
         gravity = Gravity.CENTER_VERTICAL

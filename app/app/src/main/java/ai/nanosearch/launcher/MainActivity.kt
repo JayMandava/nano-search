@@ -156,12 +156,25 @@ class MainActivity : Activity() {
 
     /** Material 3 colours for everything the launcher paints itself; rebuilt if the user changes the theme in Settings. */
     private val pal by lazy { Palette.of(this) }
-    private val themeKey get() = AppSettings.themeMode(this) + AppSettings.dynamicColor(this) + resources.configuration.uiMode
+    private val themeKey get() = AppSettings.themeMode(this) + AppSettings.dynamicColor(this) + AppSettings.style(this) + AppSettings.hub(this) + AppSettings.dots(this) + AppSettings.frames(this) + resources.configuration.uiMode
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+    /** A flat full-width bar with a hairline along its top edge (the Classic dock). */
+    private fun flatBar(fill: Int, line: Int): Drawable =
+        android.graphics.drawable.LayerDrawable(arrayOf(android.graphics.drawable.ColorDrawable(fill), android.graphics.drawable.ColorDrawable(line))).apply {
+            setLayerHeight(1, dp(1)); setLayerGravity(1, Gravity.TOP)
+        }
+
+    private var navBottom = 0
+    /** Classic: the dock bar runs down behind the navigation bar, so it carries the bar's height as padding instead of the home layer. */
+    private fun applyDockPadding() {
+        if (!::dockRow.isInitialized) return
+        dockRow.setPadding(dp(8), dp(if (pal.classic) 8 else 10), dp(8), dp(if (pal.classic) 6 else 10) + if (pal.classic) navBottom else 0)
+    }
+
     private fun round(color: Int, radiusDp: Int) = GradientDrawable().apply {
         setColor(color)
-        cornerRadius = dp(radiusDp).toFloat()
+        cornerRadius = dp(pal.radius(radiusDp)).toFloat()
     }
 
     // ---------------------------------------------------------------- setup
@@ -199,7 +212,9 @@ class MainActivity : Activity() {
                 val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.ime())
                 val barSpace = dp(BAR_SPACE_DP)
                 searchLayer.setPadding(bars.left, sys.top, bars.right, bars.bottom)
-                home.setPadding(bars.left, sys.top + barSpace, bars.right, sys.bottom)
+                navBottom = sys.bottom
+                home.setPadding(bars.left, sys.top + barSpace, bars.right, if (pal.classic) 0 else sys.bottom)
+                applyDockPadding()
                 drawer.setPadding(bars.left, sys.top + barSpace, bars.right, bars.bottom)
                 insets
             }
@@ -213,6 +228,7 @@ class MainActivity : Activity() {
      * can never run it again against files that are gone.
      */
     private fun consumeDebugExtras(i: Intent) {
+        i.getStringExtra("style")?.let { i.removeExtra("style"); AppSettings.setStyle(this, it); recreate() }
         if (i.hasExtra("bench")) { i.removeExtra("bench"); runBench() }
         if (i.hasExtra("tune")) { i.removeExtra("tune"); CpuTuner.run(this, force = true, dryRunWith = CpuPlan.candidates + CpuPlan.Plan((1L shl CpuPlan.coreCount) - 1, 6, "all cores, 6 threads", "all")) }
         if (i.hasExtra("askbench")) { i.removeExtra("askbench"); runAskBench() }
@@ -303,7 +319,7 @@ class MainActivity : Activity() {
             textSize = 18f
             setSingleLine()
             imeOptions = EditorInfo.IME_ACTION_GO
-            background = round(pal.bar, 28)
+            background = round(pal.bar, 28).also { if (pal.classic) it.setStroke(dp(1), pal.outline) }
             val lens = getDrawable(R.drawable.ic_search)!!.mutate().apply { setTint(pal.onVariant); setBounds(0, 0, dp(24), dp(24)) }
             setCompoundDrawablesRelative(lens, null, null, null)
             compoundDrawablePadding = dp(12)
@@ -323,7 +339,7 @@ class MainActivity : Activity() {
             setImageResource(R.drawable.ic_mic) // the Material mic glyph, as in Google's search bar
             scaleType = ImageView.ScaleType.CENTER_INSIDE
             setPadding(dp(15), dp(15), dp(15), dp(15))
-            background = round(pal.bar, 28)
+            background = round(pal.bar, 28).also { if (pal.classic) it.setStroke(dp(1), pal.outline) }
             imageTintList = android.content.res.ColorStateList.valueOf(pal.onVariant)
             contentDescription = "Voice search"
             setOnClickListener { if (busy) stopAnswer() else toggleVoice() }
@@ -441,8 +457,8 @@ class MainActivity : Activity() {
         dockRow = LinearLayout(this@MainActivity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            background = round(pal.dock, 36)
-            setPadding(dp(8), dp(10), dp(8), dp(10))
+            background = if (pal.classic) flatBar(pal.dock, pal.outline) else round(pal.dock, 36)
+            setPadding(dp(8), dp(if (pal.classic) 8 else 10), dp(8), dp(if (pal.classic) 6 else 10))
         }
         pager = ViewPager(this@MainActivity).apply {
             setPageTransformer(false) { page, pos -> page.alpha = 1f - kotlin.math.min(kotlin.math.abs(pos), 1f) * 0.5f }
@@ -471,7 +487,7 @@ class MainActivity : Activity() {
             // swipe-up handle
             addView(View(this@MainActivity).apply { background = round(0x99FFFFFF.toInt(), 2) },
                 LinearLayout.LayoutParams(dp(36), dp(4)).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(2); bottomMargin = dp(12) })
-            addView(dockRow, LinearLayout.LayoutParams(-1, -2).apply { setMargins(dp(16), 0, dp(16), dp(16)) })
+            addView(dockRow, LinearLayout.LayoutParams(-1, -2).apply { if (pal.classic) setMargins(0, 0, 0, 0) else setMargins(dp(16), 0, dp(16), dp(16)) })
         }
         addView(homeContent, FrameLayout.LayoutParams(-1, -1))
         rebuildDock()
@@ -591,16 +607,16 @@ class MainActivity : Activity() {
     }
 
     /** One dock slot: how to launch it, its icon and its component (null for an unresolved default). */
-    private class DockEntry(val launch: Intent, val icon: Drawable, val component: ComponentName?)
+    private class DockEntry(val launch: Intent, val icon: Drawable, val component: ComponentName?, val label: String)
 
     private fun dockEntry(slot: Int, saved: String): DockEntry? {
         val custom = ComponentName.unflattenFromString(saved)
         if (custom != null && runCatching { packageManager.getActivityInfo(custom, 0) }.isSuccess) {
-            return DockEntry(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(custom), packageManager.getActivityIcon(custom), custom)
+            return DockEntry(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(custom), packageManager.getActivityIcon(custom), custom, packageManager.getActivityInfo(custom, 0).loadLabel(packageManager).toString())
         }
         val i = defaultDock[slot]
         val ri = packageManager.resolveActivity(i, PackageManager.MATCH_DEFAULT_ONLY) ?: return null
-        return DockEntry(i, ri.loadIcon(packageManager), ri.activityInfo?.let { ComponentName(it.packageName, it.name) })
+        return DockEntry(i, ri.loadIcon(packageManager), ri.activityInfo?.let { ComponentName(it.packageName, it.name) }, ri.loadLabel(packageManager).toString())
     }
 
     private fun rebuildDock() {
@@ -610,8 +626,8 @@ class MainActivity : Activity() {
         for (slot in 0 until DOCK_SLOTS) {
             if (saved[slot] == DOCK_EMPTY) { dockRow.addView(emptyDockSlot(slot), LinearLayout.LayoutParams(0, dp(56), 1f)); continue }
             val entry = dockEntry(slot, saved[slot]) ?: continue
-            dockRow.addView(ImageView(this).apply {
-                setImageDrawable(entry.icon)
+            val show = dockCell(entry.icon, entry.label)
+            show.apply {
                 pressScale()
                 setOnClickListener { v -> launchIntent(entry.launch, v) }
                 setOnLongClickListener { v ->
@@ -623,9 +639,22 @@ class MainActivity : Activity() {
                     )))
                     true
                 }
-            }, LinearLayout.LayoutParams(0, dp(56), 1f))
+            }
+            dockRow.addView(show, LinearLayout.LayoutParams(0, dp(if (pal.classic) 66 else 56), 1f))
         }
     }
+
+    /** A dock icon: just the picture in Modern, the picture with its name underneath in Classic. */
+    private fun dockCell(icon: Drawable, label: String): View =
+        if (!pal.classic) ImageView(this).apply { setImageDrawable(icon) }
+        else LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            addView(ImageView(context).apply { setImageDrawable(icon) }, LinearLayout.LayoutParams(dp(42), dp(42)))
+            addView(TextView(context).apply {
+                text = label; textSize = 11f; setTextColor(pal.onVariant); maxLines = 1; gravity = Gravity.CENTER; ellipsize = TextUtils.TruncateAt.END
+            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(2) })
+        }
 
     /** A removed dock icon leaves a quiet "+" you can tap to put an app there. */
     private fun emptyDockSlot(slot: Int): View = FrameLayout(this).apply {
