@@ -28,6 +28,8 @@ answers questions, and listens when you speak. Small language models run entirel
   notifications are held in memory only and are never saved or sent anywhere. Texts, calls and events work without it.
 - **Dots on icons, Active Frames and tabs:** a count on an app's icon while it has notifications; a page to the left of home with your recent apps as live tiles;
   and, in Classic, All / Recent / Favourites tabs in the drawer and named home pages. Each is its own switch, and Classic turns them on by default.
+- **Classic wallpapers:** eight original wallpapers drawn on the spot at your screen's size (blue and violet light ribbons, woven carbon, brushed steel, aurora, embers, graphite and a pale
+  glacier for the light theme), in the wallpaper screen, with the usual crop and Home / Lock / Both choice. Swipe any Hub item away, or tap Clear all.
 - **Type to search:** with a hardware keyboard, start typing anywhere on home and the keys go to the search bar.
 - **Material 3 Expressive design:** colours from your wallpaper (or a fixed accent), light, dark or system, and an adaptive icon.
 

@@ -47,6 +47,8 @@ class WallpaperScreen(
     private val pickPhoto: () -> Unit,
     private val openSystemApp: () -> Unit,
     private val openLive: () -> Unit,
+    /** Set when the build includes the clock live wallpaper; opens its choices. */
+    private val openLockClock: (() -> Unit)? = null,
 ) {
     private enum class Target { HOME, LOCK, BOTH }
 
@@ -177,6 +179,7 @@ class WallpaperScreen(
         col.addView(row(R.drawable.ic_menu_wallpaper, "Choose a photo") { pendingTarget = null; pickPhoto() })
         col.addView(row(R.drawable.ic_menu_wallpaper, "Wallpaper & style") { openSystemApp() })
         col.addView(row(R.drawable.ic_menu_apps, "Live wallpapers") { openLive() })
+        openLockClock?.let { open -> col.addView(row(R.drawable.ic_menu_clock, "Clock on the lock screen") { open() }) }
         col.addView(row(R.drawable.ic_menu_home, "Use default wallpaper") {
             io.execute { runCatching { wm.clear(WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK) } }
             activity.runOnUiThread { Toast.makeText(activity, "Default wallpaper restored", Toast.LENGTH_SHORT).show(); showOverview() }

@@ -26,6 +26,12 @@ Numbers below were measured on a mid-range 2023 phone (8 GB RAM, CPU only). Othe
 - **Dots, Frames, favourites.** Icons show a count from `HubStore`. Active Frames (`FramesPage.kt`) is a page to the left of home listing apps with something to say first, then the apps opened last
   (`AppUsage.kt` keeps the last twelve and the starred ones). Hub, dots and Frames are each a switch; Classic turns them on until you choose otherwise.
 
+- **Wallpapers and a lock screen clock.** `ClassicWallpapers.kt` draws the Classic wallpapers (gradients, blurred strokes, patterns) in about 100 ms at full size. The wallpaper screen can also offer a clock
+  on the lock screen: a live wallpaper is the only way to put a moving clock behind the lock screen, so a build that includes one (the local `src/personal` source set may carry its own manifest and resources)
+  gets a "Clock on the lock screen" row. `LockClock.kt` keeps the choices (which clock, which background, where on the screen) and opens Android's own preview, where you pick home, lock or both.
+- **Dismissing in the Hub.** A notification is cleared from the shade. A text, missed call or event comes from the phone's databases, so dismissing it only stops the Hub listing it (the id is remembered, the last 600);
+  the Messages app and call log are untouched. Clear all does both.
+
 ## Search
 
 1. **Instant path (no model).** One SQLite FTS4 index holds every kind of item (Android's SQLite has no FTS5). Queries match titles first, then

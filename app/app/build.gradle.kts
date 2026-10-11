@@ -83,6 +83,8 @@ android {
             sourceSets.getByName(name) {
                 java.srcDir("src/personal/java")
                 assets.srcDir("src/personal/assets")
+                if (file("src/personal/res").exists()) res.srcDir("src/personal/res")
+                if (file("src/personal/AndroidManifest.xml").exists()) manifest.srcFile("src/personal/AndroidManifest.xml")
             }
         }
     }

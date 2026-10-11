@@ -204,6 +204,7 @@ class MainActivity : Activity() {
             pickPhoto = { tryStart { startActivityForResult(Intent(Intent.ACTION_GET_CONTENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE), REQ_PHOTO) } },
             openSystemApp = { tryStart { startActivity(Intent(Intent.ACTION_SET_WALLPAPER).setPackage("com.android.wallpaper")) } },
             openLive = { tryStart { startActivity(Intent(android.app.WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)) } },
+            openLockClock = if (LockClock.available(this)) ({ showLockClockSheet() }) else null,
         )
         home = buildHome()
         drawer = buildDrawer()
@@ -557,6 +558,16 @@ class MainActivity : Activity() {
         } catch (e: Exception) {
             Log.w(TAG, "cannot open the notification panel: $e")
         }
+    }
+
+    /** The clock wallpaper's choices, one row each: tap a row to move to its next option, then set it as the wallpaper in Android's own preview. */
+    private fun showLockClockSheet() {
+        overlays.listSheet("Clock on the lock screen", listOf(
+            MenuItem(R.drawable.ic_menu_clock, "Clock: ${LockClock.nameOf(LockClock.CLOCKS, LockClock.clock(this))}") { LockClock.cycleClock(this); showLockClockSheet() },
+            MenuItem(R.drawable.ic_menu_wallpaper, "Background: ${LockClock.nameOf(LockClock.BACKGROUNDS, LockClock.background(this))}") { LockClock.cycleBackground(this); showLockClockSheet() },
+            MenuItem(R.drawable.ic_menu_swap, "Position: ${LockClock.nameOf(LockClock.POSITIONS, LockClock.position(this))}") { LockClock.cyclePosition(this); showLockClockSheet() },
+            MenuItem(R.drawable.ic_menu_add, "Set as wallpaper…") { tryStart { LockClock.openPicker(this) } },
+        ))
     }
 
     // ---- the Hub and notification dots
