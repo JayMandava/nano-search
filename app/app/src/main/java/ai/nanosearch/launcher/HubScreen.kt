@@ -59,6 +59,7 @@ class HubScreen(
     private var listView: ListView? = null
     private var banner: TextView? = null
     private var title: TextView? = null
+    private var countBadge: TextView? = null
     private var clearButton: TextView? = null
     private val chips = LinkedHashMap<String, TextView>()
     private var appChip: TextView? = null
@@ -90,7 +91,14 @@ class HubScreen(
         val close = NText(activity).apply { text = "✕"; textSize = 18f; setTextColor(pal.onVariant); gravity = Gravity.CENTER; setOnClickListener { dismiss() } }
         val header = LinearLayout(activity).apply {
             gravity = Gravity.CENTER_VERTICAL
-            addView(title, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(title, LinearLayout.LayoutParams(-2, -2))
+            // the unread count is a small pill beside the title, not part of it
+            countBadge = NText(activity).apply {
+                textSize = 12f; setTextColor(pal.onPrimary); gravity = Gravity.CENTER; typeface = Typeface.DEFAULT_BOLD; minWidth = dp(20); setPadding(dp(6), 0, dp(6), 0)
+                background = GradientDrawable().apply { setColor(pal.primary); cornerRadius = dp(10).toFloat() }; visibility = View.GONE
+            }
+            addView(countBadge, LinearLayout.LayoutParams(-2, dp(20)).apply { marginStart = dp(10) })
+            addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
             addView(clearButton, LinearLayout.LayoutParams(-2, dp(44)))
             addView(close, LinearLayout.LayoutParams(dp(44), dp(44)))
         }
@@ -236,7 +244,8 @@ class HubScreen(
 
     private fun refreshList() {
         val unread = items.count { it.unread && (it.kind == "message" || it.kind == "call") }
-        title?.text = if (unread > 0) "Hub  ·  $unread" else "Hub"
+        title?.text = "Hub"
+        countBadge?.let { it.text = if (unread > 99) "99+" else unread.toString(); it.visibility = if (unread > 0) View.VISIBLE else View.GONE }
         clearButton?.visibility = if (items.isNotEmpty()) View.VISIBLE else View.GONE
         rows.notifyDataSetChanged()
     }
