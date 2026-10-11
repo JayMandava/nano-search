@@ -680,11 +680,12 @@ class MainActivity : Activity() {
     private fun dockEntry(slot: Int, saved: String): DockEntry? {
         val custom = ComponentName.unflattenFromString(saved)
         if (custom != null && runCatching { packageManager.getActivityInfo(custom, 0) }.isSuccess) {
-            return DockEntry(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(custom), packageManager.getActivityIcon(custom), custom, packageManager.getActivityInfo(custom, 0).loadLabel(packageManager).toString())
+            return DockEntry(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(custom), AppIcons.get(this, custom), custom, packageManager.getActivityInfo(custom, 0).loadLabel(packageManager).toString())
         }
         val i = defaultDock[slot]
         val ri = packageManager.resolveActivity(i, PackageManager.MATCH_DEFAULT_ONLY) ?: return null
-        return DockEntry(i, ri.loadIcon(packageManager), ri.activityInfo?.let { ComponentName(it.packageName, it.name) }, ri.loadLabel(packageManager).toString())
+        val cn = ri.activityInfo?.let { ComponentName(it.packageName, it.name) }
+        return DockEntry(i, if (cn != null) AppIcons.get(this, cn) else ri.loadIcon(packageManager), cn, ri.loadLabel(packageManager).toString())
     }
 
     private fun rebuildDock() {
@@ -762,7 +763,7 @@ class MainActivity : Activity() {
 
     /** A searchable sheet of every installed launcher app; [onPick] gets the chosen component string. */
     private fun chooseApp(title: String, onPick: (String) -> Unit) {
-        val apps = Indexers.apps(this).sortedBy { it.title.lowercase() }.map { PickApp(it.title, it.key, runCatching { packageManager.getActivityIcon(ComponentName.unflattenFromString(it.key)!!) }.getOrNull()) }
+        val apps = Indexers.apps(this).sortedBy { it.title.lowercase() }.map { PickApp(it.title, it.key, runCatching { AppIcons.get(this, ComponentName.unflattenFromString(it.key)!!) }.getOrNull()) }
         overlays.appPicker(title, apps) { onPick(it.key) }
     }
 
@@ -890,6 +891,7 @@ class MainActivity : Activity() {
 
     /** Apps can be updated while the launcher is not looking (the receiver below only listens on screen), so its cached icons are dropped on every return too. */
     private fun refreshIcons() {
+        AppIcons.clear()
         results.clearIcons()
         apps.clearIcons()
     }
@@ -1729,7 +1731,7 @@ class MainActivity : Activity() {
         }
 
         private fun iconFor(item: Item): Drawable? = icons.get(item.key) ?: runCatching {
-            packageManager.getActivityIcon(ComponentName.unflattenFromString(item.key)!!)
+            AppIcons.get(this@MainActivity, ComponentName.unflattenFromString(item.key)!!)
         }.getOrNull()?.also { icons.put(item.key, it) }
     }
 
@@ -1775,7 +1777,7 @@ class MainActivity : Activity() {
             (cell.getChildAt(1) as TextView).text = item.title
             val iconBox = cell.getChildAt(0) as FrameLayout
             (iconBox.getChildAt(0) as ImageView).setImageDrawable(
-                icons.get(item.key) ?: runCatching { packageManager.getActivityIcon(ComponentName.unflattenFromString(item.key)!!) }
+                icons.get(item.key) ?: runCatching { AppIcons.get(this@MainActivity, ComponentName.unflattenFromString(item.key)!!) }
                     .getOrNull()?.also { icons.put(item.key, it) }
             )
             val dots = dotCount(ComponentName.unflattenFromString(item.key)?.packageName)

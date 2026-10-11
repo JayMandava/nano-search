@@ -93,7 +93,7 @@ class HomePage(
         val cellW = (activity.resources.displayMetrics.widthPixels - dp(16)) / COLUMNS
         for (c in shortcuts) {
             val cn = ComponentName.unflattenFromString(c) ?: continue
-            val icon = runCatching { pm.getActivityIcon(cn) }.getOrNull() ?: continue // uninstalled since: skipped (and not shown)
+            val icon = runCatching { AppIcons.get(activity, cn) }.getOrNull() ?: continue // uninstalled since: skipped (and not shown)
             val label = runCatching { pm.getActivityInfo(cn, 0).loadLabel(pm).toString() }.getOrDefault("")
             val cell = LinearLayout(activity).apply {
                 orientation = LinearLayout.VERTICAL
