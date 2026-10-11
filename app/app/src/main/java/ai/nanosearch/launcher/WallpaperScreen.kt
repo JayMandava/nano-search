@@ -173,6 +173,7 @@ class WallpaperScreen(
             sameSwitch.isEnabled = true
         }
 
+        addClassicWallpapers(col)
         col.addView(row(R.drawable.ic_menu_wallpaper, "Choose a photo") { pendingTarget = null; pickPhoto() })
         col.addView(row(R.drawable.ic_menu_wallpaper, "Wallpaper & style") { openSystemApp() })
         col.addView(row(R.drawable.ic_menu_apps, "Live wallpapers") { openLive() })
@@ -181,6 +182,37 @@ class WallpaperScreen(
             activity.runOnUiThread { Toast.makeText(activity, "Default wallpaper restored", Toast.LENGTH_SHORT).show(); showOverview() }
         })
         swap(ScrollView(activity).apply { isFillViewport = true; addView(col) })
+    }
+
+    /** A strip of Classic wallpapers, drawn on the spot at the screen's size. Tap one to crop it and choose where it goes, like a photo. */
+    private fun addClassicWallpapers(col: LinearLayout) {
+        col.addView(label("Classic wallpapers", 14f, pal.onVariant).apply { setPadding(dp(4), 0, 0, dp(8)) })
+        val tw = dp(92); val th = (tw * screenH.toFloat() / screenW).toInt()
+        val strip = LinearLayout(activity)
+        for (paper in ClassicWallpapers.ALL) {
+            val img = thumbView().apply { setOnClickListener { useClassic(paper.id) } }
+            strip.addView(LinearLayout(activity).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(img, LinearLayout.LayoutParams(tw, th))
+                addView(label(paper.name, 12f, pal.onVariant).apply { gravity = Gravity.CENTER_HORIZONTAL; setPadding(0, dp(4), 0, 0) }, LinearLayout.LayoutParams(tw, -2))
+            }, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(10) })
+            io.execute {
+                val bmp = runCatching { ClassicWallpapers.render(paper.id, 216, (216 * screenH.toFloat() / screenW).toInt()) }.getOrNull()
+                activity.runOnUiThread { if (layer != null && bmp != null) img.setImageBitmap(bmp) }
+            }
+        }
+        col.addView(android.widget.HorizontalScrollView(activity).apply { isHorizontalScrollBarEnabled = false; addView(strip) }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(16) })
+    }
+
+    private fun useClassic(id: String) {
+        pendingTarget = null
+        io.execute {
+            val bmp = runCatching { ClassicWallpapers.render(id, screenW, screenH) }.onFailure { Log.w(TAG, "cannot draw wallpaper $id: $it") }.getOrNull()
+            activity.runOnUiThread {
+                if (layer == null) return@runOnUiThread
+                if (bmp == null) Toast.makeText(activity, "Couldn't draw that wallpaper", Toast.LENGTH_SHORT).show() else showCrop(bmp)
+            }
+        }
     }
 
     private fun thumbView() = ImageView(activity).apply {
