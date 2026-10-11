@@ -13,6 +13,19 @@ Numbers below were measured on a mid-range 2023 phone (8 GB RAM, CPU only). Othe
 - **Built-in widgets.** Besides Android widgets, a page can hold widgets the launcher draws itself (`BuiltinWidgets.kt`). The launcher ships none: it looks for an optional class supplied by a local `src/personal` source set, which is compiled into debug and test builds only and ignored by git, and offers whatever it provides first in the widget picker.
 - **Settings run in their own task,** so pressing Home from a settings screen behaves like leaving any other app instead of replaying a back animation.
 
+## Styles, the Hub and Frames
+
+- **Styles.** `AppSettings.style` is "modern" (default) or "classic". The Classic colours live in `ui/Theme.kt` (charcoal and white, one blue accent, light or dark), and `Palette.radius()` squares the corners
+  of everything the launcher draws. Classic also gives the dock a flat labelled bar that runs behind the navigation bar, and the drawer a bottom tab bar (All, Recent, Favourites). Changing the style recreates the home screen.
+- **Icons.** `ClassicIcons.kt` draws about twenty icons in code (handset, speech bubble, envelope, globe, camera, photo cards, notes, alarm clock, calendar page with today's date, calculator,
+  address book, filing cabinet, gear, map, notepad, shopping bag, screen with a play button, microphone, sun and cloud, wallet, clipboard). An app gets one when its package or label says what it is; every
+  other app keeps its own icon on a dark glossy tile. All of it is original artwork.
+- **Hub.** `NotificationHub` is a notification listener; it feeds `HubStore`, which keeps the notifications in memory only (nothing is written to disk) and tells the screen when they change. `HubData` adds
+  recent texts, missed calls and the next week's events from the same providers search already reads, and skips a text that a notification has already shown. `HubScreen` lists them with filters, replies in
+  place through the notification's own reply action, and dismisses. Swipe in from the left edge (the strip excludes itself from the system Back gesture) or use the button by the search bar.
+- **Dots, Frames, favourites.** Icons show a count from `HubStore`. Active Frames (`FramesPage.kt`) is a page to the left of home listing apps with something to say first, then the apps opened last
+  (`AppUsage.kt` keeps the last twelve and the starred ones). Hub, dots and Frames are each a switch; Classic turns them on until you choose otherwise.
+
 ## Search
 
 1. **Instant path (no model).** One SQLite FTS4 index holds every kind of item (Android's SQLite has no FTS5). Queries match titles first, then

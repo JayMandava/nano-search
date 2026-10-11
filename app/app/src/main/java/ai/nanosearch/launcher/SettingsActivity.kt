@@ -191,7 +191,7 @@ private fun HubCard(tick: Int) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Active Frames", style = MaterialTheme.typography.bodyLarge)
-                    Text("Your recent apps as live tiles on the first home page.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Your recent apps as live tiles, on a page to the left of home.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(checked = frames, onCheckedChange = { frames = it; AppSettings.setFrames(context, it) })
             }
@@ -255,7 +255,7 @@ private fun AppearanceCard() {
                     ) { Text(label) }
                 }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            if (!AppSettings.isClassic(context)) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Colours from wallpaper", style = MaterialTheme.typography.bodyLarge)
                     Text("Material You. Off uses the Nano Search violet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

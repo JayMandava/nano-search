@@ -20,12 +20,21 @@ answers questions, and listens when you speak. Small language models run entirel
 - **Models you choose:** pick, download, test or import the model for each job in Settings > Models.
 - **Adapts to the phone:** it detects the CPU core layout and RAM, measures once in the background which core grouping runs the models fastest, and sizes how long models stay loaded to the available memory. Settings > Advanced shows what it chose and lets you override it.
 - **Optional GPU (experimental):** Settings > Advanced can try running the language models on the GPU through Vulkan. It is off by default, only used if an on-device test shows it is faster, and switches itself off if it fails or crashes.
+- **Classic style (optional):** a second look for the whole launcher, chosen in Settings > Appearance. Flat charcoal and white with one blue accent,
+  squarer corners, a labelled dock bar, and an original set of glossy drawn icons (a handset, an envelope, a camera, a calendar page that shows today's date).
+  Apps without a drawn icon keep their own, set on a matching dark tile. Modern, the default, is unchanged.
+- **Hub:** one list for texts, missed calls, upcoming events and the notifications of your other apps, with filters, replying in place where an app allows it,
+  and dismissing. Swipe in from the left edge or tap the Hub button by the search bar. It uses Android's notification access, which you grant yourself;
+  notifications are held in memory only and are never saved or sent anywhere. Texts, calls and events work without it.
+- **Dots on icons, Active Frames and tabs:** a count on an app's icon while it has notifications; a page to the left of home with your recent apps as live tiles;
+  and, in Classic, All / Recent / Favourites tabs in the drawer and named home pages. Each is its own switch, and Classic turns them on by default.
+- **Type to search:** with a hardware keyboard, start typing anywhere on home and the keys go to the search bar.
 - **Material 3 Expressive design:** colours from your wallpaper (or a fixed accent), light, dark or system, and an adaptive icon.
 
 ## Privacy
 
 Everything is indexed into a private database inside the app. Models run on the CPU. The app has the INTERNET permission for one
-reason only: downloading models when you tap Download. Downloads are checked against a SHA-256 before they are used, and
+reason only: downloading models when you tap Download. Notification access, if you allow it for the Hub, only reads notifications on the phone. Downloads are checked against a SHA-256 before they are used, and
 "Download on Wi-Fi only" is on by default. Each search source (contacts, messages, calls, calendar, files, photos) can be switched off
 in Settings, and "Clear and rebuild" empties the index.
 

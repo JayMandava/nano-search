@@ -90,6 +90,13 @@ class MainActivity : Activity() {
     private lateinit var pager: ViewPager
     private lateinit var dots: PageDots
     private var pages: List<HomePage> = emptyList()
+    private var framesPage: FramesPage? = null
+    /** Active Frames, when on, is a page of its own to the left of the home pages; everything that counts pages allows for it. */
+    private val pageOffset get() = if (framesPage != null) 1 else 0
+    private var pageLabel: TextView? = null
+    private var drawerTab = "all" // Classic: "all", "recent" or "fav"
+    private var tabViews: Map<String, TextView> = emptyMap()
+    private lateinit var drawerEmpty: TextView
     private val widgetHost by lazy { AppWidgetHost(this, HomeWidgets.HOST_ID) }
     private lateinit var overlayHost: FrameLayout
     private lateinit var overlays: Overlays
@@ -193,7 +200,7 @@ class MainActivity : Activity() {
         hubScreen = HubScreen(this, overlayHost, pal) { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); hubScreen.dismiss(false) }
         wallpaperScreen = WallpaperScreen(
             this, overlayHost, pal,
-            pageCount = { pageIds().size },
+            pageCount = { pageIds().size + pageOffset },
             pickPhoto = { tryStart { startActivityForResult(Intent(Intent.ACTION_GET_CONTENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE), REQ_PHOTO) } },
             openSystemApp = { tryStart { startActivity(Intent(Intent.ACTION_SET_WALLPAPER).setPackage("com.android.wallpaper")) } },
             openLive = { tryStart { startActivity(Intent(android.app.WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)) } },
@@ -487,6 +494,7 @@ class MainActivity : Activity() {
             setPageTransformer(false) { page, pos -> page.alpha = 1f - kotlin.math.min(kotlin.math.abs(pos), 1f) * 0.5f }
             addOnPageChangeListener(object : ViewPager.SimpleOnPageChangeListener() {
                 override fun onPageScrolled(position: Int, positionOffset: Float, positionOffsetPixels: Int) { dots.setPosition(position + positionOffset); slideWallpaper(position + positionOffset) }
+                override fun onPageSelected(position: Int) { updatePageLabel(); if (position < pageOffset) framesPage?.refresh() }
             })
         }
         dots = PageDots(this@MainActivity, Color.WHITE)
@@ -506,6 +514,10 @@ class MainActivity : Activity() {
         homeContent = LinearLayout(this@MainActivity).apply {
             orientation = LinearLayout.VERTICAL
             addView(pager, LinearLayout.LayoutParams(-1, 0, 1f))
+            if (pal.classic) {
+                pageLabel = TextView(this@MainActivity).apply { textSize = 12f; setTextColor(pal.onVariant); gravity = Gravity.CENTER; setShadowLayer(6f, 0f, 1f, 0x99000000.toInt()); letterSpacing = 0.06f }
+                addView(pageLabel, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.CENTER_HORIZONTAL })
+            }
             addView(dots, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.CENTER_HORIZONTAL })
             // swipe-up handle
             addView(View(this@MainActivity).apply { background = round(0x99FFFFFF.toInt(), 2) },
@@ -524,7 +536,7 @@ class MainActivity : Activity() {
         setOnClickListener { if (input.hasFocus()) { hideKeyboard(); input.clearFocus() } }
 
         // Swipe up opens the drawer, unless the page's content can still scroll that way.
-        canStart = { !currentPage().scroll.canScrollVertically(1) }
+        canStart = { !activeScroll().canScrollVertically(1) }
         onDrag = { dy -> drawer.visibility = View.VISIBLE; drawer.translationY = (screenH - dy).coerceIn(0f, screenH); applyDrawerProgress() }
         onRelease = { vy, dragged ->
             if (dragged) {
@@ -533,7 +545,7 @@ class MainActivity : Activity() {
         }
 
         // Swipe down pulls the notification panel, unless something on screen is using the gesture.
-        canPullDown = { !searchActive && !drawerOpen && !overlays.isShowing && !currentPage().scroll.canScrollVertically(-1) }
+        canPullDown = { !searchActive && !drawerOpen && !overlays.isShowing && !hubScreen.isShowing && !activeScroll().canScrollVertically(-1) }
         onPullDown = { expandNotifications() }
     }
 
@@ -575,6 +587,7 @@ class MainActivity : Activity() {
     private val notificationsChanged: () -> Unit = {
         rebuildDock()
         apps.notifyDataSetChanged()
+        framesPage?.refresh()
         updateHubBadge()
     }
 
@@ -594,7 +607,27 @@ class MainActivity : Activity() {
 
     // ---- home pages
 
-    private fun currentPage(): HomePage = pages[pager.currentItem.coerceIn(0, pages.size - 1)]
+    private fun currentPage(): HomePage = pages[(pager.currentItem - pageOffset).coerceIn(0, pages.size - 1)]
+
+    /** The scrolling view of whichever page is showing, so swipe-up and pull-down only start when it cannot scroll further that way. */
+    private fun activeScroll(): android.widget.ScrollView = if (pager.currentItem < pageOffset) framesPage!!.scroll else currentPage().scroll
+
+    private fun pageName(index: Int): String {
+        if (index < pageOffset) return "Active Frames"
+        val id = pageIds()[index - pageOffset]
+        return prefs.getString("pagename_$id", null)?.takeIf { it.isNotBlank() } ?: if (index == pageOffset) "Home" else "Page ${index - pageOffset + 1}"
+    }
+
+    private fun updatePageLabel() { pageLabel?.text = pageName(pager.currentItem.coerceIn(0, pages.size + pageOffset - 1)).uppercase() }
+
+    private fun renamePage() {
+        if (pager.currentItem < pageOffset) return
+        val id = currentPage().id
+        val field = android.widget.EditText(this).apply { setText(prefs.getString("pagename_$id", "")); hint = "Page name"; setSingleLine(); setSelectAllOnFocus(true) }
+        android.app.AlertDialog.Builder(this).setTitle("Name this page").setView(field)
+            .setPositiveButton("Save") { _, _ -> prefs.edit().putString("pagename_$id", field.text.toString().trim()).apply(); updatePageLabel() }
+            .setNegativeButton("Cancel", null).show()
+    }
 
     private fun pageIds(): List<String> = prefs.getString("pages", "0")!!.split(',').filter { it.isNotBlank() }.ifEmpty { listOf("0") }
 
@@ -608,24 +641,33 @@ class MainActivity : Activity() {
                 appInfo = { cn -> showAppInfo(cn.packageName) },
             ).also { it.restore() }
         }
+        framesPage = if (AppSettings.frames(this)) FramesPage(this, pal, { cn, v -> launchComponent(cn, v) }, { cn, v ->
+            overlays.popupFor(v, listOf(listOf(
+                MenuItem(R.drawable.ic_menu_info, "App info") { showAppInfo(cn.packageName) },
+                MenuItem(R.drawable.ic_menu_remove, "Remove from frames") { AppUsage.forget(this, cn.flattenToString()); framesPage?.refresh() },
+            )))
+        }).also { it.refresh() } else null
         pages.first().root.addView(clockBlock, 0, LinearLayout.LayoutParams(-1, -2))
+        val offset = pageOffset
         pager.adapter = object : PagerAdapter() {
-            override fun getCount() = pages.size
+            override fun getCount() = pages.size + offset
             override fun isViewFromObject(view: View, obj: Any) = view === obj
-            override fun instantiateItem(container: ViewGroup, position: Int): Any = pages[position].root.also { container.addView(it) }
+            override fun instantiateItem(container: ViewGroup, position: Int): Any =
+                (if (position < offset) framesPage!!.root else pages[position - offset].root).also { container.addView(it) }
             override fun destroyItem(container: ViewGroup, position: Int, obj: Any) = container.removeView(obj as View)
             override fun getItemPosition(obj: Any) = POSITION_NONE
         }
-        pager.offscreenPageLimit = pages.size.coerceAtLeast(1)
-        dots.setCount(pages.size)
-        pager.setCurrentItem(showIndex.coerceIn(0, pages.size - 1), false)
+        pager.offscreenPageLimit = (pages.size + offset).coerceAtLeast(1)
+        dots.setCount(pages.size + offset)
+        pager.setCurrentItem(showIndex.coerceIn(0, pages.size - 1) + offset, false)
         dots.setPosition(pager.currentItem.toFloat())
         slideWallpaper(pager.currentItem.toFloat())
+        updatePageLabel()
     }
 
     /** A wallpaper wider than the screen slides as the home pages are swiped; one page, or a wallpaper the width of the screen, stays put. */
     private fun slideWallpaper(page: Float) {
-        val n = pageIds().size
+        val n = pageIds().size + pageOffset
         runCatching {
             val wm = android.app.WallpaperManager.getInstance(this)
             wm.setWallpaperOffsetSteps(if (n > 1) 1f / (n - 1) else 1f, 1f)
@@ -638,14 +680,14 @@ class MainActivity : Activity() {
         val seq = prefs.getInt("pageSeq", 1) + 1
         prefs.edit().putInt("pageSeq", seq).putString("pages", (pageIds() + "p$seq").joinToString(",")).apply()
         buildPages(pages.size)
-        pager.setCurrentItem(pages.size - 1, true)
+        pager.setCurrentItem(pages.size - 1 + pageOffset, true)
     }
 
     private fun removeCurrentPage() {
-        if (pages.size <= 1) return
+        if (pages.size <= 1 || pager.currentItem < pageOffset) return
         val page = currentPage()
         val doRemove = {
-            val at = pager.currentItem
+            val at = pager.currentItem - pageOffset
             page.clear()
             prefs.edit().putString("pages", (pageIds() - page.id).joinToString(",")).apply()
             buildPages((at - 1).coerceAtLeast(0))
@@ -698,7 +740,7 @@ class MainActivity : Activity() {
             val show = dockCell(entry.icon, entry.label, entry.component?.packageName)
             show.apply {
                 pressScale()
-                setOnClickListener { v -> launchIntent(entry.launch, v) }
+                setOnClickListener { v -> entry.component?.let { AppUsage.note(this@MainActivity, it.flattenToString()) }; launchIntent(entry.launch, v) }
                 setOnLongClickListener { v ->
                     val pkg = entry.component?.packageName
                     overlays.popupFor(v, listOf(listOf(
@@ -791,7 +833,8 @@ class MainActivity : Activity() {
             ),
             buildList {
                 if (pages.size < MAX_PAGES) add(MenuItem(R.drawable.ic_menu_page_add, "Add page") { addPage() })
-                if (pages.size > 1) add(MenuItem(R.drawable.ic_menu_delete, "Remove this page", destructive = true) { removeCurrentPage() })
+                if (pal.classic && pager.currentItem >= pageOffset) add(MenuItem(R.drawable.ic_menu_wallpaper, "Name this page") { renamePage() })
+                if (pages.size > 1 && pager.currentItem >= pageOffset) add(MenuItem(R.drawable.ic_menu_delete, "Remove this page", destructive = true) { removeCurrentPage() })
             },
             listOf(
                 MenuItem(R.drawable.ic_menu_home, "Reset dock") { prefs.edit().remove("dock").apply(); rebuildDock() },
@@ -854,6 +897,12 @@ class MainActivity : Activity() {
         }
         addView(grid, FrameLayout.LayoutParams(-1, -1))
         addView(banner, FrameLayout.LayoutParams(-1, dp(38), Gravity.TOP).apply { setMargins(dp(16), dp(4), dp(16), 0) })
+        drawerEmpty = TextView(this@MainActivity).apply { textSize = 15f; setTextColor(pal.onVariant); gravity = Gravity.CENTER; visibility = View.GONE }
+        addView(drawerEmpty, FrameLayout.LayoutParams(-1, -2, Gravity.CENTER))
+        if (pal.classic) {
+            grid.setPadding(dp(8), dp(8), dp(8), dp(24) + dp(56))
+            addView(buildTabBar(), FrameLayout.LayoutParams(-1, dp(56), Gravity.BOTTOM))
+        }
 
         // Pull down to close, but only when the app grid is scrolled to the top.
         canStart = { !grid.canScrollVertically(-1) }
@@ -865,11 +914,50 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Classic: a bar along the bottom of the drawer with a tab for all apps, the recent ones and the starred ones. */
+    private fun buildTabBar(): View {
+        val tabs = listOf(Triple("all", "All", R.drawable.ic_menu_apps), Triple("recent", "Recent", R.drawable.ic_menu_clock), Triple("fav", "Favourites", R.drawable.ic_star))
+        val views = LinkedHashMap<String, TextView>()
+        val bar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            background = flatBar(pal.dock or 0xFF000000.toInt(), pal.outline)
+            for ((key, label, icon) in tabs) {
+                val tab = TextView(context).apply {
+                    text = label; textSize = 11f; gravity = Gravity.CENTER; compoundDrawablePadding = dp(2); setPadding(0, dp(6), 0, dp(4))
+                    setCompoundDrawablesRelativeWithIntrinsicBounds(null, getDrawable(icon)!!.mutate().apply { setBounds(0, 0, dp(22), dp(22)) }, null, null)
+                    setOnClickListener { drawerTab = key; styleTabs(); search() }
+                }
+                views[key] = tab
+                addView(tab, LinearLayout.LayoutParams(0, -1, 1f))
+            }
+        }
+        tabViews = views
+        styleTabs()
+        return bar
+    }
+
+    private fun styleTabs() {
+        for ((key, tab) in tabViews) {
+            val on = key == drawerTab
+            tab.setTextColor(if (on) pal.primary else pal.onVariant)
+            tab.compoundDrawablesRelative[1]?.mutate()?.setTint(if (on) pal.primary else pal.onVariant)
+            tab.background = if (on) flatBar(0x00000000, pal.primary).also { (it as android.graphics.drawable.LayerDrawable).setLayerHeight(1, dp(3)) } else null
+        }
+    }
+
+    /** What the drawer shows for the chosen tab, from every app. */
+    private fun forTab(all: List<Item>): List<Item> = when (drawerTab) {
+        "recent" -> AppUsage.recents(this).mapNotNull { (c, _) -> all.firstOrNull { it.key == c } }
+        "fav" -> AppUsage.favourites(this).mapNotNull { c -> all.firstOrNull { it.key == c } }.sortedBy { it.title.lowercase() }
+        else -> all
+    }
+
     private fun appMenu(item: Item, anchor: View) {
         val cn = ComponentName.unflattenFromString(item.key) ?: return
         val pkg = cn.packageName
         overlays.popupFor(anchor, listOf(listOf(
             MenuItem(R.drawable.ic_menu_info, "App info") { showAppInfo(pkg) },
+            MenuItem(R.drawable.ic_star, if (AppUsage.isFavourite(this, item.key)) "Remove from favourites" else "Add to favourites") { AppUsage.toggleFavourite(this, item.key); search() },
             MenuItem(R.drawable.ic_menu_add, "Add to home") { currentPage().addShortcut(item.key); closeDrawer(clear = true); Toast.makeText(this, "${item.title} added to home", Toast.LENGTH_SHORT).show() },
             MenuItem(R.drawable.ic_menu_apps, "Add to dock") {
                 overlays.listSheet("Add ${item.title} to the dock", List(DOCK_SLOTS) { slot -> MenuItem(R.drawable.ic_menu_add, "Dock slot ${slot + 1}") { setDock(slot, item.key) } })
@@ -880,6 +968,7 @@ class MainActivity : Activity() {
 
     /** Launches an app from an icon the user touched, growing the app's window out of that icon. */
     private fun launchIntent(intent: Intent, from: View) {
+        intent.component?.let { AppUsage.note(this, it.flattenToString()) }
         val options = ActivityOptions.makeScaleUpAnimation(from, 0, 0, from.width, from.height).toBundle()
         runCatching { startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), options) }
     }
@@ -979,6 +1068,15 @@ class MainActivity : Activity() {
         consumeDebugExtras(intent)
     }
 
+    /** With a hardware keyboard, just start typing: the keys go to the search bar, wherever you are on home. */
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (!input.hasFocus() && !overlays.isShowing && !hubScreen.isShowing && !wallpaperScreen.isShowing && event.isPrintingKey && !event.isCtrlPressed && !event.isAltPressed && !event.isMetaPressed) {
+            val ch = event.unicodeChar
+            if (ch != 0) { input.requestFocus(); input.append(String(Character.toChars(ch))); input.setSelection(input.text.length); return true }
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
     @Deprecated("Launcher: back never leaves home")
     override fun onBackPressed() {
         when {
@@ -989,7 +1087,7 @@ class MainActivity : Activity() {
             input.text.isNotEmpty() -> input.setText("")
             input.hasFocus() -> { hideKeyboard(); input.clearFocus() }
             drawerOpen -> closeDrawer(clear = true)
-            pager.currentItem != 0 -> pager.setCurrentItem(0, true)
+            pager.currentItem != pageOffset -> pager.setCurrentItem(pageOffset, true)
         }
     }
 
@@ -1051,7 +1149,7 @@ class MainActivity : Activity() {
         overlays.dismissAll()
         wallpaperScreen.dismiss()
         if (::hubScreen.isInitialized) hubScreen.dismiss(false)
-        if (::pager.isInitialized && pager.currentItem != 0) pager.setCurrentItem(0, true)
+        if (::pager.isInitialized && pager.currentItem != pageOffset) pager.setCurrentItem(pageOffset, true)
         input.setText("")
         input.clearFocus()
         hideAnswer()
@@ -1119,7 +1217,12 @@ class MainActivity : Activity() {
             val found = if (query.isBlank()) emptyList() else index.search(query, limit = 60, semantic = semantic)
             ui.post {
                 if (seq != searchSeq) return@post
-                if (drawerApps != null) { apps.set(drawerApps); results.set(emptyList()) } else results.set(withAsk(query, found))
+                if (drawerApps != null) {
+                    val shown = forTab(drawerApps)
+                    apps.set(shown); results.set(emptyList())
+                    drawerEmpty.visibility = if (shown.isEmpty() && drawerTab != "all") View.VISIBLE else View.GONE
+                    drawerEmpty.text = if (drawerTab == "recent") "Apps you open show up here" else "Press and hold an app to add it to your favourites"
+                } else results.set(withAsk(query, found))
             }
         }
     }
@@ -1543,7 +1646,7 @@ class MainActivity : Activity() {
     private fun open(item: Item, from: View? = null) {
         val intent = when (item.kind) {
             "app" -> Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-                .setComponent(ComponentName.unflattenFromString(item.key))
+                .setComponent(ComponentName.unflattenFromString(item.key)).also { AppUsage.note(this, item.key) }
             "contact" -> contactIntent(item)
             "message" -> Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:${item.key.substringBefore('|')}"))
             "call" -> Intent(Intent.ACTION_DIAL, Uri.parse("tel:${item.key.substringBefore('|')}"))
