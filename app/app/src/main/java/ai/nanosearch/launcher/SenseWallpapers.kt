@@ -18,7 +18,7 @@ import kotlin.random.Random
  */
 object SenseWallpapers {
     val ALL = listOf(
-        ClassicWallpapers.Paper("spectrum", "Spectrum"), ClassicWallpapers.Paper("cloudscape", "Cloudscape"),
+        ClassicWallpapers.Paper("spectrum", "Spectrum"), ClassicWallpapers.Paper("curtain", "Curtain"), ClassicWallpapers.Paper("cloudscape", "Cloudscape"),
         ClassicWallpapers.Paper("glow", "Glow"), ClassicWallpapers.Paper("chrome", "Chrome"), ClassicWallpapers.Paper("dusk", "Dusk"),
         ClassicWallpapers.Paper("bokeh", "Bokeh"), ClassicWallpapers.Paper("ripple", "Ripple"), ClassicWallpapers.Paper("meadow", "Meadow"),
     )
@@ -29,6 +29,7 @@ object SenseWallpapers {
         val c = Canvas(bmp)
         when (id) {
             "spectrum" -> spectrum(c, w, h)
+            "curtain" -> curtain(c, w, h)
             "cloudscape" -> cloudscape(c, w, h)
             "glow" -> glow(c, w, h)
             "chrome" -> chrome(c, w, h)
@@ -254,5 +255,33 @@ object SenseWallpapers {
         for (k in 0 until 6) c.drawOval(w * (k * 0.2f - 0.1f), h * 0.68f, w * (k * 0.2f + 0.3f), h * 0.735f, soft)
         for (i in 0 until 5) cluster(c, w, w * (0.05f + 0.22f * i), h * (0.84f + 0.03f * (i % 2)), w * 0.28f, h * 0.07f, 10, rnd, 0xEEF2FBFE.toInt())
         fill(c, w, h, vgrad(h, 0f to 0x00000000, 0.75f to 0x00000000, 1f to 0x552a7da0))
+    }
+
+    /** Curtains of blue and violet light rising from the foot of the screen over a dark arched horizon. */
+    private fun curtain(c: Canvas, w: Int, h: Int) {
+        fill(c, w, h, vgrad(h, 0f to 0xFF05060f.toInt(), 0.5f to 0xFF0a0e24.toInt(), 1f to 0xFF14123a.toInt()))
+        val rnd = Random(9)
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        val add = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SCREEN)
+        for (i in 0 until 46) {
+            val x = w * (-0.05f + 1.1f * rnd.nextFloat())
+            val sw = w * (0.012f + 0.05f * rnd.nextFloat())
+            val top = h * (0.22f + 0.4f * rnd.nextFloat())
+            val violet = rnd.nextFloat() < 0.35f
+            val c0 = if (violet) 0xFF7C4DFF.toInt() else 0xFF2E9BFF.toInt()
+            p.xfermode = add
+            p.maskFilter = BlurMaskFilter(sw * 0.8f, BlurMaskFilter.Blur.NORMAL)
+            p.shader = LinearGradient(0f, top, 0f, h * 0.86f, intArrayOf(0x00000000, (0x55 + rnd.nextInt(0x40) shl 24) or (c0 and 0xFFFFFF), (0xAA shl 24) or (c0 and 0xFFFFFF)), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+            c.drawRect(x - sw / 2, top, x + sw / 2, h * 0.9f, p)
+        }
+        p.xfermode = null; p.maskFilter = null; p.shader = null
+        // the arched horizon: a dark dome with a pale glowing rim
+        val cx = w / 2f; val top = h * 0.84f
+        val dome = Path().apply { moveTo(-w * 0.2f, h * 1.02f); quadTo(cx, top - h * 0.1f, w * 1.2f, h * 1.02f); close() }
+        p.shader = LinearGradient(0f, top - h * 0.05f, 0f, h.toFloat(), 0xFF1c1a4a.toInt(), 0xFF05050c.toInt(), Shader.TileMode.CLAMP)
+        c.drawPath(dome, p)
+        p.shader = null; p.style = Paint.Style.STROKE; p.strokeWidth = w * 0.006f; p.color = 0xAA9FB5FF.toInt(); p.maskFilter = BlurMaskFilter(w * 0.006f, BlurMaskFilter.Blur.NORMAL)
+        c.drawPath(Path().apply { moveTo(-w * 0.2f, h * 1.02f); quadTo(cx, top - h * 0.1f, w * 1.2f, h * 1.02f) }, p)
+        fill(c, w, h, RadialGradient(w / 2f, h * 0.45f, h * 0.85f, 0x00000000, 0x77000000, Shader.TileMode.CLAMP))
     }
 }

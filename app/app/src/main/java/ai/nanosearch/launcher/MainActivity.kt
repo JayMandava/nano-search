@@ -94,6 +94,10 @@ class MainActivity : Activity() {
     /** Active Frames, when on, is a page of its own to the left of the home pages; everything that counts pages allows for it. */
     private val pageOffset get() = if (framesPage != null) 1 else 0
     private var pageLabel: TextView? = null
+    private var senseTitle: TextView? = null
+    private var senseHeader: View? = null
+    private var senseTabs: ai.nanosearch.launcher.ui.SenseTabBar? = null
+    private var senseSearchOpen = false
     private var drawerTab = "all" // Classic: "all", "recent" or "fav"
     private var tabViews: Map<String, TextView> = emptyMap()
     private lateinit var drawerEmpty: TextView
@@ -179,7 +183,11 @@ class MainActivity : Activity() {
     /** Classic: the dock bar runs down behind the navigation bar, so it carries the bar's height as padding instead of the home layer. */
     private fun applyDockPadding() {
         if (!::dockRow.isInitialized) return
-        if (pal.sense) { dockRow.setPadding(dp(24), 0, dp(24), navBottom + dp(12)); return }
+        if (pal.sense) { // the arch runs down behind the navigation bar; the apps sit in the bar below its top edge
+            dockRow.setPadding(dp(18), dp(24), dp(18), navBottom)
+            dockRow.layoutParams = (dockRow.layoutParams as LinearLayout.LayoutParams).apply { height = dp(88) + navBottom }
+            return
+        }
         dockRow.setPadding(dp(8), dp(if (pal.classic) 8 else 10), dp(8), dp(if (pal.classic) 6 else 10) + if (pal.classic) navBottom else 0)
     }
 
@@ -195,9 +203,6 @@ class MainActivity : Activity() {
 
     /** The search bar and its buttons: Sense glass, a flat outlined bar in Spirit, a soft rounded one in Modern. */
     private fun barBg(radiusDp: Int): Drawable = if (pal.sense) senseGlass(9) else round(pal.bar, radiusDp).also { if (pal.classic) it.setStroke(dp(1), pal.outline) }
-
-    /** The Sense dock has no panel: Phone and Camera stand on the wallpaper either side of the ring, over a faint shade that deepens towards the bottom edge. */
-    private fun senseDockShade(): Drawable = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0x00000000, 0x55000000, 0xA0000000.toInt()))
 
     /** A glossy dark band with a bright edge along its top (the tab bar of the Sense drawer). */
     private fun senseDock(): Drawable = android.graphics.drawable.LayerDrawable(arrayOf(
@@ -251,7 +256,7 @@ class MainActivity : Activity() {
                 navBottom = sys.bottom
                 home.setPadding(bars.left, sys.top + barSpace, bars.right, if (pal.classic) 0 else sys.bottom)
                 applyDockPadding()
-                drawer.setPadding(bars.left, sys.top + barSpace, bars.right, bars.bottom)
+                drawer.setPadding(bars.left, if (pal.sense) sys.top else sys.top + barSpace, bars.right, bars.bottom)
                 insets
             }
         }
@@ -513,7 +518,7 @@ class MainActivity : Activity() {
         dockRow = LinearLayout(this@MainActivity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            background = if (pal.sense) senseDockShade() else if (pal.classic) flatBar(pal.dock, pal.outline) else round(pal.dock, 36)
+            background = if (pal.sense) ai.nanosearch.launcher.ui.SenseArch(this@MainActivity) else if (pal.classic) flatBar(pal.dock, pal.outline) else round(pal.dock, 36)
             if (pal.sense) { clipChildren = false; clipToPadding = false } // the ring stands up out of the panel
             setPadding(dp(8), dp(if (pal.classic) 8 else 10), dp(8), dp(if (pal.classic) 6 else 10))
         }
@@ -557,7 +562,7 @@ class MainActivity : Activity() {
                 pageLabel = NText(this@MainActivity).apply { textSize = 12f; setTextColor(pal.onVariant); gravity = Gravity.CENTER; setShadowLayer(6f, 0f, 1f, 0x99000000.toInt()); letterSpacing = 0.06f }
                 addView(pageLabel, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.CENTER_HORIZONTAL })
             }
-            addView(dots, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.CENTER_HORIZONTAL; if (pal.sense) bottomMargin = dp(36) })
+            addView(dots, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.CENTER_HORIZONTAL; if (pal.sense) bottomMargin = dp(46) })
             // swipe-up handle (Sense has the ring instead)
             if (!pal.sense) addView(View(this@MainActivity).apply { background = round(0x99FFFFFF.toInt(), 2) },
                 LinearLayout.LayoutParams(dp(36), dp(4)).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(2); bottomMargin = dp(12) })
@@ -803,7 +808,7 @@ class MainActivity : Activity() {
         val saved = dockSaved()
         for (slot in 0 until dockSlots) {
             // Sense: the ring sits in the middle of the dock; tap it or pull it up for the apps
-            if (pal.sense && slot == dockSlots / 2) dockRow.addView(ai.nanosearch.launcher.ui.SenseRing(this) { x, y -> openDrawer(x, y) }.apply { contentDescription = "All apps" }, LinearLayout.LayoutParams(dp(96), dp(96)))
+            if (pal.sense && slot == dockSlots / 2) dockRow.addView(ai.nanosearch.launcher.ui.SenseRing(this, -dp(52).toFloat()) { x, y -> openDrawer(x, y) }.apply { contentDescription = "All apps (pull up)" }, LinearLayout.LayoutParams(dp(96), dp(96)))
             if (saved[slot] == DOCK_EMPTY) { dockRow.addView(emptyDockSlot(slot), LinearLayout.LayoutParams(0, dp(56), 1f)); continue }
             val entry = dockEntry(slot, saved[slot]) ?: continue
             val show = dockCell(entry.icon, entry.label, entry.component?.packageName)
@@ -820,8 +825,7 @@ class MainActivity : Activity() {
                     true
                 }
             }
-            if (pal.sense) show.translationY = dp(14).toFloat() // the two apps sit lower than the ring: together an arch
-            dockRow.addView(show, LinearLayout.LayoutParams(0, dp(if (pal.sense) 68 else if (pal.classic) 66 else 56), 1f))
+                        dockRow.addView(show, LinearLayout.LayoutParams(0, dp(if (pal.sense) 58 else if (pal.classic) 66 else 56), 1f))
         }
     }
 
@@ -972,9 +976,38 @@ class MainActivity : Activity() {
         addView(banner, FrameLayout.LayoutParams(-1, dp(38), Gravity.TOP).apply { setMargins(dp(16), dp(4), dp(16), 0) })
         drawerEmpty = NText(this@MainActivity).apply { textSize = 15f; setTextColor(pal.onVariant); gravity = Gravity.CENTER; visibility = View.GONE }
         addView(drawerEmpty, FrameLayout.LayoutParams(-1, -2, Gravity.CENTER))
-        if (pal.classic) {
+        if (pal.classic && !pal.sense) {
             grid.setPadding(dp(8), dp(8), dp(8), dp(24) + dp(56))
             addView(buildTabBar(), FrameLayout.LayoutParams(-1, dp(56), Gravity.BOTTOM))
+        }
+        if (pal.sense) {
+            // Sense 3's drawer: a charcoal page under a title bar, the grid, and three glossy tabs along the bottom
+            setBackgroundColor(0xFF19191B.toInt())
+            grid.setPadding(dp(8), dp(60), dp(8), dp(24) + dp(60))
+            banner.layoutParams = (banner.layoutParams as FrameLayout.LayoutParams).apply { topMargin = dp(58) }
+            senseTitle = NText(this@MainActivity).apply { text = "All apps"; textSize = 19f; setTextColor(Color.WHITE); gravity = Gravity.CENTER_VERTICAL; setPadding(dp(16), 0, 0, 0) }
+            val lens = ImageView(this@MainActivity).apply {
+                setImageResource(R.drawable.ic_search); imageTintList = android.content.res.ColorStateList.valueOf(0xFFD5D9DD.toInt()); setPadding(dp(14), dp(14), dp(14), dp(14))
+                contentDescription = "Search"; setOnClickListener { openSenseSearch() }
+            }
+            val header = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                background = android.graphics.drawable.LayerDrawable(arrayOf(
+                    GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0xFF3A3C3F.toInt(), 0xFF1D1E20.toInt())),
+                    android.graphics.drawable.ColorDrawable(0x66000000),
+                )).apply { setLayerHeight(1, dp(1)); setLayerGravity(1, Gravity.BOTTOM) }
+                addView(senseTitle, LinearLayout.LayoutParams(0, -1, 1f))
+                addView(lens, LinearLayout.LayoutParams(dp(52), dp(52)))
+            }
+            senseHeader = header
+            addView(header, FrameLayout.LayoutParams(-1, dp(52), Gravity.TOP))
+            senseTabs = ai.nanosearch.launcher.ui.SenseTabBar(this@MainActivity,
+                listOf(Triple("all", "All apps", 0), Triple("recent", "Frequent", 1), Triple("dl", "Downloaded", 2)), pal.primary) { key ->
+                drawerTab = key; senseTabs?.select(key)
+                senseTitle?.text = mapOf("all" to "All apps", "recent" to "Frequent", "dl" to "Downloaded")[key]
+                search()
+            }
+            addView(senseTabs, FrameLayout.LayoutParams(-1, dp(60), Gravity.BOTTOM))
         }
 
         // Pull down to close, but only when the app grid is scrolled to the top.
@@ -1277,8 +1310,23 @@ class MainActivity : Activity() {
         return kotlin.math.hypot(maxOf(cx, dm.widthPixels - cx), maxOf(cy, dm.heightPixels - cy))
     }
 
+    /** Sense: the drawer has a title bar instead of the search strip; the magnifier in it brings the strip (and the keyboard) back. */
+    private fun updateSenseSearch() {
+        if (!pal.sense || !::searchLayer.isInitialized) return
+        searchLayer.visibility = if (drawerOpen && !searchActive && !senseSearchOpen) View.INVISIBLE else View.VISIBLE
+        senseHeader?.visibility = if (drawerOpen && (senseSearchOpen || searchActive)) View.INVISIBLE else View.VISIBLE // the strip takes the title bar's place
+    }
+
+    private fun openSenseSearch() {
+        senseSearchOpen = true
+        updateSenseSearch()
+        input.requestFocus()
+        input.post { (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(input, 0) }
+    }
+
     private fun openDrawer(cx: Float, cy: Float) {
         drawerOpen = true
+        updateSenseSearch()
         updateBars(true)
         drawer.translationY = 0f
         drawer.visibility = View.VISIBLE
@@ -1294,6 +1342,7 @@ class MainActivity : Activity() {
     private fun openDrawer() {
         revealOrigin = null
         drawerOpen = true
+        updateSenseSearch()
         updateBars(true)
         drawer.visibility = View.VISIBLE
         animateDrawer(0f, 420) { if (drawerOpen) home.visibility = View.INVISIBLE } // nothing ghosts through the drawer
@@ -1301,6 +1350,8 @@ class MainActivity : Activity() {
 
     private fun closeDrawer(clear: Boolean) {
         drawerOpen = false
+        senseSearchOpen = false
+        updateSenseSearch()
         updateBars(resultsPanel.visibility == View.VISIBLE)
         home.visibility = View.VISIBLE
         hideKeyboard()
@@ -1360,6 +1411,7 @@ class MainActivity : Activity() {
         // The whole layer, including the status and navigation bar areas its padding leaves, gets the panel colour while results show.
         searchLayer.setBackgroundColor(if (active) pal.panel else Color.TRANSPARENT)
         updateBars(active || drawerOpen)
+        updateSenseSearch()
         home.visibility = if (active || drawerOpen) View.INVISIBLE else View.VISIBLE // nothing ghosts through the panel
         updateBanner()
     }
@@ -2054,7 +2106,7 @@ class MainActivity : Activity() {
                     addView(badgeView(0).also { it.visibility = View.GONE }, FrameLayout.LayoutParams(-2, dp(18), Gravity.TOP or Gravity.END))
                 }, LinearLayout.LayoutParams(dp(54), dp(54)))
                 addView(NText(context).apply {
-                    textSize = 12f; setTextColor(if (pal.classic) 0xFFF1F3F4.toInt() else pal.onSurface); maxLines = 1; gravity = Gravity.CENTER; if (pal.sense) setShadowLayer(4f, 0f, 1f, 0xAA000000.toInt())
+                    textSize = 12f; setTextColor(if (pal.classic) 0xFFF1F3F4.toInt() else pal.onSurface); maxLines = if (pal.sense) 2 else 1; gravity = Gravity.CENTER
                     ellipsize = TextUtils.TruncateAt.END
                     if (pal.classic && !pal.sense) { setBackgroundColor(0x80000000.toInt()); setPadding(dp(4), dp(4), dp(4), dp(4)) } else if (!pal.sense) setShadowLayer(0f, 0f, 0f, 0)
                 }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(if (pal.classic && !pal.sense) 8 else 4) })

@@ -337,7 +337,7 @@ private fun StyleCard() {
             Text(
                 when {
                     style != "classic" -> "Material 3 Expressive: rounded shapes and colours from your wallpaper."
-                    era == "sense" -> "Graphite and silver with one green accent, glossy icons, a flip clock with weather, and an arc to show which page you are on. The Hub, notification dots and Active Frames are on by default."
+                    era == "sense" -> "Graphite and silver with one green accent: a flip clock with weather, glossy icons with no tiles, an arched dock with Phone and Camera and a ring you pull up for your apps, and an app drawer in the old style. No Hub or Active Frames."
                     else -> "Flat and dark with one blue accent, a labelled bar for the dock, and the Hub, notification dots and Active Frames on by default. Each can be switched off below."
                 },
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
