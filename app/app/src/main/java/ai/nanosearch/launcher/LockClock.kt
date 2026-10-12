@@ -13,7 +13,7 @@ object LockClock {
     private const val SERVICE = "ai.nanosearch.launcher.clocks.ClockWallpaperService"
 
     val CLOCKS = listOf("steel" to "Steel Dial", "flip" to "Flip clock")
-    val BACKGROUNDS = (ClassicWallpapers.ALL + SenseWallpapers.ALL).map { it.id to it.name } + ("black" to "Black")
+    val BACKGROUNDS = ClassicWallpapers.ALL.map { it.id to it.name } + ("black" to "Black")
     val POSITIONS = listOf("top" to "Top", "middle" to "Middle", "low" to "Low")
 
     private fun prefs(c: Context) = c.getSharedPreferences("nano", Context.MODE_PRIVATE)
@@ -21,7 +21,7 @@ object LockClock {
     fun available(c: Context) = runCatching { c.packageManager.getServiceInfo(component(c), 0) }.isSuccess
 
     fun clock(c: Context) = prefs(c).getString("lockclock_clock", "steel") ?: "steel"
-    fun background(c: Context) = prefs(c).getString("lockclock_bg", "cobalt") ?: "cobalt"
+    fun background(c: Context) = prefs(c).getString("lockclock_bg", "carbon")?.takeIf { k -> BACKGROUNDS.any { it.first == k } } ?: "carbon"
     fun position(c: Context) = prefs(c).getString("lockclock_pos", "middle") ?: "middle"
 
     private fun next(options: List<Pair<String, String>>, current: String) = options[(options.indexOfFirst { it.first == current } + 1) % options.size].first

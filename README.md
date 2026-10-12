@@ -21,21 +21,20 @@ answers questions, and listens when you speak. Small language models run entirel
 - **Adapts to the phone:** it detects the CPU core layout and RAM, measures once in the background which core grouping runs the models fastest, and sizes how long models stay loaded to the available memory. Settings > Advanced shows what it chose and lets you override it.
 - **Optional GPU (experimental):** Settings > Advanced can try running the language models on the GPU through Vulkan. It is off by default, only used if an on-device test shows it is faster, and switches itself off if it fails or crashes.
 - **Old School style (optional):** a second look for the whole launcher, chosen in Settings > Appearance, in two eras. **Spirit** (the former Classic) is flat charcoal and white with one blue accent,
-  squarer corners, a labelled dock bar, and an original set of glossy drawn icons (a handset, an envelope, a camera, a calendar page that shows today's date).
-  Apps without a drawn icon keep their own, set on a matching dark tile. **Sense** is graphite and silver with a green accent, after the HTC Sense of 2011: a flip clock under a glass search strip with the weather (and its high and low) in a dark strip below it, glossy icons with no tiles,
+  squarer corners, a steel dial clock on home, a labelled dock bar, the Hub and Active Frames, and an original set of glossy drawn icons (a handset, an envelope, a camera, a calendar page that shows today's date).
+  Other apps keep their own icon on a matching dark tile. **Sense** is graphite and silver with a green accent, after the HTC Sense of 2011: a flip clock under a glass search strip with the weather (and its high and low) in a dark strip below it, glossy icons that stand straight on the wallpaper,
   and a dock shaped as an arch of dotted carbon with Phone and Camera in it and a big silver ring floating above. Grab the ring and pull it up, as far as the top of the screen if you like, and the app drawer grows round it as a circle;
   drag Phone or Camera onto the ring to open it. The drawer is a charcoal page with an "All apps" title bar and three glossy tabs (All apps, Frequent, Downloaded). Pages swing round as you swipe, and Leap view (pinch in, or from the home menu) shows them all.
-  Sense has no Hub or Active Frames, and only the ring opens the drawer. Modern, the default, is unchanged.
+  The ring is Sense's way into your apps; the Hub and Active Frames are Spirit's. Modern, the default, is unchanged.
 - **Flip clock and Steel Dial:** two clock widgets drawn by the launcher, also usable as a live wallpaper behind the lock screen. The flip clock can show the weather, which is off by default (see Privacy).
-- **Translucent drawer in Classic:** the wallpaper shows through the app drawer, and each app sits in a boxed tile with its name on a darker strip along the foot, in the manner of the later
+- **Translucent drawer in Spirit:** the wallpaper shows through the app drawer, and each app sits in a boxed tile with its name on a darker strip along the foot, in the manner of the later
   BlackBerry 10 icon style.
 - **Hub:** one list for texts, missed calls, upcoming events and the notifications of your other apps, with filters, replying in place where an app allows it,
   and dismissing. Swipe in from the left edge or tap the Hub button by the search bar. It uses Android's notification access, which you grant yourself;
   notifications are held in memory only and are never saved or sent anywhere. Texts, calls and events work without it.
 - **Dots on icons, Active Frames and tabs:** a count on an app's icon while it has notifications; a page to the left of home with your recent apps as live tiles;
-  and, in Classic, All / Recent / Favourites tabs in the drawer and named home pages. Each is its own switch, and Classic turns them on by default.
-- **Old School wallpapers:** eight original Spirit wallpapers (plus six Sense scenes: spectrum, curtain, cloudscape, glow, dusk, ripple) drawn on the spot at your screen's size (blue and violet light ribbons, woven carbon, brushed steel, aurora, embers, graphite and a pale
-  glacier for the light theme), in the wallpaper screen, with the usual crop and Home / Lock / Both choice. Swipe any Hub item away, or tap Clear all.
+  and, in Spirit, All / Recent / Favourites tabs in the drawer and named home pages. Each is its own switch, and Spirit turns them on by default.
+- **Wallpapers:** seven original wallpapers, the same in every style and drawn on the spot at your screen's size: woven carbon, brushed steel, gold, rose gold, copper, bronze and platinum. They are in the wallpaper screen, with the usual crop and Home / Lock / Both choice. Swipe any Hub item away, or tap Clear all.
 - **Peek, snooze and pin:** drag the Hub in from the left edge and it follows your finger; let go early and it slides back, or past a third and it stays. A swipe up and to the left from the bottom of home opens
   it too. Press and hold a row to pin it, snooze it for an hour or until the morning, show only that app, or hide that app from the Hub. A Priority view picks out missed calls, texts from real people and wording that asks for a reply,
   using plain rules on the phone. An optional soft tick (and a haptic one) marks opening, dismissing and clearing.

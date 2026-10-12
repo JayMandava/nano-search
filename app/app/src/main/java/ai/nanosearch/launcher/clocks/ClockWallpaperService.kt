@@ -66,7 +66,7 @@ class ClockWallpaperService : WallpaperService() {
         }
 
         private fun render(c: Canvas, steel: Boolean) {
-            val id = prefs.getString("lockclock_bg", "cobalt") ?: "cobalt"
+            val id = prefs.getString("lockclock_bg", "carbon") ?: "carbon"
             val key = "$id|$w|$h"
             if (bg == null || key != bgKey) {
                 bg = if (id == "black") null else runCatching { ClassicWallpapers.render(id, w, h) }.getOrNull()

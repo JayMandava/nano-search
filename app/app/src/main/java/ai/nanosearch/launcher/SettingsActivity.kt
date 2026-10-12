@@ -16,6 +16,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,7 +27,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -69,12 +73,26 @@ import androidx.lifecycle.LifecycleEventObserver
 class SettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { NanoTheme { SettingsScreen(onBack = { finish() }) } }
+        setContent {
+            // A change of style does not restart the screen: the old look fades into the new one, and the scroll position stays where it was.
+            val listState = rememberLazyListState()
+            val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+            Crossfade(targetState = SettingsTheme.version, animationSpec = tween(260), label = "style") { _ ->
+                NanoTheme { SettingsScreen(onBack = { finish() }, listState, scroll) }
+            }
+        }
     }
 }
 
+/** Bumped whenever a choice on this screen changes the look of the whole app; the screen then fades to the new look. */
+internal object SettingsTheme {
+    var version by mutableIntStateOf(0)
+        private set
+    fun bump() { version++ }
+}
+
 @Composable
-private fun SettingsScreen(onBack: () -> Unit) {
+private fun SettingsScreen(onBack: () -> Unit, listState: LazyListState, scroll: androidx.compose.material3.TopAppBarScrollBehavior) {
     val context = LocalContext.current
     // Anything the user can change outside this screen (the system role, permissions) is re-read whenever we come back to it.
     var tick by remember { mutableIntStateOf(0) }
@@ -84,7 +102,6 @@ private fun SettingsScreen(onBack: () -> Unit) {
         owner.lifecycle.addObserver(obs)
         onDispose { owner.lifecycle.removeObserver(obs) }
     }
-    val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
         topBar = {
@@ -96,6 +113,7 @@ private fun SettingsScreen(onBack: () -> Unit) {
         },
     ) { padding ->
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -195,7 +213,7 @@ private fun HubCard(tick: Int) {
     var dots by remember { mutableStateOf(AppSettings.dots(context)) }
     var frames by remember { mutableStateOf(AppSettings.frames(context)) }
     val allowed = remember(tick) { HubStore.allowed(context) }
-    val sense = AppSettings.isSense(context) // Sense has no Hub and no Active Frames
+    val sense = AppSettings.isSense(context) // the Hub and Active Frames are Spirit's
     Card(shape = RoundedCornerShape(24.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (!sense) {
@@ -204,7 +222,7 @@ private fun HubCard(tick: Int) {
                     Text("Hub", style = MaterialTheme.typography.bodyLarge)
                     Text("One list for texts, missed calls, events and notifications. Swipe in from the left edge, or tap the Hub button by the search bar.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Switch(checked = hub, onCheckedChange = { hub = it; AppSettings.setHub(context, it); (context as? android.app.Activity)?.recreate() })
+                Switch(checked = hub, onCheckedChange = { hub = it; AppSettings.setHub(context, it); SettingsTheme.bump() })
             }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
@@ -313,7 +331,7 @@ private fun StyleCard() {
                 options.forEachIndexed { i, (key, label) ->
                     SegmentedButton(
                         selected = style == key,
-                        onClick = { style = key; AppSettings.setStyle(context, key); (context as? android.app.Activity)?.recreate() },
+                        onClick = { style = key; AppSettings.setStyle(context, key); SettingsTheme.bump() },
                         shape = SegmentedButtonDefaults.itemShape(i, options.size),
                     ) { Text(label) }
                 }
@@ -327,7 +345,7 @@ private fun StyleCard() {
                             eras.forEach { (key, label) ->
                                 DropdownMenuItem(text = { Text(label) }, onClick = {
                                     menu = false
-                                    if (key != era) { era = key; AppSettings.setEra(context, key); (context as? android.app.Activity)?.recreate() }
+                                    if (key != era) { era = key; AppSettings.setEra(context, key); SettingsTheme.bump() }
                                 })
                             }
                         }
@@ -337,8 +355,8 @@ private fun StyleCard() {
             Text(
                 when {
                     style != "classic" -> "Material 3 Expressive: rounded shapes and colours from your wallpaper."
-                    era == "sense" -> "Graphite and silver with one green accent: a flip clock with weather, glossy icons with no tiles, an arched dock with Phone and Camera and a ring you pull up for your apps, and an app drawer in the old style. No Hub or Active Frames."
-                    else -> "Flat and dark with one blue accent, a labelled bar for the dock, and the Hub, notification dots and Active Frames on by default. Each can be switched off below."
+                    era == "sense" -> "Graphite and silver with one green accent: a flip clock with the weather, glossy icons that stand straight on the wallpaper, an arched carbon dock with Phone, Camera and a silver ring you pull up for your apps, and an app drawer with glossy tabs."
+                    else -> "Flat and dark with one blue accent, a steel dial clock, a labelled bar for the dock, and the Hub, notification dots and Active Frames on by default. Each can be switched off below."
                 },
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -359,7 +377,7 @@ private fun AppearanceCard() {
                 options.forEachIndexed { i, (key, label) ->
                     SegmentedButton(
                         selected = mode == key,
-                        onClick = { mode = key; AppSettings.setThemeMode(context, key); (context as? android.app.Activity)?.recreate() },
+                        onClick = { mode = key; AppSettings.setThemeMode(context, key); SettingsTheme.bump() },
                         shape = SegmentedButtonDefaults.itemShape(i, options.size),
                     ) { Text(label) }
                 }
@@ -369,7 +387,7 @@ private fun AppearanceCard() {
                     Text("Colours from wallpaper", style = MaterialTheme.typography.bodyLarge)
                     Text("Material You. Off uses the Nano Search violet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Switch(checked = dynamic, onCheckedChange = { dynamic = it; AppSettings.setDynamicColor(context, it); (context as? android.app.Activity)?.recreate() })
+                Switch(checked = dynamic, onCheckedChange = { dynamic = it; AppSettings.setDynamicColor(context, it); SettingsTheme.bump() })
             }
         }
     }

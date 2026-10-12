@@ -209,7 +209,7 @@ class MainActivity : Activity() {
     )).apply { setLayerHeight(1, dp(1)); setLayerGravity(1, Gravity.TOP) }
 
     /** Sense keeps its own on/off for the home clock (a flip clock), so the choice made in Spirit does not hide it. */
-    private val clockKey get() = if (pal.sense) "showClock_sense" else "showClock"
+    private val clockKey get() = if (pal.sense) "showClock_sense" else if (pal.classic) "showClock_spirit" else "showClock"
 
     // ---------------------------------------------------------------- setup
 
@@ -547,8 +547,9 @@ class MainActivity : Activity() {
         dots = PageDots(this@MainActivity, Color.WHITE, arc = pal.sense, accent = pal.primary).apply { if (pal.sense) setOnClickListener { leap() } }
         clockBlock = LinearLayout(this@MainActivity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(if (pal.sense) 12 else 28), dp(4), dp(if (pal.sense) 12 else 28), dp(8))
+            setPadding(dp(if (pal.classic) 12 else 28), dp(4), dp(if (pal.classic) 12 else 28), dp(8))
             if (pal.sense) addView(ai.nanosearch.launcher.clocks.FlipClockView(this@MainActivity, panel = true), LinearLayout.LayoutParams(-1, dp(232)))
+            else if (pal.classic) addView(ai.nanosearch.launcher.clocks.SteelDialView(this@MainActivity), LinearLayout.LayoutParams(-1, dp(250))) // Spirit's own clock: the steel dial
             else { addView(clock); addView(date) }
             visibility = if (prefs.getBoolean(clockKey, true)) View.VISIBLE else View.GONE
             var lx = 0f; var ly = 0f
