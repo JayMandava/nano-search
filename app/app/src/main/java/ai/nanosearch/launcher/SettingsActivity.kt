@@ -104,6 +104,7 @@ private fun SettingsScreen(onBack: () -> Unit) {
             item { ModelsRow() }
             item { Header("Appearance") }
             item { StyleCard() }
+            if (AppSettings.isSense(context)) item { WeatherCard() }
             item { AppearanceCard() }
             item { Header("Screen") }
             item { FullScreenCard() }
@@ -235,6 +236,42 @@ private fun HubCard(tick: Int) {
                     )
                 }
                 FilledTonalButton(onClick = { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }) { Text(if (allowed) "Manage" else "Allow") }
+            }
+        }
+    }
+}
+
+/** Weather on the flip clock: off by default; one city, chosen from the offline list. */
+@Composable
+private fun WeatherCard() {
+    val context = LocalContext.current
+    var on by remember { mutableStateOf(Weather.enabled(context)) }
+    var f by remember { mutableStateOf(Weather.fahrenheit(context)) }
+    var city by remember { mutableStateOf(Weather.city(context)?.first) }
+    var query by remember { mutableStateOf("") }
+    val matches = remember(query) { Gazetteer.search(context, query) }
+    Card(shape = RoundedCornerShape(24.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Column(Modifier.weight(1f).padding(end = 16.dp)) {
+                    Text("Weather on the flip clock", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        "Off by default. When on, the clock asks Open-Meteo for the weather in the one city you choose, at most every 30 minutes, and sends nothing else.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = on, onCheckedChange = { on = it; Weather.setEnabled(context, it) })
+            }
+            if (on) {
+                Text(if (city != null) "City: $city" else "Choose a city", style = MaterialTheme.typography.bodyMedium)
+                androidx.compose.material3.OutlinedTextField(value = query, onValueChange = { query = it }, label = { Text("Search for a city") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                matches.forEach { m ->
+                    TextButton(onClick = { Weather.setCity(context, m.place.city, m.lat, m.lon); city = m.place.city; query = "" }) { Text(m.place.toString()) }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Text("Fahrenheit", style = MaterialTheme.typography.bodyLarge)
+                    Switch(checked = f, onCheckedChange = { f = it; Weather.setFahrenheit(context, it) })
+                }
             }
         }
     }

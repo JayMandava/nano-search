@@ -38,6 +38,12 @@ class FlipClockView(context: Context) : View(context) {
     private var progress = 1f
     private var flipper: ValueAnimator? = null
     private var dateText = ""
+    private var weather: ai.nanosearch.launcher.Weather.Now? = null
+    private var weatherText = ""
+    private var cityName = ""
+    private var spin = 0f
+    private var spinner: ValueAnimator? = null
+    private val weatherArt = WeatherArt()
 
     private val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xF2FFFFFF.toInt()
@@ -57,6 +63,24 @@ class FlipClockView(context: Context) : View(context) {
     private val dateArea = RectF()
 
     init { setLayerType(LAYER_TYPE_HARDWARE, null) }
+
+    // ---- weather (optional; see Weather)
+
+    private fun loadWeather() {
+        weather = ai.nanosearch.launcher.Weather.cached(context)
+        weatherText = weather?.let { ai.nanosearch.launcher.Weather.format(context, it) } ?: ""
+        cityName = ai.nanosearch.launcher.Weather.city(context)?.first ?: ""
+        ai.nanosearch.launcher.Weather.refresh(context) { post { loadWeather(); invalidate() } }
+        if (weather != null && isShown && spinner == null) {
+            spinner = ValueAnimator.ofFloat(0f, 1f).apply {
+                duration = 6000; repeatCount = ValueAnimator.INFINITE; interpolator = LinearInterpolator()
+                addUpdateListener { spin = it.animatedValue as Float; invalidate() }
+                start()
+            }
+        } else if (weather == null) stopSpinner()
+    }
+
+    private fun stopSpinner() { spinner?.cancel(); spinner = null }
 
     // ---- time
 
@@ -118,11 +142,13 @@ class FlipClockView(context: Context) : View(context) {
         }
         advance(animate = false)
         scheduleTick()
+        loadWeather()
     }
 
     override fun onDetachedFromWindow() {
         removeCallbacks(tick)
         flipper?.cancel()
+        stopSpinner()
         if (receiving) { runCatching { context.unregisterReceiver(clockChanged) }; receiving = false }
         super.onDetachedFromWindow()
     }
@@ -130,7 +156,7 @@ class FlipClockView(context: Context) : View(context) {
     /** Hidden (the drawer is over it, another app is in front): stop ticking. Back in view: catch up without a flip. */
     override fun onVisibilityAggregated(isVisible: Boolean) {
         super.onVisibilityAggregated(isVisible)
-        if (isVisible && isAttachedToWindow) { advance(animate = false); scheduleTick() } else removeCallbacks(tick)
+        if (isVisible && isAttachedToWindow) { advance(animate = false); scheduleTick(); loadWeather() } else { removeCallbacks(tick); stopSpinner() }
     }
 
     // ---- layout and drawing
@@ -163,7 +189,21 @@ class FlipClockView(context: Context) : View(context) {
         val mx = leftX + cardW + gap
         if (minuteChanging) art.drawFlip(canvas, mx, topY, cardW, cardH, oldMinute, minute, progress) else art.drawRest(canvas, mx, topY, cardW, cardH, minute, alpha)
         datePaint.alpha = if (pressedRegion == 2) 150 else 242
-        canvas.drawText(dateText, width / 2f, dateBaseline, datePaint)
+        val w = weather
+        if (w != null && weatherText.isNotEmpty()) {
+            // date, then a small drawn sky and the temperature, centred as one line
+            val dateW = datePaint.measureText(dateText)
+            val icon = 20f * density
+            val tempW = datePaint.measureText(weatherText)
+            val gapW = 10f * density
+            val total = dateW + gapW + icon + 4f * density + tempW
+            val x0 = (width - total) / 2f
+            datePaint.textAlign = Paint.Align.LEFT
+            canvas.drawText(dateText, x0, dateBaseline, datePaint)
+            weatherArt.draw(canvas, w.sky, w.day, x0 + dateW + gapW + icon / 2f, dateBaseline - 5f * density, icon, spin)
+            canvas.drawText(weatherText, x0 + dateW + gapW + icon + 4f * density, dateBaseline, datePaint)
+            datePaint.textAlign = Paint.Align.CENTER
+        } else canvas.drawText(dateText, width / 2f, dateBaseline, datePaint)
     }
 
     // ---- touch: cards -> Clock, date -> Calendar

@@ -42,6 +42,22 @@ object Gazetteer {
         loaded = true
     }
 
+    class Match(val place: Place, val lat: Double, val lon: Double)
+
+    /** Cities whose name starts with [query] (then ones that contain it), biggest first: for choosing where the weather is for. */
+    fun search(context: Context, query: String, limit: Int = 8): List<Match> {
+        val q = query.trim().lowercase()
+        if (q.length < 2) return emptyList()
+        load(context)
+        val starts = ArrayList<Int>(); val contains = ArrayList<Int>()
+        for (i in cities.indices) {
+            val name = cities[i].lowercase()
+            if (name.startsWith(q)) starts.add(i) else if (name.contains(q)) contains.add(i)
+        }
+        return (starts.sortedByDescending { pops[it] } + contains.sortedByDescending { pops[it] }).take(limit)
+            .map { Match(Place(cities[it], regions[it], countries[it]), lats[it].toDouble(), lons[it].toDouble()) }
+    }
+
     fun nearest(context: Context, lat: Double, lon: Double): Place? {
         load(context)
         val kmPerLon = 111.0 * cos(Math.toRadians(lat)).coerceAtLeast(0.1)
