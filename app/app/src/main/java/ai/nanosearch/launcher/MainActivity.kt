@@ -166,7 +166,7 @@ class MainActivity : Activity() {
 
     /** Material 3 colours for everything the launcher paints itself; rebuilt if the user changes the theme in Settings. */
     private val pal by lazy { Palette.of(this) }
-    private val themeKey get() = AppSettings.themeMode(this) + AppSettings.dynamicColor(this) + AppSettings.style(this) + AppSettings.hub(this) + AppSettings.dots(this) + AppSettings.frames(this) + AppSettings.fullScreen(this) + resources.configuration.uiMode
+    private val themeKey get() = AppSettings.themeMode(this) + AppSettings.dynamicColor(this) + AppSettings.style(this) + AppSettings.era(this) + AppSettings.hub(this) + AppSettings.dots(this) + AppSettings.frames(this) + AppSettings.fullScreen(this) + resources.configuration.uiMode
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
     /** A flat full-width bar with a hairline along its top edge (the Classic dock). */
