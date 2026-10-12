@@ -57,7 +57,7 @@ object SenseMaterial {
     }
 }
 
-/** Smoked glass with a crisp sheen across its upper half and a bright rim, as on the original Sense widgets. Casts a shadow when given an elevation. */
+/** Smoked glass with a crisp sheen across its upper half and a bright rim. Casts a shadow when given an elevation. */
 class SenseGloss(context: Context, private val radiusDp: Int) : Drawable() {
     private val d = context.resources.displayMetrics.density
     private val r = radiusDp * d

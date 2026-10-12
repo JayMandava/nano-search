@@ -591,7 +591,7 @@ class MainActivity : Activity() {
             }
         }
 
-        // BB10-style: a swipe up and to the left from the bottom of the screen opens the Hub.
+        // A swipe up and to the left from the bottom of the screen opens the Hub.
         if (AppSettings.hub(this@MainActivity)) onSwipeUpLeft = { performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK); openHub() }
 
         // Swipe down pulls the notification panel, unless something on screen is using the gesture.
@@ -1003,7 +1003,7 @@ class MainActivity : Activity() {
             addView(buildTabBar(), FrameLayout.LayoutParams(-1, dp(56), Gravity.BOTTOM))
         }
         if (pal.sense) {
-            // Sense 3's drawer: a charcoal page under a title bar, the grid, and three glossy tabs along the bottom
+            // Sense's drawer: a charcoal page under a title bar, the grid, and three glossy tabs along the bottom
             setBackgroundColor(0xFF19191B.toInt())
             grid.setPadding(dp(8), dp(60), dp(8), dp(24) + dp(70) + dp(40))
             banner.layoutParams = (banner.layoutParams as FrameLayout.LayoutParams).apply { topMargin = dp(58) }
@@ -2341,7 +2341,7 @@ class MainActivity : Activity() {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER_HORIZONTAL
                 if (pal.classic && !pal.sense) {
-                    // a boxed tile with the name on a darker strip along its foot, as in BlackBerry 10's later icon style
+                    // a boxed tile with the name on a darker strip along its foot
                     setPadding(0, dp(10), 0, 0)
                     background = GradientDrawable().apply { setColor(0x38000000); cornerRadius = dp(pal.radius(14)).toFloat(); setStroke(dp(1), 0x26FFFFFF) }
                     clipToOutline = true
