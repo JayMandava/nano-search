@@ -16,9 +16,13 @@ import java.util.concurrent.Executors
  */
 object Weather {
     enum class Sky { CLEAR, PARTLY, CLOUDY, FOG, RAIN, SNOW, STORM }
-    class Now(val tempC: Double, val sky: Sky, val day: Boolean, val at: Long, val hiC: Double = Double.NaN, val loC: Double = Double.NaN)
+    class Now(val tempC: Double, val sky: Sky, val day: Boolean, val at: Long, val hiC: Double = Double.NaN, val loC: Double = Double.NaN, val lat: Double = Double.NaN, val lon: Double = Double.NaN)
 
     private const val REFRESH_MS = 30 * 60 * 1000L
+    /** A reading older than this is not shown at all (offline for hours): better no number than a wrong one. */
+    private const val STALE_MS = 6 * 60 * 60 * 1000L
+    /** Moving further than this from where a reading was taken makes it out of date at once. */
+    private const val MOVED_KM = 10.0
     private val io = Executors.newSingleThreadExecutor()
     @Volatile private var busy = false
 
@@ -62,7 +66,19 @@ object Weather {
     fun cached(c: Context): Now? {
         if (!enabled(c)) return null
         val j = runCatching { JSONObject(prefs(c).getString("weather_now", null) ?: return null) }.getOrNull() ?: return null
-        return Now(j.getDouble("t"), Sky.entries.getOrElse(j.getInt("s")) { Sky.CLEAR }, j.getBoolean("d"), j.getLong("at"), j.optDouble("hi", Double.NaN), j.optDouble("lo", Double.NaN))
+        val now = runCatching {
+            Now(j.getDouble("t"), Sky.entries.getOrElse(j.getInt("s")) { Sky.CLEAR }, j.getBoolean("d"), j.getLong("at"), j.optDouble("hi", Double.NaN), j.optDouble("lo", Double.NaN), j.optDouble("la", Double.NaN), j.optDouble("lo2", Double.NaN))
+        }.getOrNull() ?: return null
+        if (System.currentTimeMillis() - now.at > STALE_MS) return null
+        // a reading for somewhere else (you have travelled, or changed city) is not this place's weather
+        spot(c)?.let { (_, lat, lon) -> if (!now.lat.isNaN() && !now.lon.isNaN() && km(lat, lon, now.lat, now.lon) > MOVED_KM) return null }
+        return now
+    }
+
+    private fun km(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val dLat = Math.toRadians(lat2 - lat1); val dLon = Math.toRadians(lon2 - lon1)
+        val a = Math.sin(dLat / 2).let { it * it } + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) * Math.sin(dLon / 2).let { it * it }
+        return 6371.0 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
     }
 
     private fun shown(c: Context, celsius: Double) = if (fahrenheit(c)) celsius * 9 / 5 + 32 else celsius
@@ -88,21 +104,21 @@ object Weather {
     fun refresh(c: Context, done: () -> Unit) {
         if (!enabled(c) || busy) return
         val (_, lat, lon) = spot(c) ?: return
-        val last = cached(c)
-        if (last != null && !last.hiC.isNaN() && System.currentTimeMillis() - last.at < REFRESH_MS) return
+        val last = cached(c) // null when there is none, it is stale, or it is for somewhere else
+        if (last != null && !last.hiC.isNaN() && !last.lat.isNaN() && System.currentTimeMillis() - last.at < REFRESH_MS) return
         busy = true
         val app = c.applicationContext
         io.execute {
             try {
                 val url = URL("https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min&forecast_days=1&timezone=auto")
                 val conn = (url.openConnection() as HttpURLConnection).apply { connectTimeout = 8000; readTimeout = 8000 }
-                val body = try { conn.inputStream.bufferedReader().readText() } finally { conn.disconnect() }
+                val body = try { if (conn.responseCode != 200) return@execute; conn.inputStream.bufferedReader().readText() } finally { conn.disconnect() }
                 val cur = JSONObject(body).getJSONObject("current")
                 val sky = skyOf(cur.getInt("weather_code"))
                 val daily = JSONObject(body).optJSONObject("daily")
                 val hi = daily?.optJSONArray("temperature_2m_max")?.optDouble(0, Double.NaN) ?: Double.NaN
                 val lo = daily?.optJSONArray("temperature_2m_min")?.optDouble(0, Double.NaN) ?: Double.NaN
-                val now = JSONObject().put("hi", hi.takeUnless { it.isNaN() } ?: JSONObject.NULL).put("lo", lo.takeUnless { it.isNaN() } ?: JSONObject.NULL).put("t", cur.getDouble("temperature_2m")).put("s", sky.ordinal).put("d", cur.getInt("is_day") == 1).put("at", System.currentTimeMillis())
+                val now = JSONObject().put("hi", hi.takeUnless { it.isNaN() } ?: JSONObject.NULL).put("lo", lo.takeUnless { it.isNaN() } ?: JSONObject.NULL).put("la", lat).put("lo2", lon).put("t", cur.getDouble("temperature_2m")).put("s", sky.ordinal).put("d", cur.getInt("is_day") == 1).put("at", System.currentTimeMillis())
                 prefs(app).edit().putString("weather_now", now.toString()).apply()
                 done()
             } catch (_: Exception) {
