@@ -17,6 +17,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -32,12 +33,15 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -236,15 +240,18 @@ private fun HubCard(tick: Int) {
     }
 }
 
-/** Modern is the Material 3 Expressive launcher; Classic is the flat, dark one with a blue accent, drawn icons and the Hub. */
+/** Modern is the Material 3 Expressive launcher; Old School is the flat, dark one, in two eras: Spirit (blue, glossy drawn icons) and Sense (graphite and green, flip clock). */
 @Composable
 private fun StyleCard() {
     val context = LocalContext.current
     var style by remember { mutableStateOf(AppSettings.style(context)) }
+    var era by remember { mutableStateOf(AppSettings.era(context)) }
+    var menu by remember { mutableStateOf(false) }
+    val eras = listOf("spirit" to "Spirit", "sense" to "Sense")
     Card(shape = RoundedCornerShape(24.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Style", style = MaterialTheme.typography.titleSmall)
-            val options = listOf("modern" to "Modern", "classic" to "Classic")
+            val options = listOf("modern" to "Modern", "classic" to "Old School")
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                 options.forEachIndexed { i, (key, label) ->
                     SegmentedButton(
@@ -254,9 +261,28 @@ private fun StyleCard() {
                     ) { Text(label) }
                 }
             }
+            if (style == "classic") {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Text("Era", style = MaterialTheme.typography.bodyLarge)
+                    Box {
+                        OutlinedButton(onClick = { menu = true }) { Text(eras.first { it.first == era }.second) }
+                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            eras.forEach { (key, label) ->
+                                DropdownMenuItem(text = { Text(label) }, onClick = {
+                                    menu = false
+                                    if (key != era) { era = key; AppSettings.setEra(context, key); (context as? android.app.Activity)?.recreate() }
+                                })
+                            }
+                        }
+                    }
+                }
+            }
             Text(
-                if (style == "classic") "Flat and dark with one blue accent, a labelled bar for the dock, and the Hub, notification dots and Active Frames on by default. Each can be switched off below."
-                else "Material 3 Expressive: rounded shapes and colours from your wallpaper.",
+                when {
+                    style != "classic" -> "Material 3 Expressive: rounded shapes and colours from your wallpaper."
+                    era == "sense" -> "Graphite and silver with one green accent, glossy icons, a flip clock with weather, and an arc to show which page you are on. The Hub, notification dots and Active Frames are on by default."
+                    else -> "Flat and dark with one blue accent, a labelled bar for the dock, and the Hub, notification dots and Active Frames on by default. Each can be switched off below."
+                },
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }

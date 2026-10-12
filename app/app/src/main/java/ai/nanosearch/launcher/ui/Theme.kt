@@ -48,6 +48,16 @@ private val ClassicLight = lightColorScheme(
     surfaceContainerHigh = Color(0xFFE5E8E9), surfaceContainerHighest = Color(0xFFDFE2E4),
 )
 
+// Sense: graphite and silver, a fresh green accent.
+private val Green = Color(0xFF8CC63F)
+private val SenseDark = ClassicDark.copy(
+    primary = Green, onPrimary = Color(0xFF0E1A04), primaryContainer = Color(0xFF2B4012), onPrimaryContainer = Color(0xFFDDF3BD),
+    background = Color(0xFF0F1011), surface = Color(0xFF131415), surfaceContainerHigh = Color(0xFF212325), surfaceContainerHighest = Color(0xFF2A2D2F),
+)
+private val SenseLight = ClassicLight.copy(
+    primary = Color(0xFF5E9A1F), primaryContainer = Color(0xFFE0F2C8), onPrimaryContainer = Color(0xFF1B2E05),
+)
+
 /** True when the user chose dark, or chose "system" and the system is dark. */
 fun isDark(context: Context): Boolean = when (AppSettings.themeMode(context)) {
     "light" -> false
@@ -59,6 +69,7 @@ fun isDark(context: Context): Boolean = when (AppSettings.themeMode(context)) {
 fun nanoColorScheme(context: Context): ColorScheme {
     val dark = isDark(context)
     return when {
+        AppSettings.isSense(context) -> if (dark) SenseDark else SenseLight
         AppSettings.isClassic(context) -> if (dark) ClassicDark else ClassicLight
         AppSettings.dynamicColor(context) && Build.VERSION.SDK_INT >= 31 -> if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         dark -> DarkColors

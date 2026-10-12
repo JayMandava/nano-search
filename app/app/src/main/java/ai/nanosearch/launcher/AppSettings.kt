@@ -31,7 +31,12 @@ object AppSettings {
 
     /** "modern" (Material 3 Expressive, the default) or "classic": flat and dark with a blue accent, glossy drawn icons and a Hub. */
     fun style(c: Context) = prefs(c).getString("style", "modern") ?: "modern"
+    /** Old School: the flat, dark styles. The stored value stays "classic" so existing installs keep their look. */
     fun isClassic(c: Context) = style(c) == "classic"
+    /** Which Old School era: "spirit" (the default) or "sense". */
+    fun era(c: Context) = prefs(c).getString("era", "spirit") ?: "spirit"
+    fun isSense(c: Context) = isClassic(c) && era(c) == "sense"
+    fun setEra(c: Context, era: String) = prefs(c).edit().putString("era", era).apply()
     fun setStyle(c: Context, style: String) = prefs(c).edit().putString("style", style).apply()
 
     // Features that Classic turns on by default but that work in either style. Once the user touches one, their choice wins.

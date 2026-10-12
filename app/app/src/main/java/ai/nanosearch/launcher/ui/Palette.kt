@@ -18,6 +18,8 @@ class Palette private constructor(
     val card: Int, val container: Int, val outline: Int, val error: Int, val scrim: Int,
     /** The Classic style: flat surfaces and small corners. */
     val classic: Boolean,
+    /** Old School, Sense era: graphite with silver gloss and a green accent. */
+    val sense: Boolean = false,
 ) {
     /** A corner radius in dp for the current style: Modern is as given, Classic is much squarer. */
     fun radius(dp: Int) = if (classic) maxOf(2, dp / 6) else dp
@@ -37,7 +39,7 @@ class Palette private constructor(
                 bar = withAlpha(s.surfaceContainerHigh, if (classic) 0.97f else 0.92f), dock = withAlpha(s.surfaceContainer, if (classic) 0.97f else 0.78f),
                 panel = withAlpha(s.surface, 0.98f), drawer = withAlpha(s.surface, if (classic) 0.42f else 0.96f),
                 card = s.surfaceContainerHigh.toArgb(), container = s.surfaceContainerHighest.toArgb(), outline = withAlpha(s.onSurface, 0.12f),
-                error = s.error.toArgb(), scrim = withAlpha(s.scrim, 0.45f), classic = classic,
+                error = s.error.toArgb(), scrim = withAlpha(s.scrim, 0.45f), classic = classic, sense = ai.nanosearch.launcher.AppSettings.isSense(context),
             )
         }
     }
