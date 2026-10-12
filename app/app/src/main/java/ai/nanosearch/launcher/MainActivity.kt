@@ -187,6 +187,23 @@ class MainActivity : Activity() {
         cornerRadius = dp(pal.radius(radiusDp)).toFloat()
     }
 
+    /** Sense: dark glass, lighter at the top, with a thin silver rim. */
+    private fun senseGlass(radiusDp: Int) = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0xF2454A50.toInt(), 0xF21B1E21.toInt(), 0xF2101214.toInt())).apply {
+        cornerRadius = dp(radiusDp).toFloat(); setStroke(dp(1), 0x66D8DEE3)
+    }
+
+    /** The search bar and its buttons: Sense glass, a flat outlined bar in Spirit, a soft rounded one in Modern. */
+    private fun barBg(radiusDp: Int): Drawable = if (pal.sense) senseGlass(radiusDp) else round(pal.bar, radiusDp).also { if (pal.classic) it.setStroke(dp(1), pal.outline) }
+
+    /** The Sense launcher bar: a glossy dark band with a bright edge along its top. */
+    private fun senseDock(): Drawable = android.graphics.drawable.LayerDrawable(arrayOf(
+        GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0xF5404549.toInt(), 0xFA1A1C1F.toInt(), 0xFF0A0B0C.toInt())),
+        android.graphics.drawable.ColorDrawable(0x88E3E8EC.toInt()),
+    )).apply { setLayerHeight(1, dp(1)); setLayerGravity(1, Gravity.TOP) }
+
+    /** Sense keeps its own on/off for the home clock (a flip clock), so the choice made in Spirit does not hide it. */
+    private val clockKey get() = if (pal.sense) "showClock_sense" else "showClock"
+
     // ---------------------------------------------------------------- setup
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -337,7 +354,7 @@ class MainActivity : Activity() {
             textSize = 18f
             setSingleLine()
             imeOptions = EditorInfo.IME_ACTION_GO
-            background = round(pal.bar, 28).also { if (pal.classic) it.setStroke(dp(1), pal.outline) }
+            background = barBg(28)
             val lens = getDrawable(R.drawable.ic_search)!!.mutate().apply { setTint(pal.onVariant); setBounds(0, 0, dp(24), dp(24)) }
             setCompoundDrawablesRelative(lens, null, null, null)
             compoundDrawablePadding = dp(12)
@@ -357,7 +374,7 @@ class MainActivity : Activity() {
             setImageResource(R.drawable.ic_mic) // the Material mic glyph, as in Google's search bar
             scaleType = ImageView.ScaleType.CENTER_INSIDE
             setPadding(dp(15), dp(15), dp(15), dp(15))
-            background = round(pal.bar, 28).also { if (pal.classic) it.setStroke(dp(1), pal.outline) }
+            background = barBg(28)
             imageTintList = android.content.res.ColorStateList.valueOf(pal.onVariant)
             contentDescription = "Voice search"
             setOnClickListener { if (busy) stopAnswer() else toggleVoice() }
@@ -378,7 +395,7 @@ class MainActivity : Activity() {
                 }
                 hubButton = ImageView(context).apply {
                     setImageResource(R.drawable.ic_hub); scaleType = ImageView.ScaleType.CENTER_INSIDE; setPadding(dp(15), dp(15), dp(15), dp(15))
-                    background = round(pal.bar, 28).also { if (pal.classic) it.setStroke(dp(1), pal.outline) }
+                    background = barBg(28)
                     imageTintList = android.content.res.ColorStateList.valueOf(pal.onVariant); contentDescription = "Hub"
                     setOnClickListener { openHub() }
                 }
@@ -491,23 +508,34 @@ class MainActivity : Activity() {
         dockRow = LinearLayout(this@MainActivity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            background = if (pal.classic) flatBar(pal.dock, pal.outline) else round(pal.dock, 36)
+            background = if (pal.sense) senseDock() else if (pal.classic) flatBar(pal.dock, pal.outline) else round(pal.dock, 36)
             setPadding(dp(8), dp(if (pal.classic) 8 else 10), dp(8), dp(if (pal.classic) 6 else 10))
         }
         pager = ViewPager(this@MainActivity).apply {
-            setPageTransformer(false) { page, pos -> page.alpha = 1f - kotlin.math.min(kotlin.math.abs(pos), 1f) * 0.5f }
+            setPageTransformer(false) { page, pos ->
+                val a = kotlin.math.min(kotlin.math.abs(pos), 1f)
+                if (pal.sense) {
+                    // Sense's carousel: the pages swing round a vertical edge as they pass
+                    page.cameraDistance = 14000f * resources.displayMetrics.density
+                    page.pivotX = if (pos < 0) page.width.toFloat() else 0f
+                    page.pivotY = page.height / 2f
+                    page.rotationY = -pos.coerceIn(-1f, 1f) * 32f
+                    page.scaleX = 1f - a * 0.1f; page.scaleY = 1f - a * 0.1f
+                    page.alpha = 1f - a * 0.65f
+                } else page.alpha = 1f - a * 0.5f
+            }
             addOnPageChangeListener(object : ViewPager.SimpleOnPageChangeListener() {
                 override fun onPageScrolled(position: Int, positionOffset: Float, positionOffsetPixels: Int) { dots.setPosition(position + positionOffset); slideWallpaper(position + positionOffset) }
                 override fun onPageSelected(position: Int) { updatePageLabel(); if (position < pageOffset) framesPage?.refresh() }
             })
         }
-        dots = PageDots(this@MainActivity, Color.WHITE, arc = pal.sense, accent = pal.primary)
+        dots = PageDots(this@MainActivity, Color.WHITE, arc = pal.sense, accent = pal.primary).apply { if (pal.sense) setOnClickListener { leap() } }
         clockBlock = LinearLayout(this@MainActivity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(28), dp(4), dp(28), dp(8))
-            addView(clock)
-            addView(date)
-            visibility = if (prefs.getBoolean("showClock", true)) View.VISIBLE else View.GONE
+            setPadding(dp(if (pal.sense) 12 else 28), dp(4), dp(if (pal.sense) 12 else 28), dp(8))
+            if (pal.sense) addView(ai.nanosearch.launcher.clocks.FlipClockView(this@MainActivity), LinearLayout.LayoutParams(-1, dp(190)))
+            else { addView(clock); addView(date) }
+            visibility = if (prefs.getBoolean(clockKey, true)) View.VISIBLE else View.GONE
             var lx = 0f; var ly = 0f
             setOnTouchListener { _, e -> if (e.actionMasked == android.view.MotionEvent.ACTION_DOWN) { lx = e.rawX; ly = e.rawY }; false }
             setOnLongClickListener {
@@ -518,7 +546,7 @@ class MainActivity : Activity() {
         homeContent = LinearLayout(this@MainActivity).apply {
             orientation = LinearLayout.VERTICAL
             addView(pager, LinearLayout.LayoutParams(-1, 0, 1f))
-            if (pal.classic) {
+            if (pal.classic && !pal.sense) {
                 pageLabel = NText(this@MainActivity).apply { textSize = 12f; setTextColor(pal.onVariant); gravity = Gravity.CENTER; setShadowLayer(6f, 0f, 1f, 0x99000000.toInt()); letterSpacing = 0.06f }
                 addView(pageLabel, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.CENTER_HORIZONTAL })
             }
@@ -763,6 +791,8 @@ class MainActivity : Activity() {
         dockRow.removeAllViews()
         val saved = dockSaved()
         for (slot in 0 until DOCK_SLOTS) {
+            // Sense: the round "all apps" button sits in the middle of the bar
+            if (pal.sense && slot == DOCK_SLOTS / 2) dockRow.addView(ai.nanosearch.launcher.ui.SenseAppsButton(this, pal.primary).apply { contentDescription = "All apps"; setOnClickListener { openDrawer() } }, LinearLayout.LayoutParams(dp(74), dp(70)))
             if (saved[slot] == DOCK_EMPTY) { dockRow.addView(emptyDockSlot(slot), LinearLayout.LayoutParams(0, dp(56), 1f)); continue }
             val entry = dockEntry(slot, saved[slot]) ?: continue
             val show = dockCell(entry.icon, entry.label, entry.component?.packageName)
@@ -795,7 +825,8 @@ class MainActivity : Activity() {
     }
 
     private fun dockContent(icon: Drawable, label: String): View =
-        if (!pal.classic) ImageView(this).apply { setImageDrawable(icon) }
+        if (pal.sense) ImageView(this).apply { setImageDrawable(icon); setPadding(dp(3), dp(3), dp(3), dp(3)) } // no names on the Sense bar
+        else if (!pal.classic) ImageView(this).apply { setImageDrawable(icon) }
         else LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
@@ -838,7 +869,7 @@ class MainActivity : Activity() {
     }
 
     private fun setClockShown(shown: Boolean) {
-        prefs.edit().putBoolean("showClock", shown).apply()
+        prefs.edit().putBoolean(clockKey, shown).apply()
         clockBlock.visibility = if (shown) View.VISIBLE else View.GONE
     }
 
@@ -856,6 +887,7 @@ class MainActivity : Activity() {
                 MenuItem(R.drawable.ic_menu_wallpaper, "Wallpaper & style") { changeWallpaper() },
                 MenuItem(R.drawable.ic_menu_widgets, "Widgets") { currentPage().widgets.pick() },
                 MenuItem(R.drawable.ic_menu_apps, "Apps list") { openDrawer() },
+                *(if (pal.sense) arrayOf(MenuItem(R.drawable.ic_menu_page_add, "Leap view") { leap() }) else emptyArray()),
                 *(if (AppSettings.hub(this)) arrayOf(MenuItem(R.drawable.ic_hub, "Hub") { openHub() }) else emptyArray()),
                 MenuItem(R.drawable.ic_menu_clock, if (clockShown) "Remove clock" else "Add clock") { setClockShown(!clockShown) },
             ),
@@ -945,11 +977,12 @@ class MainActivity : Activity() {
 
     /** Classic: a bar along the bottom of the drawer with a tab for all apps, the recent ones and the starred ones. */
     private fun buildTabBar(): View {
-        val tabs = listOf(Triple("all", "All", R.drawable.ic_menu_apps), Triple("recent", "Recent", R.drawable.ic_menu_clock), Triple("fav", "Favourites", R.drawable.ic_star))
+        val tabs = if (pal.sense) listOf(Triple("all", "All apps", R.drawable.ic_menu_apps), Triple("recent", "Frequent", R.drawable.ic_menu_clock), Triple("dl", "Downloaded", R.drawable.ic_menu_download))
+        else listOf(Triple("all", "All", R.drawable.ic_menu_apps), Triple("recent", "Recent", R.drawable.ic_menu_clock), Triple("fav", "Favourites", R.drawable.ic_star))
         val views = LinkedHashMap<String, TextView>()
         val bar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            background = flatBar(pal.dock or 0xFF000000.toInt(), pal.outline)
+            background = if (pal.sense) senseDock() else flatBar(pal.dock or 0xFF000000.toInt(), pal.outline)
             for ((key, label, icon) in tabs) {
                 val tab = NText(context).apply {
                     text = label; textSize = 11f; gravity = Gravity.CENTER; compoundDrawablePadding = dp(2); setPadding(0, dp(6), 0, dp(4))
@@ -977,6 +1010,7 @@ class MainActivity : Activity() {
     /** What the drawer shows for the chosen tab, from every app. */
     private fun forTab(all: List<Item>): List<Item> = when (drawerTab) {
         "recent" -> AppUsage.recents(this).mapNotNull { (c, _) -> all.firstOrNull { it.key == c } }
+        "dl" -> all.filter { runCatching { packageManager.getApplicationInfo(ComponentName.unflattenFromString(it.key)!!.packageName, 0).flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM == 0 }.getOrDefault(false) }
         "fav" -> AppUsage.favourites(this).mapNotNull { c -> all.firstOrNull { it.key == c } }.sortedBy { it.title.lowercase() }
         else -> all
     }
@@ -1126,9 +1160,55 @@ class MainActivity : Activity() {
         return super.onKeyDown(keyCode, event)
     }
 
+    // ---- Leap view (Sense): every page at once
+
+    private var leapView: ai.nanosearch.launcher.ui.LeapView? = null
+
+    private fun leap() {
+        if (leapView != null || drawerOpen) return
+        val total = pages.size + pageOffset
+        val thumbs = (0 until total).map { i ->
+            val v = if (i < pageOffset) framesPage!!.root else pages[i - pageOffset].root
+            runCatching {
+                if (v.width <= 0 || v.height <= 0) null else {
+                    val scale = 320f / v.width
+                    android.graphics.Bitmap.createBitmap(320, (v.height * scale).toInt().coerceAtLeast(1), android.graphics.Bitmap.Config.ARGB_8888).also { b ->
+                        val c = android.graphics.Canvas(b); c.scale(scale, scale); v.draw(c)
+                    }
+                }
+            }.getOrNull()
+        }
+        val view = ai.nanosearch.launcher.ui.LeapView(this, pal, (0 until total).map { pageName(it) }, thumbs, pager.currentItem,
+            onPick = { i -> pager.setCurrentItem(i, false); closeLeap() }, onClose = { closeLeap() })
+        leapView = view
+        val host = home.parent as ViewGroup
+        host.addView(view, host.indexOfChild(overlayHost), FrameLayout.LayoutParams(-1, -1))
+    }
+
+    private fun closeLeap() {
+        val v = leapView ?: return
+        leapView = null
+        v.dismiss { (v.parent as? ViewGroup)?.removeView(v) }
+    }
+
+    private var pinchScale = 1f
+    private val pinch by lazy {
+        android.view.ScaleGestureDetector(this, object : android.view.ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            override fun onScaleBegin(d: android.view.ScaleGestureDetector): Boolean { pinchScale = 1f; return true }
+            override fun onScale(d: android.view.ScaleGestureDetector): Boolean { pinchScale *= d.scaleFactor; return true }
+            override fun onScaleEnd(d: android.view.ScaleGestureDetector) { if (pinchScale < 0.8f && !overlays.isShowing && !hubScreen.isShowing && !wallpaperScreen.isShowing) leap() }
+        })
+    }
+
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        if (pal.sense && leapView == null) pinch.onTouchEvent(ev)
+        return super.dispatchTouchEvent(ev)
+    }
+
     @Deprecated("Launcher: back never leaves home")
     override fun onBackPressed() {
         when {
+            leapView != null -> closeLeap()
             hubScreen.isShowing -> hubScreen.back()
             wallpaperScreen.isShowing -> wallpaperScreen.back()
             overlays.isShowing -> overlays.dismissAll()
@@ -1907,7 +1987,7 @@ class MainActivity : Activity() {
             val cell = (convertView as? LinearLayout) ?: LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER_HORIZONTAL
-                if (pal.classic) {
+                if (pal.classic && !pal.sense) {
                     // a boxed tile with the name on a darker strip along its foot, as in BlackBerry 10's later icon style
                     setPadding(0, dp(10), 0, 0)
                     background = GradientDrawable().apply { setColor(0x38000000); cornerRadius = dp(pal.radius(14)).toFloat(); setStroke(dp(1), 0x26FFFFFF) }
@@ -1926,10 +2006,10 @@ class MainActivity : Activity() {
                     addView(badgeView(0).also { it.visibility = View.GONE }, FrameLayout.LayoutParams(-2, dp(18), Gravity.TOP or Gravity.END))
                 }, LinearLayout.LayoutParams(dp(54), dp(54)))
                 addView(NText(context).apply {
-                    textSize = 12f; setTextColor(if (pal.classic) 0xFFF1F3F4.toInt() else pal.onSurface); maxLines = 1; gravity = Gravity.CENTER
+                    textSize = 12f; setTextColor(if (pal.classic) 0xFFF1F3F4.toInt() else pal.onSurface); maxLines = 1; gravity = Gravity.CENTER; if (pal.sense) setShadowLayer(4f, 0f, 1f, 0xAA000000.toInt())
                     ellipsize = TextUtils.TruncateAt.END
-                    if (pal.classic) { setBackgroundColor(0x80000000.toInt()); setPadding(dp(4), dp(4), dp(4), dp(4)) } else setShadowLayer(0f, 0f, 0f, 0)
-                }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(if (pal.classic) 8 else 4) })
+                    if (pal.classic && !pal.sense) { setBackgroundColor(0x80000000.toInt()); setPadding(dp(4), dp(4), dp(4), dp(4)) } else if (!pal.sense) setShadowLayer(0f, 0f, 0f, 0)
+                }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(if (pal.classic && !pal.sense) 8 else 4) })
             }
             val item = items[position]
             (cell.getChildAt(1) as TextView).text = item.title

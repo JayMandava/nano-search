@@ -30,6 +30,7 @@ class Palette private constructor(
         fun of(context: Context): Palette {
             val s = nanoColorScheme(context)
             val classic = ai.nanosearch.launcher.AppSettings.isClassic(context)
+            val sense = ai.nanosearch.launcher.AppSettings.isSense(context)
             return Palette(
                 s.onSurface.toArgb(), s.onSurfaceVariant.toArgb(), s.primary.toArgb(), s.onPrimary.toArgb(),
                 s.primaryContainer.toArgb(), s.onPrimaryContainer.toArgb(),
@@ -37,9 +38,9 @@ class Palette private constructor(
                 s.tertiaryContainer.toArgb(), s.onTertiaryContainer.toArgb(),
                 s.errorContainer.toArgb(), s.onErrorContainer.toArgb(),
                 bar = withAlpha(s.surfaceContainerHigh, if (classic) 0.97f else 0.92f), dock = withAlpha(s.surfaceContainer, if (classic) 0.97f else 0.78f),
-                panel = withAlpha(s.surface, 0.98f), drawer = withAlpha(s.surface, if (classic) 0.42f else 0.96f),
+                panel = withAlpha(s.surface, 0.98f), drawer = withAlpha(s.surface, if (sense) 0.94f else if (classic) 0.42f else 0.96f),
                 card = s.surfaceContainerHigh.toArgb(), container = s.surfaceContainerHighest.toArgb(), outline = withAlpha(s.onSurface, 0.12f),
-                error = s.error.toArgb(), scrim = withAlpha(s.scrim, 0.45f), classic = classic, sense = ai.nanosearch.launcher.AppSettings.isSense(context),
+                error = s.error.toArgb(), scrim = withAlpha(s.scrim, 0.45f), classic = classic, sense = sense,
             )
         }
     }
