@@ -37,8 +37,9 @@ object AppIcons {
         val label = runCatching { pm.getActivityInfo(cn, 0).loadLabel(pm).toString() }.getOrDefault("")
         val kind = kindOf(cn.packageName, label)
         val day = if (kind == "calendar") Calendar.getInstance().get(Calendar.DAY_OF_MONTH) else 0
-        val key = "${cn.flattenToShortString()}|$kind|$day"
-        return cache.get(key) ?: BitmapDrawable(context.resources, if (kind != null) draw(kind, day) else tile(own)).also { cache.put(key, it) }
+        val sense = AppSettings.isSense(context)
+        val key = "${if (sense) "s" else "c"}|${cn.flattenToShortString()}|$kind|$day"
+        return cache.get(key) ?: BitmapDrawable(context.resources, if (sense) senseTile(own, kind?.let { draw(it, day) }) else if (kind != null) draw(kind, day) else tile(own)).also { cache.put(key, it) }
     }
 
     private val KINDS = listOf(
@@ -94,6 +95,19 @@ object AppIcons {
         c.sheen(t, 14f, 100f, 0x40)
         own.setBounds(40, 36, 152, 148)
         own.draw(c)
+    }
+
+    /** The Sense look: every icon, drawn or the app's own, sits on one dark glass tile with a silver rim and a curved highlight. */
+    private fun senseTile(own: Drawable, drawn: Bitmap?): Bitmap = bitmap { c ->
+        val t = rr(10f, 10f, 182f, 182f, 40f)
+        c.glossy(t, 0xFF4b5056.toInt(), 0xFF141618.toInt(), 10f, 182f)
+        c.drawPath(t, paint().apply { style = Paint.Style.STROKE; strokeWidth = 3.5f; shader = lin(10f, 182f, 0xFFe9edf0.toInt(), 0xFF6c737a.toInt()) })
+        if (drawn != null) c.drawBitmap(drawn, null, RectF(34f, 30f, 158f, 154f), Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG))
+        else { own.setBounds(46f.toInt(), 42f.toInt(), 146f.toInt(), 142f.toInt()); own.draw(c) }
+        val gloss = Path().apply { moveTo(10f, 10f); lineTo(182f, 10f); lineTo(182f, 66f); quadTo(96f, 112f, 10f, 66f); close() }
+        c.save(); c.clipPath(t)
+        c.drawPath(gloss, paint().apply { shader = lin(10f, 100f, 0x4DFFFFFF, 0x0DFFFFFF) })
+        c.restore()
     }
 
     // ---------------------------------------------------------------- the icons

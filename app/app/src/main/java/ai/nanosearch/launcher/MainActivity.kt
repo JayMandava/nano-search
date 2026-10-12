@@ -501,7 +501,7 @@ class MainActivity : Activity() {
                 override fun onPageSelected(position: Int) { updatePageLabel(); if (position < pageOffset) framesPage?.refresh() }
             })
         }
-        dots = PageDots(this@MainActivity, Color.WHITE)
+        dots = PageDots(this@MainActivity, Color.WHITE, arc = pal.sense, accent = pal.primary)
         clockBlock = LinearLayout(this@MainActivity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(28), dp(4), dp(28), dp(8))

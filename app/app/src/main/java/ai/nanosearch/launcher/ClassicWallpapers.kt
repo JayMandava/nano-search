@@ -34,9 +34,12 @@ object ClassicWallpapers {
             "ember" -> ribbons(c, w, h, 0xFF0c0605.toInt(), 0xFF5a1608.toInt(), 0xFFd9480f.toInt(), 0xFFffc060.toInt(), 3)
             "graphite" -> graphite(c, w, h)
             "glacier" -> glacier(c, w, h)
-            else -> c.drawColor(0xFF111213.toInt())
+            else -> if (SenseWallpapers.has(id)) c.drawBitmap(SenseWallpapers.render(id, w, h), 0f, 0f, null) else c.drawColor(0xFF111213.toInt())
         }
     }
+
+    /** The wallpapers to offer: the Sense scenes first in the Sense era, the Spirit set otherwise. */
+    fun forEra(sense: Boolean) = if (sense) SenseWallpapers.ALL else ALL
 
     private fun lin(x0: Float, y0: Float, x1: Float, y1: Float, vararg colors: Int) =
         LinearGradient(x0, y0, x1, y1, colors, null, Shader.TileMode.CLAMP)

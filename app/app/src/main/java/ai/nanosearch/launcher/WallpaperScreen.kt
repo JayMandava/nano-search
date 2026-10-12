@@ -189,10 +189,10 @@ class WallpaperScreen(
 
     /** A strip of Classic wallpapers, drawn on the spot at the screen's size. Tap one to crop it and choose where it goes, like a photo. */
     private fun addClassicWallpapers(col: LinearLayout) {
-        col.addView(label("Classic wallpapers", 14f, pal.onVariant).apply { setPadding(dp(4), 0, 0, dp(8)) })
+        col.addView(label(if (pal.sense) "Sense wallpapers" else "Classic wallpapers", 14f, pal.onVariant).apply { setPadding(dp(4), 0, 0, dp(8)) })
         val tw = dp(92); val th = (tw * screenH.toFloat() / screenW).toInt()
         val strip = LinearLayout(activity)
-        for (paper in ClassicWallpapers.ALL) {
+        for (paper in ClassicWallpapers.forEra(pal.sense)) {
             val img = thumbView().apply { setOnClickListener { useClassic(paper.id) } }
             strip.addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.VERTICAL

@@ -8,9 +8,9 @@ import android.view.View
 
 /**
  * The page indicator, after Launcher3's: 6 dp dots with 4 dp gaps, the current page a dot twice as long that slides with the swipe, the others
- * at half opacity. Hidden while there is only one page.
+ * at half opacity. Hidden while there is only one page. With [arc] (the Sense style) the dots sit along a shallow curve and the current page glows in [accent].
  */
-class PageDots(context: Context, private val color: Int) : View(context) {
+class PageDots(context: Context, private val color: Int, private val arc: Boolean = false, private val accent: Int = color) : View(context) {
     private val density = resources.displayMetrics.density
     private val dot = 6 * density
     private val gap = 4 * density
@@ -25,10 +25,34 @@ class PageDots(context: Context, private val color: Int) : View(context) {
     fun setPosition(p: Float) { position = p; invalidate() }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        if (arc) { setMeasuredDimension((count * 14 * density + 18 * density).toInt() + paddingLeft + paddingRight, (30 * density).toInt()); return }
         setMeasuredDimension((count * dot + (count - 1) * gap + dot).toInt() + paddingLeft + paddingRight, (24 * density).toInt())
     }
 
+    private fun drawArc(canvas: Canvas) {
+        val step = 14 * density
+        val startX = (width - (count - 1) * step) / 2f
+        val sag = 5 * density
+        for (i in 0 until count) {
+            val t = if (count == 1) 0.5f else i / (count - 1f)
+            val x = startX + i * step
+            val y = height / 2f + sag / 2 - sag * (1f - (2 * t - 1f) * (2 * t - 1f)) + sag / 2
+            val near = (1f - kotlin.math.abs(i - position)).coerceIn(0f, 1f)
+            val r = (2.2f + 1.8f * near) * density
+            if (near > 0f) {
+                paint.color = accent; paint.alpha = (90 * near).toInt()
+                canvas.drawCircle(x, y, r * 2.1f, paint)
+            }
+            paint.color = if (near > 0.5f) accent else color
+            paint.alpha = (110 + 145 * near).toInt()
+            canvas.drawCircle(x, y, r, paint)
+            paint.color = 0xFFFFFFFF.toInt(); paint.alpha = (150 * near).toInt()
+            canvas.drawCircle(x - r * 0.3f, y - r * 0.3f, r * 0.35f, paint)
+        }
+    }
+
     override fun onDraw(canvas: Canvas) {
+        if (arc) { drawArc(canvas); return }
         val cy = height / 2f
         val startX = (width - (count * dot + (count - 1) * gap + dot)) / 2f
         // the dots keep their places; the active pill stretches from the dot it leaves to the dot it reaches

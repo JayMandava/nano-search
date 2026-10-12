@@ -277,6 +277,15 @@ private fun StyleCard() {
                     }
                 }
             }
+            if (style == "classic" && era == "sense") {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilledTonalButton(onClick = { SenseTones.play(context, SenseTones.Tone.CHIME) }) { Text("Hear chime") }
+                    FilledTonalButton(onClick = {
+                        val n = SenseTones.install(context)
+                        android.widget.Toast.makeText(context, if (n > 0) "Added $n Sense sounds. Pick them in Sound settings." else "Sense sounds are already on this phone.", android.widget.Toast.LENGTH_LONG).show()
+                    }) { Text("Add to phone") }
+                }
+            }
             Text(
                 when {
                     style != "classic" -> "Material 3 Expressive: rounded shapes and colours from your wallpaper."
