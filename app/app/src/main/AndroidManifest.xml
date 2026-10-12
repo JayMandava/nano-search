@@ -21,6 +21,9 @@
     <!-- Lets the file index see documents and downloads, not just media. Granted by the user in Settings. -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 
+    <!-- Optional: only to pick the weather's city from the phone's approximate location, when the user switches that on. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
     <uses-feature android:name="android.software.live_wallpaper" android:required="false" />
 
     <queries>

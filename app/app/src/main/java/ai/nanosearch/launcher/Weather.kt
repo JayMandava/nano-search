@@ -1,6 +1,10 @@
 package ai.nanosearch.launcher
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationManager
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -30,6 +34,26 @@ object Weather {
     }
     fun setCity(c: Context, name: String, lat: Double, lon: Double) = prefs(c).edit().putString("weather_city", "$name|$lat|$lon").remove("weather_now").apply()
 
+    /** Optional: use the phone's approximate location instead of a chosen city. Needs the coarse location permission; off if it is not granted. */
+    fun locationGranted(c: Context) = c.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+    fun useLocation(c: Context) = prefs(c).getBoolean("weather_loc", false) && locationGranted(c)
+    fun setUseLocation(c: Context, on: Boolean) = prefs(c).edit().putBoolean("weather_loc", on).remove("weather_now").apply()
+
+    @Suppress("MissingPermission")
+    private fun lastKnown(c: Context): Location? {
+        val lm = c.getSystemService(LocationManager::class.java) ?: return null
+        return listOf(LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER).mapNotNull { runCatching { lm.getLastKnownLocation(it) }.getOrNull() }.maxByOrNull { it.time }
+    }
+
+    /** Where to ask about: the approximate location (rounded to about a kilometre, named after the nearest city) if chosen and known, else the chosen city. */
+    fun spot(c: Context): Triple<String, Double, Double>? {
+        if (useLocation(c)) lastKnown(c)?.let { l ->
+            val lat = Math.round(l.latitude * 100) / 100.0; val lon = Math.round(l.longitude * 100) / 100.0
+            return Triple(Gazetteer.nearest(c, lat, lon)?.city ?: "Here", lat, lon)
+        }
+        return city(c)
+    }
+
     /** Fahrenheit instead of Celsius. Defaults to what the phone's region uses. */
     fun fahrenheit(c: Context) = if (prefs(c).contains("weather_f")) prefs(c).getBoolean("weather_f", false) else java.util.Locale.getDefault().country in setOf("US", "BS", "BZ", "KY", "LR")
     fun setFahrenheit(c: Context, on: Boolean) = prefs(c).edit().putBoolean("weather_f", on).apply()
@@ -49,7 +73,7 @@ object Weather {
     /** Fetches fresh conditions if the cached ones are old, then calls [done] on the calling thread's behalf (from the worker; post to the UI yourself). */
     fun refresh(c: Context, done: () -> Unit) {
         if (!enabled(c) || busy) return
-        val (_, lat, lon) = city(c) ?: return
+        val (_, lat, lon) = spot(c) ?: return
         val last = cached(c)
         if (last != null && System.currentTimeMillis() - last.at < REFRESH_MS) return
         busy = true

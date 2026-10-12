@@ -256,14 +256,27 @@ private fun WeatherCard() {
                 Column(Modifier.weight(1f).padding(end = 16.dp)) {
                     Text("Weather on the flip clock", style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        "Off by default. When on, the clock asks Open-Meteo for the weather in the one city you choose, at most every 30 minutes, and sends nothing else.",
+                        "Off by default. When on, the clock asks Open-Meteo for the weather in one city (chosen below, or from your approximate location), at most every 30 minutes, and sends nothing else.",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 Switch(checked = on, onCheckedChange = { on = it; Weather.setEnabled(context, it) })
             }
             if (on) {
-                Text(if (city != null) "City: $city" else "Choose a city", style = MaterialTheme.typography.bodyMedium)
+                var here by remember { mutableStateOf(Weather.useLocation(context)) }
+                val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok -> Weather.setUseLocation(context, ok); here = ok }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f).padding(end = 16.dp)) {
+                        Text("Use my location", style = MaterialTheme.typography.bodyLarge)
+                        Text("Optional. Uses your approximate location, never a precise one, to pick the city. Off: choose a city below.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(checked = here, onCheckedChange = { want ->
+                        if (!want) { Weather.setUseLocation(context, false); here = false }
+                        else if (Weather.locationGranted(context)) { Weather.setUseLocation(context, true); here = true }
+                        else ask.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+                    })
+                }
+                Text(if (here) "City: ${Weather.spot(context)?.first ?: "waiting for a location"} (from your location)" else if (city != null) "City: $city" else "Choose a city", style = MaterialTheme.typography.bodyMedium)
                 androidx.compose.material3.OutlinedTextField(value = query, onValueChange = { query = it }, label = { Text("Search for a city") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 matches.forEach { m ->
                     TextButton(onClick = { Weather.setCity(context, m.place.city, m.lat, m.lon); city = m.place.city; query = "" }) { Text(m.place.toString()) }

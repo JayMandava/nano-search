@@ -44,7 +44,7 @@ answers questions, and listens when you speak. Small language models run entirel
 ## Privacy
 
 Everything is indexed into a private database inside the app. Models run on the CPU. The app has the INTERNET permission for two
-reasons: downloading models when you tap Download, and, only if you switch on the flip clock's weather and choose a city, fetching that city's current weather from Open-Meteo (the city's coordinates are the only thing sent). Notification access, if you allow it for the Hub, only reads notifications on the phone. Downloads are checked against a SHA-256 before they are used, and
+reasons: downloading models when you tap Download, and, only if you switch on the flip clock's weather and choose a city, fetching that city's current weather from Open-Meteo (the city's coordinates are the only thing sent). The weather can optionally use your approximate location (a separate switch and permission, coarse only, rounded to about a kilometre) instead of a chosen city. Notification access, if you allow it for the Hub, only reads notifications on the phone. Downloads are checked against a SHA-256 before they are used, and
 "Download on Wi-Fi only" is on by default. Each search source (contacts, messages, calls, calendar, files, photos) can be switched off
 in Settings, and "Clear and rebuild" empties the index.
 
