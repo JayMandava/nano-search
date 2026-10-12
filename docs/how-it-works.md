@@ -10,13 +10,20 @@ Numbers below were measured on a mid-range 2023 phone (8 GB RAM, CPU only). Othe
   A Launcher3-style indicator (6 dp dots, the active one stretched) slides with the swipe.
 - **Dock.** Long-press an icon for App info, Change app and Remove; a removed slot shows a "+". "Add to home" and "Add to dock" are in the drawer's long-press menu.
 - **Drawer.** It rises with a decelerating curve while the home screen behind it eases back (scale 0.97) and fades. Icons grow slightly when pressed, and apps open from the icon that was tapped.
-- **Built-in widgets.** Besides Android widgets, a page can hold widgets the launcher draws itself (`BuiltinWidgets.kt`). The launcher ships none: it looks for an optional class supplied by a local `src/personal` source set, which is compiled into debug and test builds only and ignored by git, and offers whatever it provides first in the widget picker.
+- **Built-in widgets.** Besides Android widgets, a page can hold widgets the launcher draws itself (`BuiltinWidgets.kt`). The launcher ships two, in `clocks/`: the flip clock and the Steel Dial (`ClockWidgets.kt`), both drawn on a canvas with open fonts (Play and Barlow). They are listed first in the widget picker and behave like any widget: long-press to resize or remove. A local `src/personal` source set (ignored by git, compiled into debug and test builds only) may add more, and may drop a Porscha911.ttf into its assets to restyle the dial's numerals.
+- **Default clocks.** `HomeWidgets.seedDefault` puts a style's own clock at the top of the first page once (Spirit the Steel Dial, Sense the flip clock) and `dropDefault` takes the other style's default off when the style changes; a clock the user added by hand is never touched, and one they removed stays removed.
 - **Settings run in their own task,** so pressing Home from a settings screen behaves like leaving any other app instead of replaying a back animation.
 
 ## Styles, the Hub and Frames
 
-- **Styles.** `AppSettings.style` is "modern" (default) or "classic". The Classic colours live in `ui/Theme.kt` (charcoal and white, one blue accent, light or dark), and `Palette.radius()` squares the corners
-  of everything the launcher draws. Classic also gives the dock a flat labelled bar that runs behind the navigation bar, and the drawer a bottom tab bar (All, Recent, Favourites). Changing the style recreates the home screen.
+- **Styles.** `AppSettings.style` is "modern" (default) or "classic" (shown as Old School), and `AppSettings.era` is "spirit" (default) or "sense". The Spirit colours live in `ui/Theme.kt` (charcoal and white, one blue accent, light or dark), and `Palette.radius()` squares the corners
+  of everything the launcher draws. Spirit also gives the dock a flat labelled bar that runs behind the navigation bar, and the drawer a bottom tab bar (All, Recent, Favourites). `Palette.sense` marks the Sense era, whose colours are graphite and silver with a green accent.
+  Changing the style or era rebuilds the home screen (the era is part of `MainActivity.themeKey`), and Settings fades to the new look instead of restarting.
+- **Sense.** It keeps Spirit's palette machinery but has its own look and gestures, all drawn in code (`ui/SenseViews.kt`, `ui/SenseMaterial.kt`, `ClassicIcons.senseIcon`): glass strips (`SenseGloss`) for the search bar and the clock's weather panel; icons that stand on the wallpaper; a dock shaped as an arch of dotted carbon (`SenseArch`) holding Phone and Camera; and one ring (`SenseRing`) that is the only way into the app drawer.
+  Pulling the ring moves a ghost copy in the overlay while the drawer is revealed as a growing circle (`setDrawerClip`); letting go past a quarter of the screen, or with a flick, finishes the move, and the drawer's own ring (hidden until the drawer is open) takes you back home the same way, so only one ring is ever visible.
+  Dock apps can be dragged onto the ring to open them (`senseDragToRing`). The drawer has a title bar and three glossy tabs (`SenseTabBar`: All apps, Frequent, Downloaded). Pages swing round as you swipe (a page transformer) and `LeapView` shows every page at once (pinch in, tap the arc of dots, or the home menu).
+  `PageDots(arc = true)` draws the arc. Sense has no Hub or Active Frames, and the swipe-up that opens the drawer in Spirit is off. Ring haptics are one switch (`AppSettings.ringHaptics`). The dock is only rebuilt when a dock app's badge count changes (`dockSignature`), because a rebuild mid-touch would cancel a pull.
+- **Weather.** `Weather.kt` is off by default. When on, the flip clock asks Open-Meteo for the current conditions and today's high and low at one place: a city chosen from the offline list (`Gazetteer.search`), or, if the user allows approximate location, the phone's last known coarse fix rounded to about a kilometre (never an active location request). A reading is refetched when it is 30 minutes old or the place has moved more than 10 km, and is not shown at all once it is over 6 hours old. `WeatherArt` draws the sky pictures.
 - **Icons.** `ClassicIcons.kt` draws about twenty icons in code (handset, speech bubble, envelope, globe, camera, photo cards, notes, alarm clock, calendar page with today's date, calculator,
   address book, filing cabinet, gear, map, notepad, shopping bag, screen with a play button, microphone, sun and cloud, wallet, clipboard). An app gets one when its package or label says what it is; every
   other app keeps its own icon on a dark glossy tile. All of it is original artwork.
@@ -24,11 +31,11 @@ Numbers below were measured on a mid-range 2023 phone (8 GB RAM, CPU only). Othe
   recent texts, missed calls and the next week's events from the same providers search already reads, and skips a text that a notification has already shown. `HubScreen` lists them with filters, replies in
   place through the notification's own reply action, and dismisses. Swipe in from the left edge (the strip excludes itself from the system Back gesture) or use the button by the search bar.
 - **Dots, Frames, favourites.** Icons show a count from `HubStore`. Active Frames (`FramesPage.kt`) is a page to the left of home listing apps with something to say first, then the apps opened last
-  (`AppUsage.kt` keeps the last twelve and the starred ones). Hub, dots and Frames are each a switch; Classic turns them on until you choose otherwise.
+  (`AppUsage.kt` keeps the last twelve and the starred ones). Hub, dots and Frames are each a switch; Spirit turns them on until you choose otherwise, and Sense has no Hub or Frames.
 
-- **Wallpapers and a lock screen clock.** `ClassicWallpapers.kt` draws the Classic wallpapers (gradients, blurred strokes, patterns) in about 100 ms at full size. The wallpaper screen can also offer a clock
-  on the lock screen: a live wallpaper is the only way to put a moving clock behind the lock screen, so a build that includes one (the local `src/personal` source set may carry its own manifest and resources)
-  gets a "Clock on the lock screen" row. `LockClock.kt` keeps the choices (which clock, which background, where on the screen) and opens Android's own preview, where you pick home, lock or both.
+- **Wallpapers and a lock screen clock.** `ClassicWallpapers.kt` draws seven wallpapers, the same in every style: woven carbon, brushed steel and five more metals (gold, rose gold, copper, bronze, platinum), the metals built like Steel from vertical bands of light and dark with fine horizontal brushing, in about 100 ms at full size. The wallpaper screen can also offer a clock
+  on the lock screen: a live wallpaper is the only way to put a moving clock behind the lock screen, so `clocks/ClockWallpaperService.kt` is one, drawing a background (one of the wallpapers or black) and the Steel Dial or the flip clock.
+  `LockClock.kt` keeps the choices (which clock, which background, where on the screen) and opens Android's own preview, where you pick home, lock or both. The lock screen itself is left to the system.
 - **Dismissing in the Hub.** A notification is cleared from the shade. A text, missed call or event comes from the phone's databases, so dismissing it only stops the Hub listing it (the id is remembered, the last 600);
   the Messages app and call log are untouched. Clear all does both.
 
@@ -36,7 +43,7 @@ Numbers below were measured on a mid-range 2023 phone (8 GB RAM, CPU only). Othe
   fifth of home is recognised in `DragLayout.dispatchTouchEvent`, before the children see the touch (a child had been taking the gesture), which cancels them and opens the Hub; a straight swipe up still opens the drawer.
 - **Row actions.** Pins are remembered by item id. Snoozing a notification hands it back to Android (`snoozeNotification`), which posts it again later; texts, calls and events are hidden until the time. "Priority" is plain rules in `HubData.isPriority`.
   `HubFeedback` makes the optional tick tones on the spot (a 70 ms decaying sine), so there are no sound files.
-- **Typeface.** Classic uses Source Sans 3, a variable font, through `NText` and `NEdit` (a TextView and an EditText that map any requested weight onto the font's weight axis) and a Compose typography for Settings.
+- **Typeface.** Old School (both eras) uses Source Sans 3, a variable font, through `NText` and `NEdit` (a TextView and an EditText that map any requested weight onto the font's weight axis) and a Compose typography for Settings.
 - **Full screen.** `WindowInsetsController` hides the system bars with swipe-to-reveal; the layout takes the display cutout as an inset so the search bar clears a camera hole when the status bar is gone.
 
 ## Search
