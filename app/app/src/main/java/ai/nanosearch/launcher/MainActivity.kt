@@ -998,7 +998,7 @@ class MainActivity : Activity() {
         if (pal.sense) {
             // Sense 3's drawer: a charcoal page under a title bar, the grid, and three glossy tabs along the bottom
             setBackgroundColor(0xFF19191B.toInt())
-            grid.setPadding(dp(8), dp(60), dp(8), dp(24) + dp(60))
+            grid.setPadding(dp(8), dp(60), dp(8), dp(24) + dp(70))
             banner.layoutParams = (banner.layoutParams as FrameLayout.LayoutParams).apply { topMargin = dp(58) }
             senseTitle = NText(this@MainActivity).apply { text = "All apps"; textSize = 19f; setTextColor(Color.WHITE); gravity = Gravity.CENTER_VERTICAL; setPadding(dp(16), 0, 0, 0) }
             val lens = ImageView(this@MainActivity).apply {
@@ -1023,7 +1023,7 @@ class MainActivity : Activity() {
                 senseTitle?.text = mapOf("all" to "All apps", "recent" to "Frequent", "dl" to "Downloaded")[key]
                 search()
             }
-            addView(senseTabs, FrameLayout.LayoutParams(-1, dp(60), Gravity.BOTTOM))
+            addView(senseTabs, FrameLayout.LayoutParams(-1, dp(70), Gravity.BOTTOM))
         }
 
         // Pull down to close, but only when the app grid is scrolled to the top.

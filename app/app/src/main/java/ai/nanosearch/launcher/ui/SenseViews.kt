@@ -182,17 +182,18 @@ class SenseTabBar(context: Context, private val tabs: List<Triple<String, String
             val on = key == selected
             if (on) {
                 // the chosen tab is a raised glass key, lit and bordered all the way round
-                val r = android.graphics.RectF(x0 + 3 * d, 4 * d, x0 + cell - 3 * d, h - 4 * d)
+                // the outer tabs stand in from the screen's edge and its rounded corners, so their borders are never cut off
+                val r = android.graphics.RectF(x0 + (if (i == 0) 14 * d else 4 * d), 6 * d, x0 + cell - (if (i == tabs.size - 1) 14 * d else 4 * d), h - 12 * d)
                 paint.shader = LinearGradient(0f, r.top, 0f, r.bottom, intArrayOf(0xFF74777C.toInt(), 0xFF4A4D52.toInt(), 0xFF2C2E31.toInt()), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
                 c.drawRoundRect(r, 12 * d, 12 * d, paint); paint.shader = null
                 paint.style = Paint.Style.STROKE; paint.strokeWidth = 1.4f * d
                 paint.shader = LinearGradient(0f, r.top, 0f, r.bottom, 0xFFFFFFFF.toInt(), 0x99FFFFFF.toInt(), Shader.TileMode.CLAMP)
                 c.drawRoundRect(r, 12 * d, 12 * d, paint); paint.shader = null; paint.style = Paint.Style.FILL
             } else if (i > 0) { paint.color = 0x33FFFFFF; c.drawRect(x0, 10 * d, x0 + 1f * d, h - 10 * d, paint) }
-            drawIcon(c, icon, x0 + cell / 2f, h * 0.38f, 11 * d, on)
+            drawIcon(c, icon, x0 + cell / 2f, h * 0.36f, 11 * d, on)
             paint.color = if (on) 0xFFFFFFFF.toInt() else 0xFFC4C8CC.toInt(); paint.textSize = 11.5f * d; paint.textAlign = Paint.Align.CENTER
             paint.typeface = android.graphics.Typeface.create("sans-serif", if (on) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
-            c.drawText(label, x0 + cell / 2f, h - 10 * d, paint)
+            c.drawText(label, x0 + cell / 2f, h - 19 * d, paint)
         }
     }
 
