@@ -18,10 +18,10 @@ import kotlin.math.sin
 
 /**
  * The sounds of the Sense era, made here from sine waves (a soft bell: a fundamental with a few decaying overtones), so there are no sound files and nothing
- * copied from any phone: a notification chime, a short ping, a ringtone phrase and the unlock sweep. They can also be added to the phone's own sound lists.
+ * copied from any phone: a notification chime, a short ping, and a ringtone phrase. They can also be added to the phone's own sound lists.
  */
 object SenseTones {
-    enum class Tone(val title: String, val kind: Kind) { CHIME("Sense Chime", Kind.NOTIFICATION), PING("Sense Ping", Kind.NOTIFICATION), RING("Sense Ring", Kind.RINGTONE), UNLOCK("Sense Unlock", Kind.NOTIFICATION) }
+    enum class Tone(val title: String, val kind: Kind) { CHIME("Sense Chime", Kind.NOTIFICATION), PING("Sense Ping", Kind.NOTIFICATION), RING("Sense Ring", Kind.RINGTONE) }
     enum class Kind { NOTIFICATION, RINGTONE }
 
     const val RATE = 22050
@@ -51,15 +51,6 @@ object SenseTones {
         when (tone) {
             Tone.CHIME -> FloatArray((RATE * 1.4).toInt()).also { bell(it, 0.0, 659.3, 1.2, 1.0); bell(it, 0.13, 987.8, 1.2, 0.9) }
             Tone.PING -> FloatArray((RATE * 0.6).toInt()).also { bell(it, 0.0, 1568.0, 0.55, 1.0, 8.0) }
-            Tone.UNLOCK -> FloatArray((RATE * 0.5).toInt()).also { out ->
-                var phase = 0.0
-                for (i in out.indices) {
-                    val t = i / RATE.toDouble()
-                    phase += 2 * PI * (420.0 + 1100.0 * t / 0.35).coerceAtMost(1520.0) / RATE
-                    out[i] = (sin(phase) * (1 - exp(-t * 400.0)) * exp(-t * 7.0) * 0.8).toFloat()
-                }
-                bell(out, 0.3, 1568.0, 0.2, 0.6, 12.0)
-            }
             Tone.RING -> FloatArray(RATE * 7).also { out ->
                 val up = doubleArrayOf(523.3, 659.3, 784.0, 1046.5)
                 val down = doubleArrayOf(784.0, 659.3, 587.3, 523.3)
