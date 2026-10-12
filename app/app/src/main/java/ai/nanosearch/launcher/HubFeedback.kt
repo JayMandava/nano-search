@@ -20,7 +20,6 @@ object HubFeedback {
     }
 
     private val tones = HashMap<Cue, ShortArray>()
-    private val senseTones = HashMap<Cue, ShortArray>()
 
     private fun tone(cue: Cue): ShortArray = tones.getOrPut(cue) {
         val rate = 22050; val n = rate * 70 / 1000
@@ -34,7 +33,7 @@ object HubFeedback {
     fun play(context: Context, view: View?, cue: Cue) {
         view?.performHapticFeedback(cue.haptic)
         if (!AppSettings.hubSounds(context)) return
-        val data = if (AppSettings.isSense(context)) senseTones.getOrPut(cue) { SenseTones.tick(cue.freq) } else tone(cue)
+        val data = tone(cue)
         runCatching {
             val track = AudioTrack.Builder()
                 .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())

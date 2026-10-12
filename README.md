@@ -23,9 +23,8 @@ answers questions, and listens when you speak. Small language models run entirel
 - **Old School style (optional):** a second look for the whole launcher, chosen in Settings > Appearance, in two eras. **Spirit** (the former Classic) is flat charcoal and white with one blue accent,
   squarer corners, a labelled dock bar, and an original set of glossy drawn icons (a handset, an envelope, a camera, a calendar page that shows today's date).
   Apps without a drawn icon keep their own, set on a matching dark tile. **Sense** is graphite and silver with a green accent, glass icon tiles, an arc that shows which home page you are on,
-  a flip clock, and its own wallpapers and sounds. Modern, the default, is unchanged.
+  a flip clock and its own wallpapers. Modern, the default, is unchanged.
 - **Flip clock and Steel Dial:** two clock widgets drawn by the launcher, also usable as a live wallpaper behind the lock screen. The flip clock can show the weather, which is off by default (see Privacy).
-- **Sense sounds:** a chime, a ping and a ringtone, synthesised in the app (no sound files), which Settings can add to the phone's own sound lists.
 - **Translucent drawer in Classic:** the wallpaper shows through the app drawer, and each app sits in a boxed tile with its name on a darker strip along the foot, in the manner of the later
   BlackBerry 10 icon style.
 - **Hub:** one list for texts, missed calls, upcoming events and the notifications of your other apps, with filters, replying in place where an app allows it,
