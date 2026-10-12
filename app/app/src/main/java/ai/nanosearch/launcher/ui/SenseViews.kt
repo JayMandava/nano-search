@@ -18,41 +18,81 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 
-/** The round silver button in the middle of the Sense launcher bar: a glass disc with a rim and a grid of nine dots, for "all apps". */
-class SenseAppsButton(context: Context, private val accent: Int) : View(context) {
+/**
+ * The ring: a thick brushed-silver ring with a smoked-glass middle, sitting in the middle of the Sense dock. Tap it, or pull it up, to open the app drawer.
+ * [onOpen] gets the ring's centre on the screen, so the drawer can open outwards from it.
+ */
+class SenseRing(context: Context, private val onOpen: (Float, Float) -> Unit) : View(context) {
     private val d = resources.displayMetrics.density
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private var pressedNow = false
+    private var downX = 0f
+    private var downY = 0f
+    private var pull = 0f
+    private var glow = 0f
+    private val restY = -20 * d // the ring floats above the two apps
 
-    override fun onDraw(c: Canvas) {
-        val cx = width / 2f; val cy = height / 2f
-        val r = minOf(width, height) / 2f - 2 * d
-        // soft shadow under the button
-        paint.shader = RadialGradient(cx, cy + 3 * d, r * 1.25f, 0x66000000, 0x00000000, Shader.TileMode.CLAMP)
-        c.drawCircle(cx, cy + 3 * d, r * 1.25f, paint)
-        // the silver rim, then the dark glass inside it
-        paint.shader = LinearGradient(0f, cy - r, 0f, cy + r, 0xFFF3F6F8.toInt(), 0xFF5F676E.toInt(), Shader.TileMode.CLAMP)
-        c.drawCircle(cx, cy, r, paint)
-        paint.shader = LinearGradient(0f, cy - r, 0f, cy + r, if (pressedNow) 0xFF3E454B.toInt() else 0xFF2A2F34.toInt(), 0xFF0E1012.toInt(), Shader.TileMode.CLAMP)
-        c.drawCircle(cx, cy, r - 3.5f * d, paint)
-        // a curved highlight over the top half
-        paint.shader = LinearGradient(0f, cy - r, 0f, cy, 0x55FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP)
-        c.drawArc(cx - r + 4 * d, cy - r + 4 * d, cx + r - 4 * d, cy + r - 4 * d, 180f, 180f, true, paint)
-        paint.shader = null
-        // nine dots
-        val gap = 9 * d
-        for (row in -1..1) for (col in -1..1) {
-            paint.color = if (row == 0 && col == 0) accent else 0xFFF1F3F4.toInt()
-            c.drawCircle(cx + col * gap, cy + row * gap, 2.6f * d, paint)
-        }
+    init { translationY = restY }
+    private val slop = android.view.ViewConfiguration.get(context).scaledTouchSlop
+
+    private fun fire() {
+        val at = IntArray(2); getLocationOnScreen(at)
+        onOpen(at[0] + width / 2f, at[1] + height / 2f)
+    }
+
+    private fun release(open: Boolean) {
+        if (open) { performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM); fire() }
+        animate().translationY(restY).setDuration(260).setInterpolator(android.view.animation.OvershootInterpolator(2.2f)).start()
+        val back = android.animation.ValueAnimator.ofFloat(glow, 0f).apply { duration = 260; addUpdateListener { glow = it.animatedValue as Float; invalidate() } }
+        back.start()
     }
 
     override fun onTouchEvent(e: android.view.MotionEvent): Boolean {
         when (e.actionMasked) {
-            android.view.MotionEvent.ACTION_DOWN -> { pressedNow = true; invalidate() }
-            android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> { pressedNow = false; invalidate() }
+            android.view.MotionEvent.ACTION_DOWN -> { downX = e.rawX; downY = e.rawY; pull = 0f; glow = 1f; parent?.requestDisallowInterceptTouchEvent(true); animate().cancel(); invalidate(); return true }
+            android.view.MotionEvent.ACTION_MOVE -> {
+                pull = (downY - e.rawY).coerceIn(0f, 52f * d)
+                translationY = restY - pull
+            }
+            android.view.MotionEvent.ACTION_UP -> {
+                val moved = kotlin.math.hypot(e.rawX - downX, e.rawY - downY)
+                release(open = pull > 28 * d || moved < slop)
+            }
+            android.view.MotionEvent.ACTION_CANCEL -> release(open = false)
         }
-        return super.onTouchEvent(e)
+        return true
+    }
+
+    override fun onDraw(c: Canvas) {
+        val cx = width / 2f; val cy = height / 2f
+        val r = minOf(width, height) / 2f - 3 * d
+        val band = 11 * d
+        // shadow
+        paint.shader = RadialGradient(cx, cy + 4 * d, r * 1.3f, 0x77000000, 0x00000000, Shader.TileMode.CLAMP)
+        c.drawCircle(cx, cy + 4 * d, r * 1.3f, paint)
+        // soft glow while held
+        if (glow > 0f) {
+            paint.shader = RadialGradient(cx, cy, r * 1.5f, ((0x66 * glow).toInt() shl 24) or 0xB7F25A, 0x00B7F25A, Shader.TileMode.CLAMP)
+            c.drawCircle(cx, cy, r * 1.5f, paint)
+        }
+        // the smoked glass in the middle
+        paint.shader = RadialGradient(cx, cy - r * 0.3f, r, 0xCC30363B.toInt(), 0xEE06080A.toInt(), Shader.TileMode.CLAMP)
+        c.drawCircle(cx, cy, r - band * 0.5f, paint)
+        // the brushed ring: a sweep of light and dark, so it catches the light all the way round
+        val metal = intArrayOf(0xFFF7F9FA.toInt(), 0xFF8B9299.toInt(), 0xFFE6EAEC.toInt(), 0xFF565C63.toInt(), 0xFFEEF1F3.toInt(), 0xFF7B828A.toInt(), 0xFFF7F9FA.toInt())
+        paint.shader = android.graphics.SweepGradient(cx, cy, metal, floatArrayOf(0f, 0.18f, 0.34f, 0.52f, 0.7f, 0.86f, 1f))
+        paint.style = Paint.Style.STROKE; paint.strokeWidth = band
+        c.drawCircle(cx, cy, r - band / 2f, paint)
+        // a bright hairline on the outer edge and a dark one on the inner edge
+        paint.shader = null
+        paint.strokeWidth = 1.2f * d; paint.color = 0xCCFFFFFF.toInt()
+        c.drawCircle(cx, cy, r - 0.6f * d, paint)
+        paint.color = 0xAA000000.toInt()
+        c.drawCircle(cx, cy, r - band, paint)
+        paint.style = Paint.Style.FILL
+        // the curved highlight across the top of the glass
+        paint.shader = LinearGradient(0f, cy - r, 0f, cy, 0x44FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP)
+        c.drawArc(cx - r + band, cy - r + band, cx + r - band, cy + r - band, 180f, 180f, true, paint)
+        paint.shader = null
     }
 }
 

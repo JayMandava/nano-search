@@ -44,7 +44,7 @@ object AppSettings {
     private fun setFeature(c: Context, key: String, on: Boolean) = prefs(c).edit().putBoolean(key, on).apply()
 
     /** The Hub: one list for messages, missed calls, events and notifications. */
-    fun hub(c: Context) = feature(c, "hub")
+    fun hub(c: Context) = !isSense(c) && feature(c, "hub") // Sense has no Hub
     fun setHub(c: Context, on: Boolean) = setFeature(c, "hub", on)
 
     /** A small dot or count on an app's icon while it has notifications. */
@@ -52,7 +52,7 @@ object AppSettings {
     fun setDots(c: Context, on: Boolean) = setFeature(c, "dots", on)
 
     /** Active Frames: the apps you used last, as live tiles on the first home page. */
-    fun frames(c: Context) = feature(c, "frames")
+    fun frames(c: Context) = !isSense(c) && feature(c, "frames") // nor Active Frames
     fun setFrames(c: Context, on: Boolean) = setFeature(c, "frames", on)
 
     /** Full screen: the status bar and navigation bar are hidden and slide in when you swipe from the top or bottom edge. */

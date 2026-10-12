@@ -18,6 +18,7 @@ import kotlin.random.Random
  */
 object SenseWallpapers {
     val ALL = listOf(
+        ClassicWallpapers.Paper("spectrum", "Spectrum"), ClassicWallpapers.Paper("cloudscape", "Cloudscape"),
         ClassicWallpapers.Paper("glow", "Glow"), ClassicWallpapers.Paper("chrome", "Chrome"), ClassicWallpapers.Paper("dusk", "Dusk"),
         ClassicWallpapers.Paper("bokeh", "Bokeh"), ClassicWallpapers.Paper("ripple", "Ripple"), ClassicWallpapers.Paper("meadow", "Meadow"),
     )
@@ -27,6 +28,8 @@ object SenseWallpapers {
     fun render(id: String, w: Int, h: Int): Bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).also { bmp ->
         val c = Canvas(bmp)
         when (id) {
+            "spectrum" -> spectrum(c, w, h)
+            "cloudscape" -> cloudscape(c, w, h)
             "glow" -> glow(c, w, h)
             "chrome" -> chrome(c, w, h)
             "dusk" -> dusk(c, w, h)
@@ -190,5 +193,66 @@ object SenseWallpapers {
             c.save(); c.clipPath(band); c.drawPath(edge, p); c.restore()
         }
         fill(c, w, h, RadialGradient(w / 2f, h * 0.4f, h * 0.9f, 0x00000000, 0x88000000.toInt(), Shader.TileMode.CLAMP))
+    }
+
+    /** The full spectrum, violet to red: ribbons of light that cross each other over a dark ground, each one carrying every colour. */
+    private fun spectrum(c: Canvas, w: Int, h: Int) {
+        fill(c, w, h, vgrad(h, 0f to 0xFF03040a.toInt(), 1f to 0xFF0a0c18.toInt()))
+        val rainbow = intArrayOf(0xFFB02BFF.toInt(), 0xFF4655FF.toInt(), 0xFF1E9BFF.toInt(), 0xFF2EDB6C.toInt(), 0xFFFFE23A.toInt(), 0xFFFF8A1F.toInt(), 0xFFFF2A3D.toInt())
+        val screen = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SCREEN) // brightens where they cross without blowing out to white
+        for (i in 0 until 13) {
+            val t = i / 12f
+            val path = Path().apply {
+                moveTo(-w * 0.2f, h * (1.08f - 0.085f * i))
+                cubicTo(w * 0.32f, h * (0.12f + 0.07f * i), w * 0.58f, h * (0.98f - 0.06f * i), w * 1.2f, h * (0.0f + 0.075f * i))
+            }
+            val colors = IntArray(rainbow.size + 1) { rainbow[(it + i) % rainbow.size] }
+            val sh = LinearGradient(w * 0.1f, h.toFloat(), w * 0.9f, 0f, colors, null, Shader.TileMode.MIRROR)
+            c.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; shader = sh; xfermode = screen
+                strokeWidth = w * (0.03f + 0.05f * (1f - t)); alpha = 95; maskFilter = BlurMaskFilter(w * 0.03f, BlurMaskFilter.Blur.NORMAL)
+            })
+            c.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; shader = sh; xfermode = screen
+                strokeWidth = w * 0.007f; alpha = 235; maskFilter = BlurMaskFilter(w * 0.003f, BlurMaskFilter.Blur.NORMAL)
+            })
+        }
+        val bloom = Paint().apply { xfermode = screen }
+        bloom.shader = RadialGradient(w * 0.1f, h * 0.9f, h * 0.34f, 0x55FF6A2E, 0x00FF6A2E, Shader.TileMode.CLAMP)
+        c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), bloom)
+        bloom.shader = RadialGradient(w * 0.95f, h * 0.1f, h * 0.3f, 0x443B6BFF, 0x003B6BFF, Shader.TileMode.CLAMP)
+        c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), bloom)
+        fill(c, w, h, RadialGradient(w / 2f, h / 2f, h * 0.85f, 0x00000000, 0x88000000.toInt(), Shader.TileMode.CLAMP))
+    }
+
+    /** Cumulus: a cluster of soft overlapping puffs, a cool shade under each and the lit top over it. */
+    private fun cluster(c: Canvas, w: Int, cx: Float, cy: Float, rw: Float, rh: Float, puffs: Int, rnd: Random, lit: Int) {
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        repeat(puffs) {
+            val x = cx + rw * (rnd.nextFloat() * 2f - 1f)
+            val y = cy + rh * (rnd.nextFloat() * 2f - 1f) * 0.45f
+            val r = rh * (0.55f + 0.9f * rnd.nextFloat())
+            p.maskFilter = BlurMaskFilter(w * 0.03f, BlurMaskFilter.Blur.NORMAL)
+            p.color = 0x773A79A0; c.drawCircle(x, y + r * 0.3f, r, p)
+            p.color = lit; c.drawCircle(x, y - r * 0.05f, r * 0.92f, p)
+        }
+    }
+
+    /** Cloud banks over a far blue mountain range, with mist in the valley and a bright bank of fog in front: a soft, photographic scene. */
+    private fun cloudscape(c: Canvas, w: Int, h: Int) {
+        fill(c, w, h, vgrad(h, 0f to 0xFF0a4672.toInt(), 0.30f to 0xFF2a86b5.toInt(), 0.56f to 0xFFa5d6e6.toInt(), 1f to 0xFF2a7da0.toInt()))
+        val rnd = Random(21)
+        for (i in 0 until 4) cluster(c, w, w * (0.12f + 0.26f * i), h * (0.10f + 0.04f * (i % 2)), w * 0.3f, h * 0.05f, 12, rnd, 0xAAF4FBFF.toInt())
+        for (i in 0 until 3) cluster(c, w, w * (0.1f + 0.4f * i), h * (0.30f + 0.05f * (i % 2)), w * 0.35f, h * 0.06f, 14, rnd, 0xCCFFFFFF.toInt())
+        val far = ridge(w, h, 0.61f, 0.06f, 0.31, 1.1, 3.3)
+        c.drawPath(far, Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = LinearGradient(0f, h * 0.52f, 0f, h * 0.68f, 0xFF1f6286.toInt(), 0xFF4a93b3.toInt(), Shader.TileMode.CLAMP); maskFilter = BlurMaskFilter(w * 0.004f, BlurMaskFilter.Blur.NORMAL) })
+        val near = ridge(w, h, 0.68f, 0.05f, 0.77, 0.8, 2.6)
+        c.drawPath(near, Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = LinearGradient(0f, h * 0.6f, 0f, h * 0.76f, 0xFF0f3f5b.toInt(), 0xFF2a7194.toInt(), Shader.TileMode.CLAMP) })
+        val soft = Paint(Paint.ANTI_ALIAS_FLAG)
+        soft.maskFilter = BlurMaskFilter(w * 0.06f, BlurMaskFilter.Blur.NORMAL)
+        soft.color = 0xAAE6F6FC.toInt()
+        for (k in 0 until 6) c.drawOval(w * (k * 0.2f - 0.1f), h * 0.68f, w * (k * 0.2f + 0.3f), h * 0.735f, soft)
+        for (i in 0 until 5) cluster(c, w, w * (0.05f + 0.22f * i), h * (0.84f + 0.03f * (i % 2)), w * 0.28f, h * 0.07f, 10, rnd, 0xEEF2FBFE.toInt())
+        fill(c, w, h, vgrad(h, 0f to 0x00000000, 0.75f to 0x00000000, 1f to 0x552a7da0))
     }
 }

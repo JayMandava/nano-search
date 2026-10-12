@@ -13,8 +13,11 @@ class WeatherArt {
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
 
     private fun sun(c: Canvas, cx: Float, cy: Float, r: Float, t: Float) {
-        p.style = Paint.Style.FILL; p.color = 0xFFFFC93C.toInt(); c.drawCircle(cx, cy, r * 0.42f, p)
-        p.style = Paint.Style.STROKE; p.strokeWidth = r * 0.14f; p.strokeCap = Paint.Cap.ROUND
+        p.style = Paint.Style.FILL
+        p.shader = android.graphics.RadialGradient(cx, cy, r * 0.95f, 0x66FFD54F, 0x00FFD54F, android.graphics.Shader.TileMode.CLAMP); c.drawCircle(cx, cy, r * 0.95f, p)
+        p.shader = android.graphics.RadialGradient(cx - r * 0.12f, cy - r * 0.14f, r * 0.5f, 0xFFFFF3A0.toInt(), 0xFFFF9F1C.toInt(), android.graphics.Shader.TileMode.CLAMP); c.drawCircle(cx, cy, r * 0.42f, p)
+        p.shader = null
+        p.style = Paint.Style.STROKE; p.strokeWidth = r * 0.14f; p.strokeCap = Paint.Cap.ROUND; p.color = 0xFFFFC93C.toInt()
         for (i in 0 until 8) {
             val a = (i / 8f + t) * 2 * PI
             c.drawLine(cx + (r * 0.62f * cos(a)).toFloat(), cy + (r * 0.62f * sin(a)).toFloat(), cx + (r * 0.92f * cos(a)).toFloat(), cy + (r * 0.92f * sin(a)).toFloat(), p)
@@ -30,11 +33,14 @@ class WeatherArt {
 
     private fun cloud(c: Canvas, cx: Float, cy: Float, r: Float, color: Int = 0xFFF4F6F8.toInt(), drift: Float = 0f) {
         p.style = Paint.Style.FILL; p.color = color
+        // lit from above: white on top, a cool grey underneath
+        p.shader = android.graphics.LinearGradient(0f, cy - r * 0.55f, 0f, cy + r * 0.42f, color, (color and 0xFF000000.toInt()) or ((((color shr 16) and 0xFF) * 8 / 10) shl 16) or ((((color shr 8) and 0xFF) * 85 / 100) shl 8) or (((color and 0xFF) * 92) / 100), android.graphics.Shader.TileMode.CLAMP)
         val x = cx + drift
         c.drawCircle(x - r * 0.32f, cy + r * 0.05f, r * 0.34f, p)
         c.drawCircle(x + r * 0.06f, cy - r * 0.14f, r * 0.42f, p)
         c.drawCircle(x + r * 0.42f, cy + r * 0.08f, r * 0.3f, p)
         c.drawRoundRect(x - r * 0.66f, cy + r * 0.02f, x + r * 0.72f, cy + r * 0.4f, r * 0.2f, r * 0.2f, p)
+        p.shader = null
     }
 
     fun draw(c: Canvas, sky: Weather.Sky, day: Boolean, cx: Float, cy: Float, size: Float, t: Float) {

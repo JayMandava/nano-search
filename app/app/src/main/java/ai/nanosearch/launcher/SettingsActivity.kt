@@ -195,14 +195,17 @@ private fun HubCard(tick: Int) {
     var dots by remember { mutableStateOf(AppSettings.dots(context)) }
     var frames by remember { mutableStateOf(AppSettings.frames(context)) }
     val allowed = remember(tick) { HubStore.allowed(context) }
+    val sense = AppSettings.isSense(context) // Sense has no Hub and no Active Frames
     Card(shape = RoundedCornerShape(24.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (!sense) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).padding(end = 16.dp)) {
                     Text("Hub", style = MaterialTheme.typography.bodyLarge)
                     Text("One list for texts, missed calls, events and notifications. Swipe in from the left edge, or tap the Hub button by the search bar.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(checked = hub, onCheckedChange = { hub = it; AppSettings.setHub(context, it); (context as? android.app.Activity)?.recreate() })
+            }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).padding(end = 16.dp)) {
@@ -211,6 +214,7 @@ private fun HubCard(tick: Int) {
                 }
                 Switch(checked = dots, onCheckedChange = { dots = it; AppSettings.setDots(context, it) })
             }
+            if (!sense) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).padding(end = 16.dp)) {
                     Text("Active Frames", style = MaterialTheme.typography.bodyLarge)
@@ -218,13 +222,16 @@ private fun HubCard(tick: Int) {
                 }
                 Switch(checked = frames, onCheckedChange = { frames = it; AppSettings.setFrames(context, it) })
             }
+            }
             var sounds by remember { mutableStateOf(AppSettings.hubSounds(context)) }
+            if (!sense) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).padding(end = 16.dp)) {
                     Text("Hub sounds", style = MaterialTheme.typography.bodyLarge)
                     Text("A soft tick when the Hub opens and when you dismiss or clear things. The haptic tick is always on.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(checked = sounds, onCheckedChange = { sounds = it; AppSettings.setHubSounds(context, it) })
+            }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).padding(end = 16.dp)) {

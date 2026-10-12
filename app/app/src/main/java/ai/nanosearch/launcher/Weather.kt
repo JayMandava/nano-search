@@ -16,7 +16,7 @@ import java.util.concurrent.Executors
  */
 object Weather {
     enum class Sky { CLEAR, PARTLY, CLOUDY, FOG, RAIN, SNOW, STORM }
-    class Now(val tempC: Double, val sky: Sky, val day: Boolean, val at: Long)
+    class Now(val tempC: Double, val sky: Sky, val day: Boolean, val at: Long, val hiC: Double = Double.NaN, val loC: Double = Double.NaN)
 
     private const val REFRESH_MS = 30 * 60 * 1000L
     private val io = Executors.newSingleThreadExecutor()
@@ -62,12 +62,26 @@ object Weather {
     fun cached(c: Context): Now? {
         if (!enabled(c)) return null
         val j = runCatching { JSONObject(prefs(c).getString("weather_now", null) ?: return null) }.getOrNull() ?: return null
-        return Now(j.getDouble("t"), Sky.entries.getOrElse(j.getInt("s")) { Sky.CLEAR }, j.getBoolean("d"), j.getLong("at"))
+        return Now(j.getDouble("t"), Sky.entries.getOrElse(j.getInt("s")) { Sky.CLEAR }, j.getBoolean("d"), j.getLong("at"), j.optDouble("hi", Double.NaN), j.optDouble("lo", Double.NaN))
     }
 
-    fun format(c: Context, w: Now): String {
-        val v = if (fahrenheit(c)) w.tempC * 9 / 5 + 32 else w.tempC
-        return "${Math.round(v)}°"
+    private fun shown(c: Context, celsius: Double) = if (fahrenheit(c)) celsius * 9 / 5 + 32 else celsius
+
+    fun format(c: Context, w: Now): String = "${Math.round(shown(c, w.tempC))}°"
+
+    /** Today's high and low, or null when the reading has none. */
+    fun highLow(c: Context, w: Now): Pair<String, String>? =
+        if (w.hiC.isNaN() || w.loC.isNaN()) null else "${Math.round(shown(c, w.hiC))}°" to "${Math.round(shown(c, w.loC))}°"
+
+    /** The conditions in words, as a weather widget writes them. */
+    fun label(w: Now) = when (w.sky) {
+        Sky.CLEAR -> if (w.day) "Sunny" else "Clear"
+        Sky.PARTLY -> if (w.day) "Partly sunny" else "Partly cloudy"
+        Sky.CLOUDY -> "Cloudy"
+        Sky.FOG -> "Foggy"
+        Sky.RAIN -> "Rain"
+        Sky.SNOW -> "Snow"
+        Sky.STORM -> "Thunderstorm"
     }
 
     /** Fetches fresh conditions if the cached ones are old, then calls [done] on the calling thread's behalf (from the worker; post to the UI yourself). */
@@ -75,17 +89,20 @@ object Weather {
         if (!enabled(c) || busy) return
         val (_, lat, lon) = spot(c) ?: return
         val last = cached(c)
-        if (last != null && System.currentTimeMillis() - last.at < REFRESH_MS) return
+        if (last != null && !last.hiC.isNaN() && System.currentTimeMillis() - last.at < REFRESH_MS) return
         busy = true
         val app = c.applicationContext
         io.execute {
             try {
-                val url = URL("https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,weather_code,is_day&timezone=auto")
+                val url = URL("https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min&forecast_days=1&timezone=auto")
                 val conn = (url.openConnection() as HttpURLConnection).apply { connectTimeout = 8000; readTimeout = 8000 }
                 val body = try { conn.inputStream.bufferedReader().readText() } finally { conn.disconnect() }
                 val cur = JSONObject(body).getJSONObject("current")
                 val sky = skyOf(cur.getInt("weather_code"))
-                val now = JSONObject().put("t", cur.getDouble("temperature_2m")).put("s", sky.ordinal).put("d", cur.getInt("is_day") == 1).put("at", System.currentTimeMillis())
+                val daily = JSONObject(body).optJSONObject("daily")
+                val hi = daily?.optJSONArray("temperature_2m_max")?.optDouble(0, Double.NaN) ?: Double.NaN
+                val lo = daily?.optJSONArray("temperature_2m_min")?.optDouble(0, Double.NaN) ?: Double.NaN
+                val now = JSONObject().put("hi", hi.takeUnless { it.isNaN() } ?: JSONObject.NULL).put("lo", lo.takeUnless { it.isNaN() } ?: JSONObject.NULL).put("t", cur.getDouble("temperature_2m")).put("s", sky.ordinal).put("d", cur.getInt("is_day") == 1).put("at", System.currentTimeMillis())
                 prefs(app).edit().putString("weather_now", now.toString()).apply()
                 done()
             } catch (_: Exception) {

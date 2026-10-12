@@ -27,7 +27,7 @@ import kotlin.math.min
  * The flip clock, drawn by the launcher itself at the screen's refresh rate. It flips when the minute (or hour) changes, only ticks while it is on screen,
  * and has two touch targets: the cards open the Clock app, the date line opens the Calendar.
  */
-class FlipClockView(context: Context) : View(context) {
+class FlipClockView(context: Context, private val panel: Boolean = false) : View(context) {
     private val art = FlipFaces(context)
     private val density = resources.displayMetrics.density
 
@@ -44,6 +44,12 @@ class FlipClockView(context: Context) : View(context) {
     private var spin = 0f
     private var spinner: ValueAnimator? = null
     private val weatherArt = WeatherArt()
+
+    // [panel] (the Sense home): the weather sits in a dark glass strip under the cards, with its picture breaking out over their lower edge
+    private val panelOn get() = panel && weather != null && weatherText.isNotEmpty()
+    private val panelRect = RectF()
+    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt() }
+    private val panelFill = Paint(Paint.ANTI_ALIAS_FLAG)
 
     private val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xF2FFFFFF.toInt()
@@ -69,7 +75,8 @@ class FlipClockView(context: Context) : View(context) {
     private fun loadWeather() {
         weather = ai.nanosearch.launcher.Weather.cached(context)
         weatherText = weather?.let { ai.nanosearch.launcher.Weather.format(context, it) } ?: ""
-        cityName = ai.nanosearch.launcher.Weather.city(context)?.first ?: ""
+        cityName = ai.nanosearch.launcher.Weather.spot(context)?.first ?: ""
+        computeGeometry()
         ai.nanosearch.launcher.Weather.refresh(context) { post { loadWeather(); invalidate() } }
         if (weather != null && isShown && spinner == null) {
             spinner = ValueAnimator.ofFloat(0f, 1f).apply {
@@ -161,8 +168,12 @@ class FlipClockView(context: Context) : View(context) {
 
     // ---- layout and drawing
 
-    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-        val dateH = 22f * density
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) { computeGeometry(); advance(animate = false) }
+
+    private fun computeGeometry() {
+        val w = width; val h = height
+        if (w <= 0 || h <= 0) return
+        val dateH = if (panelOn) 62f * density else 22f * density
         val pad = 6f * density
         gap = 5f * density
         val availH = h - dateH - pad
@@ -175,7 +186,38 @@ class FlipClockView(context: Context) : View(context) {
         dateBaseline = topY + cardH + 18f * density
         cardsArea.set(leftX, topY, leftX + 2 * cardW + gap, topY + cardH)
         dateArea.set(0f, topY + cardH, w.toFloat(), h.toFloat())
-        advance(animate = false)
+        panelRect.set(leftX, topY + cardH + 8f * density, leftX + 2 * cardW + gap, topY + cardH + 8f * density + 54f * density)
+    }
+
+    /** The glass strip: city, conditions and date on the left, the temperature and today's high and low on the right. */
+    private fun drawPanel(canvas: Canvas, w: ai.nanosearch.launcher.Weather.Now) {
+        val r = 6f * density
+        panelFill.color = 0xFF000000.toInt() // a shader is dimmed by the paint's own alpha
+        panelFill.shader = android.graphics.LinearGradient(0f, panelRect.top, 0f, panelRect.bottom, intArrayOf(0xFF45484C.toInt(), 0xFF1A1C1F.toInt(), 0xFF0C0D0F.toInt()), floatArrayOf(0f, 0.45f, 1f), android.graphics.Shader.TileMode.CLAMP)
+        canvas.drawRoundRect(panelRect, r, r, panelFill)
+        panelFill.shader = null
+        panelFill.style = Paint.Style.STROKE; panelFill.strokeWidth = 1f * density; panelFill.color = 0x66FFFFFF
+        canvas.drawRoundRect(panelRect, r, r, panelFill)
+        panelFill.style = Paint.Style.FILL
+        val left = panelRect.left + 12f * density
+        textPaint.textAlign = Paint.Align.LEFT
+        textPaint.typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+        textPaint.color = 0xFFC9CED3.toInt(); textPaint.textSize = 12f * density
+        canvas.drawText(DateFormat.format("d MMM", Calendar.getInstance()).toString(), left, panelRect.top + 16f * density, textPaint)
+        textPaint.color = 0xFFFFFFFF.toInt(); textPaint.textSize = 16f * density; textPaint.typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        canvas.drawText(cityName.ifEmpty { "Here" }, left, panelRect.top + 33f * density, textPaint)
+        textPaint.color = 0xFFC9CED3.toInt(); textPaint.textSize = 13f * density; textPaint.typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+        canvas.drawText(ai.nanosearch.launcher.Weather.label(w), left, panelRect.top + 49f * density, textPaint)
+        val right = panelRect.right - 12f * density
+        textPaint.textAlign = Paint.Align.RIGHT
+        textPaint.color = 0xFFFFFFFF.toInt(); textPaint.textSize = 34f * density; textPaint.typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+        canvas.drawText(weatherText, right, panelRect.top + 34f * density, textPaint)
+        ai.nanosearch.launcher.Weather.highLow(context, w)?.let { (hi, lo) ->
+            textPaint.color = 0xFFC9CED3.toInt(); textPaint.textSize = 12f * density; textPaint.typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+            canvas.drawText("H $hi   L $lo", right, panelRect.top + 49f * density, textPaint)
+        }
+        // the picture of the weather stands over the edge of the cards, as on the original widget
+        weatherArt.draw(canvas, w.sky, w.day, width / 2f + 6f * density, cardsArea.bottom - 4f * density, 74f * density, spin)
     }
 
     private var pressedRegion = 0
@@ -190,7 +232,8 @@ class FlipClockView(context: Context) : View(context) {
         if (minuteChanging) art.drawFlip(canvas, mx, topY, cardW, cardH, oldMinute, minute, progress) else art.drawRest(canvas, mx, topY, cardW, cardH, minute, alpha)
         datePaint.alpha = if (pressedRegion == 2) 150 else 242
         val w = weather
-        if (w != null && weatherText.isNotEmpty()) {
+        if (panelOn) { drawPanel(canvas, w!!) }
+        else if (w != null && weatherText.isNotEmpty()) {
             // date, then a small drawn sky and the temperature, centred as one line
             val dateW = datePaint.measureText(dateText)
             val icon = 20f * density
