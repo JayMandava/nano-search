@@ -4,7 +4,6 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.LinearGradient
 import android.graphics.Paint
-import android.graphics.RadialGradient
 import android.graphics.Shader
 import kotlin.math.max
 import kotlin.random.Random
@@ -38,22 +37,18 @@ object ClassicWallpapers {
         LinearGradient(x0, y0, x1, y1, colors, null, Shader.TileMode.CLAMP)
 
     /**
-     * A sheet of brushed metal: bands of light and dark running across it a little off the horizontal, as a polished plate reflects a room, then fine
-     * brushing, a soft sheen sweeping over it and a shaded edge. The seven tones go from deep shadow to the brightest highlight and back.
+     * A sheet of brushed metal, built the way Steel is: bands of light and dark standing side by side down the screen, fine horizontal brushing across them,
+     * and light from above that falls away towards the foot. The seven tones go from deep shadow to the brightest highlight and back.
      */
     private fun metal(c: Canvas, w: Int, h: Int, t0: Long, t1: Long, t2: Long, t3: Long, t4: Long, t5: Long, t6: Long, seed: Int) {
         val tones = longArrayOf(t0, t1, t2, t3, t4, t5, t6).map { it.toInt() }.toIntArray()
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
-        p.shader = LinearGradient(0f, h * 0.04f, w.toFloat(), h * 0.6f, tones, floatArrayOf(0f, 0.17f, 0.32f, 0.5f, 0.66f, 0.84f, 1f), Shader.TileMode.CLAMP)
+        p.shader = LinearGradient(0f, 0f, w.toFloat(), 0f, tones, floatArrayOf(0f, 0.17f, 0.32f, 0.5f, 0.66f, 0.84f, 1f), Shader.TileMode.CLAMP)
         c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p); p.shader = null
         val rnd = Random(seed)
         p.strokeWidth = 1f
-        repeat(h) { p.color = if (rnd.nextBoolean()) 0x0EFFFFFF else 0x12000000; val y = rnd.nextFloat() * h; c.drawLine(0f, y, w.toFloat(), y, p) }
-        p.shader = LinearGradient(w * 0.05f, 0f, w * 0.95f, h * 0.45f, intArrayOf(0x00FFFFFF, 0x38FFFFFF, 0x00FFFFFF), floatArrayOf(0.2f, 0.42f, 0.64f), Shader.TileMode.CLAMP)
-        c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p)
-        p.shader = lin(0f, 0f, 0f, h.toFloat(), 0x26FFFFFF, 0x00FFFFFF, 0x66000000)
-        c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p)
-        p.shader = RadialGradient(w / 2f, h * 0.45f, h * 0.8f, 0x00000000, 0x77000000, Shader.TileMode.CLAMP)
+        repeat(h) { p.color = if (rnd.nextBoolean()) 0x0AFFFFFF else 0x0C000000; val y = rnd.nextFloat() * h; c.drawLine(0f, y, w.toFloat(), y, p) }
+        p.shader = lin(0f, 0f, 0f, h.toFloat(), 0x33FFFFFF, 0x00FFFFFF, 0x55000000)
         c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p)
     }
 

@@ -46,7 +46,7 @@ class FlipClockView(context: Context, private val panel: Boolean = false) : View
     private val weatherArt = WeatherArt()
 
     // [panel] (the Sense home): the weather sits in a dark glass strip under the cards, with its picture breaking out over their lower edge
-    private val panelOn get() = panel && weather != null && weatherText.isNotEmpty()
+    private val panelOn get() = panel && weather != null && weatherText.isNotEmpty() && height >= 200f * density // the strip needs the room; a short widget shows the date line
     private val panelRect = RectF()
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt() }
     private val panelFill = Paint(Paint.ANTI_ALIAS_FLAG)

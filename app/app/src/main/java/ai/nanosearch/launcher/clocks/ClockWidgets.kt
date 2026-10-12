@@ -15,8 +15,8 @@ object ClockWidgets {
     private object FlipClock : BuiltinWidget {
         override val id = "flipclock"
         override val label = "Flip Clock"
-        override val defaultHeightDp = 150
-        override fun create(context: Context): View = FlipClockView(context)
+        override val defaultHeightDp = 232
+        override fun create(context: Context): View = FlipClockView(context, panel = true)
         override fun preview(context: Context): Drawable {
             val art = FlipFaces(context)
             val cw = 150; val ch = 150

@@ -88,6 +88,19 @@ class HomeWidgets(
         kept.forEach { token -> token.toIntOrNull()?.let { show(it) } ?: showBuiltin(token) }
     }
 
+    /**
+     * Puts a built-in widget at the top of this page the first time it is asked for under [flag] (once ever), at its own size. It is an ordinary widget:
+     * long-press it to resize or remove it, and once removed it stays removed. A page that already has one is left as it is.
+     */
+    fun seedDefault(flag: String, builtinId: String, heightDp: Int) {
+        if (prefs.getBoolean(flag, false)) return
+        prefs.edit().putBoolean(flag, true).apply()
+        if (BuiltinWidgets.find(builtinId) == null || items.any { it.startsWith("b:$builtinId:") }) return
+        val token = "b:$builtinId:${System.currentTimeMillis()}"
+        items = listOf(token) + items
+        saveSize(token, 0, heightDp)
+    }
+
     fun pick() {
         val providers = manager.installedProviders.sortedBy { it.loadLabel(activity.packageManager).toString().lowercase() }
         val builtins = BuiltinWidgets.all

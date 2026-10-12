@@ -208,8 +208,8 @@ class MainActivity : Activity() {
         android.graphics.drawable.ColorDrawable(0x88E3E8EC.toInt()),
     )).apply { setLayerHeight(1, dp(1)); setLayerGravity(1, Gravity.TOP) }
 
-    /** Sense keeps its own on/off for the home clock (a flip clock), so the choice made in Spirit does not hide it. */
-    private val clockKey get() = if (pal.sense) "showClock_sense" else if (pal.classic) "showClock_spirit" else "showClock"
+    /** The thin text clock at the top of home, in Modern. Spirit and Sense start with a clock widget instead, which is resized or removed like any widget. */
+    private val clockKey get() = "showClock"
 
     // ---------------------------------------------------------------- setup
 
@@ -547,11 +547,9 @@ class MainActivity : Activity() {
         dots = PageDots(this@MainActivity, Color.WHITE, arc = pal.sense, accent = pal.primary).apply { if (pal.sense) setOnClickListener { leap() } }
         clockBlock = LinearLayout(this@MainActivity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(if (pal.classic) 12 else 28), dp(4), dp(if (pal.classic) 12 else 28), dp(8))
-            if (pal.sense) addView(ai.nanosearch.launcher.clocks.FlipClockView(this@MainActivity, panel = true), LinearLayout.LayoutParams(-1, dp(232)))
-            else if (pal.classic) addView(ai.nanosearch.launcher.clocks.SteelDialView(this@MainActivity), LinearLayout.LayoutParams(-1, dp(250))) // Spirit's own clock: the steel dial
-            else { addView(clock); addView(date) }
-            visibility = if (prefs.getBoolean(clockKey, true)) View.VISIBLE else View.GONE
+            setPadding(dp(28), dp(4), dp(28), dp(8))
+            if (!pal.classic) { addView(clock); addView(date) }
+            visibility = if (!pal.classic && prefs.getBoolean(clockKey, true)) View.VISIBLE else View.GONE
             var lx = 0f; var ly = 0f
             setOnTouchListener { _, e -> if (e.actionMasked == android.view.MotionEvent.ACTION_DOWN) { lx = e.rawX; ly = e.rawY }; false }
             setOnLongClickListener {
@@ -715,12 +713,16 @@ class MainActivity : Activity() {
     /** (Re)builds every page from what is saved. The clock rides at the top of whichever page is first. */
     private fun buildPages(showIndex: Int) {
         (clockBlock.parent as? ViewGroup)?.removeView(clockBlock)
-        pages = pageIds().map { id ->
+        pages = pageIds().mapIndexed { index, id ->
             HomePage(this, id, widgetHost, overlays, pal,
                 onEmptyLongPress = { x, y -> showHomeMenu(x, y) },
                 launch = { cn, v -> launchComponent(cn, v) },
                 appInfo = { cn -> showAppInfo(cn.packageName) },
-            ).also { it.restore() }
+            ).also { page ->
+                // Spirit and Sense each start with their own clock on the first page: a widget to resize or remove like any other
+                if (index == 0) { if (pal.sense) page.widgets.seedDefault("seeded_flip", "flipclock", 232) else if (pal.classic) page.widgets.seedDefault("seeded_steel", "steeldial", 270) }
+                page.restore()
+            }
         }
         framesPage = if (AppSettings.frames(this)) FramesPage(this, pal, { cn, v -> launchComponent(cn, v) }, { cn, v ->
             overlays.popupFor(v, listOf(listOf(
@@ -921,7 +923,7 @@ class MainActivity : Activity() {
                 MenuItem(R.drawable.ic_menu_apps, "Apps list") { openDrawer() },
                 *(if (pal.sense) arrayOf(MenuItem(R.drawable.ic_menu_page_add, "Leap view") { leap() }) else emptyArray()),
                 *(if (AppSettings.hub(this)) arrayOf(MenuItem(R.drawable.ic_hub, "Hub") { openHub() }) else emptyArray()),
-                MenuItem(R.drawable.ic_menu_clock, if (clockShown) "Remove clock" else "Add clock") { setClockShown(!clockShown) },
+                *(if (!pal.classic) arrayOf(MenuItem(R.drawable.ic_menu_clock, if (clockShown) "Remove clock" else "Add clock") { setClockShown(!clockShown) }) else emptyArray()),
             ),
             buildList {
                 if (pages.size < MAX_PAGES) add(MenuItem(R.drawable.ic_menu_page_add, "Add page") { addPage() })
@@ -999,7 +1001,7 @@ class MainActivity : Activity() {
         if (pal.sense) {
             // Sense 3's drawer: a charcoal page under a title bar, the grid, and three glossy tabs along the bottom
             setBackgroundColor(0xFF19191B.toInt())
-            grid.setPadding(dp(8), dp(60), dp(8), dp(24) + dp(70))
+            grid.setPadding(dp(8), dp(60), dp(8), dp(24) + dp(70) + dp(40))
             banner.layoutParams = (banner.layoutParams as FrameLayout.LayoutParams).apply { topMargin = dp(58) }
             senseTitle = NText(this@MainActivity).apply { text = "All apps"; textSize = 19f; setTextColor(Color.WHITE); gravity = Gravity.CENTER_VERTICAL; setPadding(dp(16), 0, 0, 0) }
             val lens = ImageView(this@MainActivity).apply {
@@ -1024,6 +1026,9 @@ class MainActivity : Activity() {
                 senseTitle?.text = mapOf("all" to "All apps", "recent" to "Frequent", "dl" to "Downloaded")[key]
                 search()
             }
+            // the ring peeks up from behind the tab bar; pulling it closes the drawer
+            drawerRing = ai.nanosearch.launcher.ui.SenseRing(this@MainActivity, 0f, drawerRingListener).apply { contentDescription = "Home (pull up)" }
+            addView(drawerRing, FrameLayout.LayoutParams(dp(132), dp(132), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = -dp(18) })
             addView(senseTabs, FrameLayout.LayoutParams(-1, dp(70), Gravity.BOTTOM))
         }
 
@@ -1343,6 +1348,8 @@ class MainActivity : Activity() {
 
     private var senseRing: ai.nanosearch.launcher.ui.SenseRing? = null
     private var ringGhost: ai.nanosearch.launcher.ui.RingArt? = null
+    private var activeRing: ai.nanosearch.launcher.ui.SenseRing? = null
+    private var drawerRing: ai.nanosearch.launcher.ui.SenseRing? = null
     private var ringHome = 0f to 0f
 
     /** Shows [drawer] only inside a circle of radius [r] round ([cx], [cy]); a negative radius takes the clip away. */
@@ -1360,7 +1367,8 @@ class MainActivity : Activity() {
     private fun endRingDrag() {
         ringGhost?.let { overlayHost.removeView(it) }
         ringGhost = null
-        senseRing?.alpha = 1f
+        activeRing?.alpha = 1f
+        activeRing = null
         searchLayer.alpha = 1f
     }
 
@@ -1372,6 +1380,7 @@ class MainActivity : Activity() {
         override fun onStart(ring: ai.nanosearch.launcher.ui.SenseRing, cx: Float, cy: Float) {
             if (drawerOpen) return
             ringHome = cx to cy
+            activeRing = ring
             ring.alpha = 0f
             val size = ring.width
             val ghost = ai.nanosearch.launcher.ui.RingArt(this@MainActivity).apply { glow = 1f }
@@ -1440,6 +1449,81 @@ class MainActivity : Activity() {
                 }
             }
             return open
+        }
+    }
+
+    /** Puts the home screen back as it was and shuts the drawer, with no animation of its own (the ring's drag has just played one). */
+    private fun finishCloseDrawer() {
+        drawerOpen = false
+        senseSearchOpen = false
+        revealOrigin = null
+        updateSenseSearch()
+        updateBars(resultsPanel.visibility == View.VISIBLE)
+        home.visibility = View.VISIBLE
+        hideKeyboard()
+        input.setText("")
+        drawer.visibility = View.INVISIBLE
+        drawer.translationY = screenH
+        setDrawerClip(-1f, 0f, 0f)
+        applyDrawerProgress()
+    }
+
+    /**
+     * The ring that peeks up above the tab bar inside the drawer: the same pull that opened the drawer closes it. The drawer shrinks into a circle round the
+     * ring as it is pulled, and the home screen shows through the space it leaves.
+     */
+    private val drawerRingListener = object : ai.nanosearch.launcher.ui.SenseRing.Listener {
+        private var origin = 0f to 0f
+
+        override fun onStart(ring: ai.nanosearch.launcher.ui.SenseRing, cx: Float, cy: Float) {
+            if (!drawerOpen) return
+            origin = cx to cy
+            activeRing = ring
+            ring.alpha = 0f
+            val size = ring.width
+            val ghost = ai.nanosearch.launcher.ui.RingArt(this@MainActivity).apply { glow = 1f }
+            overlayHost.addView(ghost, FrameLayout.LayoutParams(size, size))
+            ghost.x = cx - size / 2f; ghost.y = cy - size / 2f
+            ringGhost = ghost
+            home.visibility = View.VISIBLE
+            hideKeyboard()
+            setDrawerClip(revealRadius(cx, cy), cx, cy)
+        }
+
+        override fun onPull(pull: Float, cx: Float, cy: Float) {
+            val ghost = ringGhost ?: return
+            ghost.y = cy - ghost.height / 2f
+            val frac = (pull / (resources.displayMetrics.heightPixels * 0.55f)).coerceIn(0f, 1f)
+            setDrawerClip((1f - frac) * revealRadius(origin.first, origin.second), cx, cy)
+            homeContent.alpha = 0.15f + 0.85f * frac
+        }
+
+        override fun onRelease(pull: Float, velocityY: Float): Boolean {
+            val ghost = ringGhost ?: return false
+            val h = resources.displayMetrics.heightPixels
+            val close = pull > h * 0.25f || velocityY < -1500f
+            val full = revealRadius(origin.first, origin.second)
+            val cx = origin.first; val cy = origin.second - pull
+            val from = (1f - (pull / (h * 0.55f)).coerceIn(0f, 1f)) * full
+            val to = if (close) 0f else full
+            ObjectAnimator.ofFloat(from, to).apply {
+                duration = 240
+                interpolator = DecelerateInterpolator(1.4f)
+                addUpdateListener {
+                    val v = it.animatedValue as Float
+                    setDrawerClip(v, cx, cy)
+                    ghost.alpha = if (close) 1f - it.animatedFraction else 1f
+                    if (!close) ghost.y = cy + (origin.second - cy) * it.animatedFraction - ghost.height / 2f
+                }
+                addListener(object : android.animation.AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(a: android.animation.Animator) {
+                        if (close) finishCloseDrawer() else { setDrawerClip(-1f, 0f, 0f); home.visibility = View.INVISIBLE; applyDrawerProgress() }
+                        endRingDrag()
+                    }
+                })
+                start()
+            }
+            return close
         }
     }
 
