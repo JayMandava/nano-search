@@ -69,8 +69,10 @@ class SenseRing(context: Context, private val rest: Float, private val listener:
     interface Listener {
         fun onStart(ring: SenseRing, cx: Float, cy: Float)
         fun onPull(pull: Float, cx: Float, cy: Float)
-        /** Returns true if the drawer opened (the ring then settles back quietly). */
+        /** Returns true if the pull went all the way (the drawer opened or closed). */
         fun onRelease(pull: Float, velocityY: Float): Boolean
+        /** How far the ring must be pulled before letting go finishes the move, in pixels. */
+        fun threshold(): Float
     }
 
     private var downY = 0f
@@ -78,6 +80,10 @@ class SenseRing(context: Context, private val rest: Float, private val listener:
     private var tracker: android.view.VelocityTracker? = null
     private var startX = 0f
     private var startY = 0f
+    private var armed = false
+
+    /** A tick or thump on the ring, if the user has haptics for it switched on. */
+    fun buzz(type: Int) { if (ai.nanosearch.launcher.AppSettings.ringHaptics(context)) performHapticFeedback(type) }
 
     init { translationY = rest }
 
@@ -92,6 +98,8 @@ class SenseRing(context: Context, private val rest: Float, private val listener:
                 animate().cancel()
                 val (cx, cy) = screenCentre(); startX = cx; startY = cy
                 glow = 1f
+                armed = false
+                buzz(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
                 listener.onStart(this, cx, cy)
                 return true
             }
@@ -99,6 +107,8 @@ class SenseRing(context: Context, private val rest: Float, private val listener:
                 tracker?.addMovement(e)
                 pull = (downY - e.rawY).coerceAtLeast(0f)
                 listener.onPull(pull, startX, startY - pull)
+                val past = pull > listener.threshold()
+                if (past != armed) { armed = past; buzz(android.view.HapticFeedbackConstants.CONTEXT_CLICK) } // a tick as it crosses the point where letting go finishes the move
             }
             android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
                 tracker?.addMovement(e); tracker?.computeCurrentVelocity(1000)
@@ -106,7 +116,7 @@ class SenseRing(context: Context, private val rest: Float, private val listener:
                 tracker?.recycle(); tracker = null
                 glow = 0f
                 val opened = listener.onRelease(if (e.actionMasked == android.view.MotionEvent.ACTION_CANCEL) 0f else pull, vy)
-                if (!opened) performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                if (opened) buzz(android.view.HapticFeedbackConstants.CONFIRM)
             }
         }
         return true

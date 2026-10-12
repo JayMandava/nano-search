@@ -1027,7 +1027,7 @@ class MainActivity : Activity() {
                 search()
             }
             // the ring peeks up from behind the tab bar; pulling it closes the drawer
-            drawerRing = ai.nanosearch.launcher.ui.SenseRing(this@MainActivity, 0f, drawerRingListener).apply { contentDescription = "Home (pull up)" }
+            drawerRing = ai.nanosearch.launcher.ui.SenseRing(this@MainActivity, 0f, drawerRingListener).apply { contentDescription = "Home (pull up)"; alpha = 0f }
             addView(drawerRing, FrameLayout.LayoutParams(dp(132), dp(132), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = -dp(18) })
             addView(senseTabs, FrameLayout.LayoutParams(-1, dp(70), Gravity.BOTTOM))
         }
@@ -1335,6 +1335,7 @@ class MainActivity : Activity() {
     /** Sense: the drawer has a title bar instead of the search strip; the magnifier in it brings the strip (and the keyboard) back. */
     private fun updateSenseSearch() {
         if (!pal.sense || !::searchLayer.isInitialized) return
+        syncRings()
         searchLayer.visibility = if (drawerOpen && !searchActive && !senseSearchOpen) View.INVISIBLE else View.VISIBLE
         senseHeader?.visibility = if (drawerOpen && (senseSearchOpen || searchActive)) View.INVISIBLE else View.VISIBLE // the strip takes the title bar's place
     }
@@ -1364,12 +1365,20 @@ class MainActivity : Activity() {
         drawer.invalidateOutline()
     }
 
+    private fun centreOf(v: View): Pair<Float, Float> { val at = IntArray(2); v.getLocationOnScreen(at); return at[0] + v.width / 2f to at[1] + v.height / 2f }
+
+    /** There is one ring on screen at a time: the dock's on home, the drawer's once the drawer is open. The other waits invisible, and the ghost carries it between them. */
+    private fun syncRings() {
+        drawerRing?.alpha = if (drawerOpen && ringGhost == null) 1f else 0f
+    }
+
     private fun endRingDrag() {
         ringGhost?.let { overlayHost.removeView(it) }
         ringGhost = null
         activeRing?.alpha = 1f
         activeRing = null
         searchLayer.alpha = 1f
+        syncRings()
     }
 
     /**
@@ -1377,6 +1386,7 @@ class MainActivity : Activity() {
      * (or with a flick) and the circle fills the screen; let go sooner and it shrinks back into the ring.
      */
     private val ringListener = object : ai.nanosearch.launcher.ui.SenseRing.Listener {
+        override fun threshold() = 0.25f * resources.displayMetrics.heightPixels
         override fun onStart(ring: ai.nanosearch.launcher.ui.SenseRing, cx: Float, cy: Float) {
             if (drawerOpen) return
             ringHome = cx to cy
@@ -1413,10 +1423,12 @@ class MainActivity : Activity() {
                 revealOrigin = ringHome
                 updateBars(true)
                 updateSenseSearch()
+                val settleY = drawerRing?.let { centreOf(it).second - ghost.height / 2f } ?: ghost.y
+                val startY = ghost.y
                 ObjectAnimator.ofFloat(from, full * 1.05f).apply {
                     duration = 280
                     interpolator = DecelerateInterpolator(1.4f)
-                    addUpdateListener { setDrawerClip(it.animatedValue as Float, cx, cy); ghost.alpha = 1f - it.animatedFraction }
+                    addUpdateListener { setDrawerClip(it.animatedValue as Float, cx, cy); ghost.y = startY + (settleY - startY) * it.animatedFraction }
                     addListener(object : android.animation.AnimatorListenerAdapter() {
                         override fun onAnimationEnd(a: android.animation.Animator) {
                             setDrawerClip(-1f, 0f, 0f)
@@ -1474,12 +1486,14 @@ class MainActivity : Activity() {
      */
     private val drawerRingListener = object : ai.nanosearch.launcher.ui.SenseRing.Listener {
         private var origin = 0f to 0f
+        override fun threshold() = 0.25f * resources.displayMetrics.heightPixels
 
         override fun onStart(ring: ai.nanosearch.launcher.ui.SenseRing, cx: Float, cy: Float) {
             if (!drawerOpen) return
             origin = cx to cy
             activeRing = ring
             ring.alpha = 0f
+            senseRing?.alpha = 0f // the dock's ring stays out of sight until the ghost reaches it
             val size = ring.width
             val ghost = ai.nanosearch.launcher.ui.RingArt(this@MainActivity).apply { glow = 1f }
             overlayHost.addView(ghost, FrameLayout.LayoutParams(size, size))
@@ -1506,18 +1520,19 @@ class MainActivity : Activity() {
             val cx = origin.first; val cy = origin.second - pull
             val from = (1f - (pull / (h * 0.55f)).coerceIn(0f, 1f)) * full
             val to = if (close) 0f else full
+            val startY = ghost.y
+            val endY = (if (close) senseRing?.let { centreOf(it).second } else origin.second)?.minus(ghost.height / 2f) ?: startY
             ObjectAnimator.ofFloat(from, to).apply {
                 duration = 240
                 interpolator = DecelerateInterpolator(1.4f)
                 addUpdateListener {
-                    val v = it.animatedValue as Float
-                    setDrawerClip(v, cx, cy)
-                    ghost.alpha = if (close) 1f - it.animatedFraction else 1f
-                    if (!close) ghost.y = cy + (origin.second - cy) * it.animatedFraction - ghost.height / 2f
+                    setDrawerClip(it.animatedValue as Float, cx, cy)
+                    ghost.y = startY + (endY - startY) * it.animatedFraction
                 }
                 addListener(object : android.animation.AnimatorListenerAdapter() {
                     override fun onAnimationEnd(a: android.animation.Animator) {
                         if (close) finishCloseDrawer() else { setDrawerClip(-1f, 0f, 0f); home.visibility = View.INVISIBLE; applyDrawerProgress() }
+                        senseRing?.alpha = 1f
                         endRingDrag()
                     }
                 })
@@ -1549,7 +1564,13 @@ class MainActivity : Activity() {
                         view.parent?.requestDisallowInterceptTouchEvent(true)
                         view.translationZ = dp(20).toFloat()
                     }
-                    if (dragging) { view.translationX = dx; view.translationY = dy; senseRing?.hot = overRing(); true } else false
+                    if (dragging) {
+                        view.translationX = dx; view.translationY = dy
+                        val over = overRing()
+                        if (over && senseRing?.hot == false) senseRing?.buzz(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                        senseRing?.hot = over
+                        true
+                    } else false
                 }
                 android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
                     view.animate().scaleX(1f).scaleY(1f).setDuration(150).start()
@@ -1557,7 +1578,7 @@ class MainActivity : Activity() {
                         val hit = e.actionMasked == android.view.MotionEvent.ACTION_UP && overRing()
                         senseRing?.hot = false
                         view.animate().translationX(0f).translationY(0f).setDuration(220).withEndAction { view.translationZ = 0f }.start()
-                        if (hit) senseRing?.let { onDrop(it) }
+                        if (hit) senseRing?.let { it.buzz(android.view.HapticFeedbackConstants.CONFIRM); onDrop(it) }
                         dragging = false
                         true
                     } else false

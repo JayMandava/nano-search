@@ -351,6 +351,16 @@ private fun StyleCard() {
                         }
                     }
                 }
+                if (era == "sense") {
+                    var haptics by remember { mutableStateOf(AppSettings.ringHaptics(context)) }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f).padding(end = 16.dp)) {
+                            Text("Ring haptics", style = MaterialTheme.typography.bodyLarge)
+                            Text("A tick as you grab the ring, another as it passes the point where letting go finishes the move, and a thump when an app is dropped on it.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(checked = haptics, onCheckedChange = { haptics = it; AppSettings.setRingHaptics(context, it) })
+                    }
+                }
             }
             Text(
                 when {

@@ -25,7 +25,7 @@ answers questions, and listens when you speak. Small language models run entirel
   Other apps keep their own icon on a matching dark tile. **Sense** is graphite and silver with a green accent, after the HTC Sense of 2011: a flip clock under a glass search strip with the weather (and its high and low) in a dark strip below it, glossy icons that stand straight on the wallpaper,
   and a dock shaped as an arch of dotted carbon with Phone and Camera in it and a big silver ring floating above. Grab the ring and pull it up, as far as the top of the screen if you like, and the app drawer grows round it as a circle;
   drag Phone or Camera onto the ring to open it. The drawer is a charcoal page with an "All apps" title bar and three glossy tabs (All apps, Frequent, Downloaded). Pages swing round as you swipe, and Leap view (pinch in, or from the home menu) shows them all.
-  The ring is Sense's way into your apps; the Hub and Active Frames are Spirit's. Modern, the default, is unchanged.
+  There is a single ring: it opens the drawer from home and, from inside the drawer, takes you back home, with optional haptics for grabbing it, passing the release point and dropping an app on it. The ring is Sense's way into your apps; the Hub and Active Frames are Spirit's. Modern, the default, is unchanged.
 - **Flip clock and Steel Dial:** two clock widgets drawn by the launcher, also usable as a live wallpaper behind the lock screen. The flip clock can show the weather, which is off by default (see Privacy).
 - **Translucent drawer in Spirit:** the wallpaper shows through the app drawer, and each app sits in a boxed tile with its name on a darker strip along the foot, in the manner of the later
   BlackBerry 10 icon style.

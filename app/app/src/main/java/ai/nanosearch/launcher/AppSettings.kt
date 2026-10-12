@@ -55,6 +55,10 @@ object AppSettings {
     fun frames(c: Context) = !isSense(c) && feature(c, "frames") // nor Active Frames
     fun setFrames(c: Context, on: Boolean) = setFeature(c, "frames", on)
 
+    /** Sense: a small tick when the ring is grabbed, when it passes the point where letting go finishes the move, and when an app is dropped on it. On by default. */
+    fun ringHaptics(c: Context) = prefs(c).getBoolean("ringHaptics", true)
+    fun setRingHaptics(c: Context, on: Boolean) = prefs(c).edit().putBoolean("ringHaptics", on).apply()
+
     /** Full screen: the status bar and navigation bar are hidden and slide in when you swipe from the top or bottom edge. */
     fun fullScreen(c: Context) = prefs(c).getBoolean("fullScreen", false)
     fun setFullScreen(c: Context, on: Boolean) = prefs(c).edit().putBoolean("fullScreen", on).apply()
