@@ -13,13 +13,13 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 /**
- * The wallpapers of the Sense era, drawn in code at the screen's size: a dusk over layered ridges, a bright meadow, ripples on dark water,
- * soft bokeh and a night skyline. Scenes in the spirit of that period's phones, all original artwork.
+ * The wallpapers of the Sense era, drawn in code at the screen's size: glossy and soft-focused, the way that period's phones looked. A burst of light,
+ * silver chrome waves, a dusk over layered ridges, deep bokeh, ripples on dark water and a soft-focus meadow. All original artwork.
  */
 object SenseWallpapers {
     val ALL = listOf(
-        ClassicWallpapers.Paper("dusk", "Dusk"), ClassicWallpapers.Paper("meadow", "Meadow"), ClassicWallpapers.Paper("ripple", "Ripple"),
-        ClassicWallpapers.Paper("bokeh", "Bokeh"), ClassicWallpapers.Paper("skyline", "Skyline"),
+        ClassicWallpapers.Paper("glow", "Glow"), ClassicWallpapers.Paper("chrome", "Chrome"), ClassicWallpapers.Paper("dusk", "Dusk"),
+        ClassicWallpapers.Paper("bokeh", "Bokeh"), ClassicWallpapers.Paper("ripple", "Ripple"), ClassicWallpapers.Paper("meadow", "Meadow"),
     )
 
     fun has(id: String) = ALL.any { it.id == id }
@@ -27,14 +27,17 @@ object SenseWallpapers {
     fun render(id: String, w: Int, h: Int): Bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).also { bmp ->
         val c = Canvas(bmp)
         when (id) {
+            "glow" -> glow(c, w, h)
+            "chrome" -> chrome(c, w, h)
             "dusk" -> dusk(c, w, h)
             "meadow" -> meadow(c, w, h)
             "ripple" -> ripple(c, w, h)
             "bokeh" -> bokeh(c, w, h)
-            "skyline" -> skyline(c, w, h)
             else -> c.drawColor(0xFF111213.toInt())
         }
     }
+
+    private fun darker(color: Int, f: Float) = android.graphics.Color.rgb((android.graphics.Color.red(color) * f).toInt(), (android.graphics.Color.green(color) * f).toInt(), (android.graphics.Color.blue(color) * f).toInt())
 
     private fun vgrad(h: Int, vararg stops: Pair<Float, Int>) =
         LinearGradient(0f, 0f, 0f, h.toFloat(), stops.map { it.second }.toIntArray(), stops.map { it.first }.toFloatArray(), Shader.TileMode.CLAMP)
@@ -73,19 +76,30 @@ object SenseWallpapers {
         }
     }
 
+    /** A bright, soft-focus meadow: sky, a sun glare, soft clouds and hills that blur with distance. */
     private fun meadow(c: Canvas, w: Int, h: Int) {
-        fill(c, w, h, vgrad(h, 0f to 0xFF2f7fd6.toInt(), 0.5f to 0xFF7fc4f2.toInt(), 0.72f to 0xFFd9f0fb.toInt(), 1f to 0xFFd9f0fb.toInt()))
+        fill(c, w, h, vgrad(h, 0f to 0xFF2273cf.toInt(), 0.35f to 0xFF63b0ec.toInt(), 0.62f to 0xFFcdeaf8.toInt(), 1f to 0xFFeaf6fb.toInt()))
+        fill(c, w, h, RadialGradient(w * 0.78f, h * 0.26f, w * 0.75f, 0xCCFFFFFF.toInt(), 0x00FFFFFF, Shader.TileMode.CLAMP))
         val rnd = Random(7)
-        val cloud = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xE6FFFFFF.toInt(); maskFilter = BlurMaskFilter(w * 0.03f, BlurMaskFilter.Blur.NORMAL) }
-        for (i in 0 until 6) {
-            val cx = w * (0.1f + 0.8f * rnd.nextFloat()); val cy = h * (0.08f + 0.34f * rnd.nextFloat()); val s = w * (0.1f + 0.1f * rnd.nextFloat())
-            for (j in 0 until 4) c.drawCircle(cx + (j - 1.5f) * s * 0.7f, cy + (if (j % 2 == 0) 0f else -s * 0.25f), s * (0.7f + 0.25f * rnd.nextFloat()), cloud)
+        val cloud = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x88FFFFFF.toInt(); maskFilter = BlurMaskFilter(w * 0.05f, BlurMaskFilter.Blur.NORMAL) }
+        for (i in 0 until 5) {
+            val cx = w * (0.05f + 0.9f * rnd.nextFloat()); val cy = h * (0.1f + 0.3f * rnd.nextFloat()); val s = w * (0.1f + 0.08f * rnd.nextFloat())
+            for (j in 0 until 5) c.drawCircle(cx + (j - 2) * s * 0.55f, cy + (if (j % 2 == 0) 0f else -s * 0.2f), s * (0.55f + 0.2f * rnd.nextFloat()), cloud)
         }
-        val greens = listOf(0xFF8fcf4f.toInt() to 0xFF5aa32e.toInt(), 0xFF6fb83e.toInt() to 0xFF3f8a24.toInt(), 0xFF3f9a2e.toInt() to 0xFF1f6a1c.toInt())
-        greens.forEachIndexed { i, (top, bottom) ->
-            val base = 0.64f + 0.1f * i
-            val path = ridge(w, h, base, 0.045f, 0.2 * i + 0.1, 0.9 + 0.5 * i, 2.2 + 0.4 * i)
-            c.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = LinearGradient(0f, h * (base - 0.05f), 0f, h * (base + 0.2f), top, bottom, Shader.TileMode.CLAMP) })
+        val hills = listOf(Triple(0.62f, 0xFF86b9b0.toInt(), 0.012f), Triple(0.70f, 0xFF6cb04c.toInt(), 0.006f), Triple(0.80f, 0xFF3f9a2e.toInt(), 0f))
+        hills.forEachIndexed { i, (base, color, blur) ->
+            val path = ridge(w, h, base, 0.04f, 0.2 * i + 0.1, 0.9 + 0.5 * i, 2.2 + 0.4 * i)
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = LinearGradient(0f, h * (base - 0.05f), 0f, h * (base + 0.2f), color, darker(color, 0.72f), Shader.TileMode.CLAMP)
+                if (blur > 0f) maskFilter = BlurMaskFilter(w * blur, BlurMaskFilter.Blur.NORMAL)
+            }
+            c.drawPath(path, paint)
+        }
+        val glint = Paint(Paint.ANTI_ALIAS_FLAG)
+        for (i in 0 until 14) {
+            val r = w * (0.012f + 0.03f * rnd.nextFloat())
+            glint.color = 0x55FFFFFF; glint.maskFilter = BlurMaskFilter(r * 0.7f, BlurMaskFilter.Blur.NORMAL)
+            c.drawCircle(w * rnd.nextFloat(), h * (0.62f + 0.35f * rnd.nextFloat()), r, glint)
         }
     }
 
@@ -104,45 +118,77 @@ object SenseWallpapers {
         fill(c, w, h, RadialGradient(cx, cy, w * 0.5f, 0x55BFF6FF, 0x00BFF6FF, Shader.TileMode.CLAMP))
     }
 
+    /** Deep bokeh: soft out-of-focus lights of different sizes over a dark blue-violet gradient, a few of them sharper with a bright rim. */
     private fun bokeh(c: Canvas, w: Int, h: Int) {
-        fill(c, w, h, vgrad(h, 0f to 0xFF0d1626.toInt(), 0.6f to 0xFF1c2f4a.toInt(), 1f to 0xFF2a2038.toInt()))
+        fill(c, w, h, vgrad(h, 0f to 0xFF070d1f.toInt(), 0.55f to 0xFF14284a.toInt(), 1f to 0xFF2a1d3d.toInt()))
+        fill(c, w, h, RadialGradient(w * 0.3f, h * 0.7f, h * 0.55f, 0x663FA7E8, 0x003FA7E8, Shader.TileMode.CLAMP))
         val rnd = Random(11)
-        val colors = intArrayOf(0xFF8CC63F.toInt(), 0xFF4fc3f7.toInt(), 0xFFffd166.toInt(), 0xFFf78fb3.toInt(), 0xFFffffff.toInt())
-        for (i in 0 until 34) {
-            val r = w * (0.03f + 0.11f * rnd.nextFloat() * rnd.nextFloat())
-            val x = w * rnd.nextFloat(); val y = h * rnd.nextFloat()
+        val colors = intArrayOf(0xFF8CC63F.toInt(), 0xFF4fc3f7.toInt(), 0xFFffd166.toInt(), 0xFFf78fb3.toInt(), 0xFFffffff.toInt(), 0xFF7aa2ff.toInt())
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        for (i in 0 until 30) {
+            val r = w * (0.04f + 0.13f * rnd.nextFloat() * rnd.nextFloat())
             val col = colors[rnd.nextInt(colors.size)]
-            val fillP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = (col and 0xFFFFFF) or (0x26 shl 24) }
-            c.drawCircle(x, y, r, fillP)
-            val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = r * 0.06f; color = (col and 0xFFFFFF) or (0x55 shl 24) }
-            c.drawCircle(x, y, r, edge)
+            p.style = Paint.Style.FILL; p.color = (col and 0xFFFFFF) or (0x2A shl 24); p.maskFilter = BlurMaskFilter(r * 0.35f, BlurMaskFilter.Blur.NORMAL)
+            val x = w * rnd.nextFloat(); val y = h * rnd.nextFloat()
+            c.drawCircle(x, y, r, p)
+            if (i % 5 == 0) {
+                p.maskFilter = null; p.style = Paint.Style.STROKE; p.strokeWidth = r * 0.05f; p.color = (col and 0xFFFFFF) or (0x66 shl 24)
+                c.drawCircle(x, y, r, p)
+            }
         }
     }
 
-    private fun skyline(c: Canvas, w: Int, h: Int) {
-        fill(c, w, h, vgrad(h, 0f to 0xFF07101f.toInt(), 0.55f to 0xFF1b3a66.toInt(), 0.82f to 0xFFe98a5a.toInt(), 1f to 0xFFf6c27a.toInt()))
-        val rnd = Random(5)
-        val stars = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xCCFFFFFF.toInt() }
-        for (i in 0 until 60) c.drawCircle(w * rnd.nextFloat(), h * 0.45f * rnd.nextFloat(), 1f + 2f * rnd.nextFloat(), stars)
-        for (layer in 0 until 2) {
-            val base = h * (0.86f - 0.09f * (1 - layer))
-            val body = Paint().apply { color = if (layer == 0) 0xFF1a2036.toInt() else 0xFF0b0e1a.toInt() }
-            val win = Paint().apply { color = 0xFFffd98a.toInt() }
-            var x = -w * 0.02f
-            while (x < w) {
-                val bw = w * (0.07f + 0.09f * rnd.nextFloat())
-                val bh = h * (0.08f + (if (layer == 0) 0.16f else 0.1f) * rnd.nextFloat())
-                c.drawRect(x, base - bh, x + bw, h.toFloat(), body)
-                if (layer == 1) {
-                    var wy = base - bh + h * 0.012f
-                    while (wy < base - h * 0.01f) {
-                        var wx = x + bw * 0.12f
-                        while (wx < x + bw * 0.88f) { if (rnd.nextFloat() < 0.42f) c.drawRect(wx, wy, wx + bw * 0.1f, wy + h * 0.007f, win); wx += bw * 0.22f }
-                        wy += h * 0.022f
-                    }
-                }
-                x += bw + w * 0.004f
+    /** A burst of light from the lower left: a bright core, soft rays fanning across the screen and a few drifting sparks. */
+    private fun glow(c: Canvas, w: Int, h: Int) {
+        fill(c, w, h, vgrad(h, 0f to 0xFF020a1e.toInt(), 0.55f to 0xFF0a3a78.toInt(), 1f to 0xFF0b5ea0.toInt()))
+        val ox = w * 0.18f; val oy = h * 0.86f
+        val rays = Paint(Paint.ANTI_ALIAS_FLAG).apply { maskFilter = BlurMaskFilter(w * 0.012f, BlurMaskFilter.Blur.NORMAL) }
+        val rnd = Random(3)
+        for (i in 0 until 16) {
+            val a = Math.toRadians(-100.0 + i * 8.5 + rnd.nextDouble() * 4)
+            val spread = Math.toRadians(1.5 + rnd.nextDouble() * 3.5)
+            val len = h * 1.6f
+            val path = Path().apply {
+                moveTo(ox, oy)
+                lineTo(ox + (len * kotlin.math.cos(a - spread)).toFloat(), oy + (len * sin(a - spread)).toFloat())
+                lineTo(ox + (len * kotlin.math.cos(a + spread)).toFloat(), oy + (len * sin(a + spread)).toFloat())
+                close()
             }
+            rays.shader = LinearGradient(ox, oy, ox + (len * kotlin.math.cos(a)).toFloat(), oy + (len * sin(a)).toFloat(), (0x30 + rnd.nextInt(0x18) shl 24) or 0x9FDFFF, 0x009FDFFF, Shader.TileMode.CLAMP)
+            c.drawPath(path, rays)
         }
+        fill(c, w, h, RadialGradient(ox, oy, h * 0.55f, intArrayOf(0xFFFFFFFF.toInt(), 0xCC8FDCFF.toInt(), 0x403FA7E8, 0x00000000), floatArrayOf(0f, 0.12f, 0.5f, 1f), Shader.TileMode.CLAMP))
+        val spark = Paint(Paint.ANTI_ALIAS_FLAG)
+        for (i in 0 until 22) {
+            val r = w * (0.004f + 0.012f * rnd.nextFloat())
+            spark.color = 0x66FFFFFF; spark.maskFilter = BlurMaskFilter(r * 1.2f, BlurMaskFilter.Blur.NORMAL)
+            c.drawCircle(w * (0.1f + 0.9f * rnd.nextFloat()), h * (0.05f + 0.8f * rnd.nextFloat()), r, spark)
+        }
+        fill(c, w, h, RadialGradient(w / 2f, h / 2f, h * 0.85f, 0x00000000, 0x77000000, Shader.TileMode.CLAMP))
+    }
+
+    /** Silver chrome: stacked glossy ribbons with a bright edge along the top of each, on charcoal. */
+    private fun chrome(c: Canvas, w: Int, h: Int) {
+        fill(c, w, h, vgrad(h, 0f to 0xFF30353a.toInt(), 0.5f to 0xFF15181b.toInt(), 1f to 0xFF08090a.toInt()))
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        for (i in 0 until 7) {
+            val base = 0.2f + i * 0.1f
+            val top = ridge(w, h, base, 0.07f, 0.13 * i, 0.9 + 0.1 * i, 1.7)
+            val thick = h * (0.16f + 0.01f * i)
+            val band = Path().apply {
+                addPath(top)
+                val m = android.graphics.Matrix(); m.setTranslate(0f, thick)
+                val under = Path(top); under.transform(m)
+                op(under, Path.Op.DIFFERENCE)
+            }
+            p.style = Paint.Style.FILL; p.maskFilter = null
+            p.shader = LinearGradient(0f, h * (base - 0.08f), 0f, h * base + thick, intArrayOf(0xFFF2F5F7.toInt(), 0xFF9aa2a9.toInt(), 0xFF3a4046.toInt()), floatArrayOf(0f, 0.35f, 1f), Shader.TileMode.CLAMP)
+            p.alpha = 235
+            c.drawPath(band, p)
+            p.shader = null; p.style = Paint.Style.STROKE; p.strokeWidth = w * 0.004f; p.color = 0xCCFFFFFF.toInt(); p.alpha = 200
+            val edge = Path(top)
+            c.save(); c.clipPath(band); c.drawPath(edge, p); c.restore()
+        }
+        fill(c, w, h, RadialGradient(w / 2f, h * 0.4f, h * 0.9f, 0x00000000, 0x88000000.toInt(), Shader.TileMode.CLAMP))
     }
 }
