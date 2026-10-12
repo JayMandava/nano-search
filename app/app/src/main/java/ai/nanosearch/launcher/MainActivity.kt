@@ -719,8 +719,12 @@ class MainActivity : Activity() {
                 launch = { cn, v -> launchComponent(cn, v) },
                 appInfo = { cn -> showAppInfo(cn.packageName) },
             ).also { page ->
-                // Spirit and Sense each start with their own clock on the first page: a widget to resize or remove like any other
-                if (index == 0) { if (pal.sense) page.widgets.seedDefault("seeded_flip", "flipclock", 232) else if (pal.classic) page.widgets.seedDefault("seeded_steel", "steeldial", 270) }
+                // Spirit and Sense each start with their own clock on the first page (a widget to resize or remove like any other); another style's default clock is taken off
+                if (index == 0) {
+                    if (pal.sense) { page.widgets.dropDefault("seeded_steel"); page.widgets.seedDefault("seeded_flip", "flipclock", 232) }
+                    else if (pal.classic) { page.widgets.dropDefault("seeded_flip"); page.widgets.seedDefault("seeded_steel", "steeldial", 270) }
+                    else { page.widgets.dropDefault("seeded_flip"); page.widgets.dropDefault("seeded_steel") }
+                }
                 page.restore()
             }
         }

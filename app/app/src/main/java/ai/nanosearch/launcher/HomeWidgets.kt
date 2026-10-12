@@ -89,16 +89,27 @@ class HomeWidgets(
     }
 
     /**
-     * Puts a built-in widget at the top of this page the first time it is asked for under [flag] (once ever), at its own size. It is an ordinary widget:
-     * long-press it to resize or remove it, and once removed it stays removed. A page that already has one is left as it is.
+     * Puts a style's default clock at the top of this page the first time it is asked for under [flag]. It is an ordinary widget: long-press it to resize
+     * or remove it, and once removed it stays removed for that style. A clock the user added themselves is never touched.
      */
     fun seedDefault(flag: String, builtinId: String, heightDp: Int) {
         if (prefs.getBoolean(flag, false)) return
         prefs.edit().putBoolean(flag, true).apply()
-        if (BuiltinWidgets.find(builtinId) == null || items.any { it.startsWith("b:$builtinId:") }) return
+        if (BuiltinWidgets.find(builtinId) == null) return
         val token = "b:$builtinId:${System.currentTimeMillis()}"
         items = listOf(token) + items
         saveSize(token, 0, heightDp)
+        prefs.edit().putString("${flag}_token", token).apply()
+    }
+
+    /** Takes a style's default clock off this page when another style is chosen (if it is still the one that was seeded), so it comes back fresh when that style does. */
+    fun dropDefault(flag: String) {
+        val token = prefs.getString("${flag}_token", null)
+        prefs.edit().remove(flag).remove("${flag}_token").apply()
+        if (token != null && token in items) {
+            items = items - token
+            prefs.edit().remove("wsize_$token").apply()
+        }
     }
 
     fun pick() {
