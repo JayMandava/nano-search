@@ -50,6 +50,7 @@ class FlipClockView(context: Context, private val panel: Boolean = false) : View
     private val panelRect = RectF()
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt() }
     private val panelFill = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val panelGloss = ai.nanosearch.launcher.ui.SenseGloss(context, 6)
 
     private val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xF2FFFFFF.toInt()
@@ -192,13 +193,14 @@ class FlipClockView(context: Context, private val panel: Boolean = false) : View
     /** The glass strip: city, conditions and date on the left, the temperature and today's high and low on the right. */
     private fun drawPanel(canvas: Canvas, w: ai.nanosearch.launcher.Weather.Now) {
         val r = 6f * density
-        panelFill.color = 0xFF000000.toInt() // a shader is dimmed by the paint's own alpha
-        panelFill.shader = android.graphics.LinearGradient(0f, panelRect.top, 0f, panelRect.bottom, intArrayOf(0xFF45484C.toInt(), 0xFF1A1C1F.toInt(), 0xFF0C0D0F.toInt()), floatArrayOf(0f, 0.45f, 1f), android.graphics.Shader.TileMode.CLAMP)
-        canvas.drawRoundRect(panelRect, r, r, panelFill)
-        panelFill.shader = null
-        panelFill.style = Paint.Style.STROKE; panelFill.strokeWidth = 1f * density; panelFill.color = 0x66FFFFFF
-        canvas.drawRoundRect(panelRect, r, r, panelFill)
-        panelFill.style = Paint.Style.FILL
+        // a soft shadow under the strip (a hardware canvas has no shape shadows, so a few faint offset layers stand in)
+        panelFill.style = Paint.Style.FILL; panelFill.shader = null
+        for (i in 1..5) {
+            panelFill.color = 0x14000000
+            canvas.drawRoundRect(panelRect.left - i * density * 0.6f, panelRect.top + i * density * 1.1f, panelRect.right + i * density * 0.6f, panelRect.bottom + i * density * 1.6f, r + i * density, r + i * density, panelFill)
+        }
+        panelGloss.setBounds(panelRect.left.toInt(), panelRect.top.toInt(), panelRect.right.toInt(), panelRect.bottom.toInt())
+        panelGloss.draw(canvas)
         val left = panelRect.left + 12f * density
         textPaint.textAlign = Paint.Align.LEFT
         textPaint.typeface = Typeface.create("sans-serif", Typeface.NORMAL)

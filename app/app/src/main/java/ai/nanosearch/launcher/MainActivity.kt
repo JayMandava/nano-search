@@ -184,8 +184,8 @@ class MainActivity : Activity() {
     private fun applyDockPadding() {
         if (!::dockRow.isInitialized) return
         if (pal.sense) { // the arch runs down behind the navigation bar; the apps sit in the bar below its top edge
-            dockRow.setPadding(dp(18), dp(24), dp(18), navBottom)
-            dockRow.layoutParams = (dockRow.layoutParams as LinearLayout.LayoutParams).apply { height = dp(88) + navBottom }
+            dockRow.setPadding(dp(18), dp(84), dp(18), navBottom) // 60 dp for the ring above the arch, then the arch's 24
+            dockRow.layoutParams = (dockRow.layoutParams as LinearLayout.LayoutParams).apply { height = dp(148) + navBottom }
             return
         }
         dockRow.setPadding(dp(8), dp(if (pal.classic) 8 else 10), dp(8), dp(if (pal.classic) 6 else 10) + if (pal.classic) navBottom else 0)
@@ -196,10 +196,8 @@ class MainActivity : Activity() {
         cornerRadius = dp(pal.radius(radiusDp)).toFloat()
     }
 
-    /** Sense: dark glass, lighter at the top, with a thin silver rim. */
-    private fun senseGlass(radiusDp: Int) = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0xF2454A50.toInt(), 0xF21B1E21.toInt(), 0xF2101214.toInt())).apply {
-        cornerRadius = dp(radiusDp).toFloat(); setStroke(dp(1), 0x66D8DEE3)
-    }
+    /** Sense: smoked glass with a crisp sheen across its upper half and a bright rim. */
+    private fun senseGlass(radiusDp: Int): Drawable = ai.nanosearch.launcher.ui.SenseGloss(this, radiusDp)
 
     /** The search bar and its buttons: Sense glass, a flat outlined bar in Spirit, a soft rounded one in Modern. */
     private fun barBg(radiusDp: Int): Drawable = if (pal.sense) senseGlass(9) else round(pal.bar, radiusDp).also { if (pal.classic) it.setStroke(dp(1), pal.outline) }
@@ -437,8 +435,14 @@ class MainActivity : Activity() {
             addView(divider, LinearLayout.LayoutParams(-1, dp(1)).apply { setMargins(dp(20), dp(12), dp(20), dp(4)) })
             addView(list, LinearLayout.LayoutParams(-1, 0, 1f))
         }
+        if (pal.sense) { // raised glass: the strip and its buttons cast a soft shadow
+            bar.clipChildren = false
+            input.elevation = dp(6).toFloat(); mic.elevation = dp(6).toFloat()
+            (hubButton?.parent as? View)?.elevation = dp(6).toFloat()
+        }
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            if (pal.sense) clipChildren = false
             addView(bar, LinearLayout.LayoutParams(-1, -2).apply { setMargins(dp(16), dp(10), dp(16), dp(6)) })
             addView(resultsPanel, LinearLayout.LayoutParams(-1, 0, 1f))
         }
@@ -518,7 +522,7 @@ class MainActivity : Activity() {
         dockRow = LinearLayout(this@MainActivity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            background = if (pal.sense) ai.nanosearch.launcher.ui.SenseArch(this@MainActivity) else if (pal.classic) flatBar(pal.dock, pal.outline) else round(pal.dock, 36)
+            background = if (pal.sense) ai.nanosearch.launcher.ui.SenseArch(this@MainActivity, dp(60).toFloat()) else if (pal.classic) flatBar(pal.dock, pal.outline) else round(pal.dock, 36)
             if (pal.sense) { clipChildren = false; clipToPadding = false } // the ring stands up out of the panel
             setPadding(dp(8), dp(if (pal.classic) 8 else 10), dp(8), dp(if (pal.classic) 6 else 10))
         }
@@ -562,11 +566,11 @@ class MainActivity : Activity() {
                 pageLabel = NText(this@MainActivity).apply { textSize = 12f; setTextColor(pal.onVariant); gravity = Gravity.CENTER; setShadowLayer(6f, 0f, 1f, 0x99000000.toInt()); letterSpacing = 0.06f }
                 addView(pageLabel, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.CENTER_HORIZONTAL })
             }
-            addView(dots, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.CENTER_HORIZONTAL; if (pal.sense) bottomMargin = dp(46) })
+            addView(dots, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.CENTER_HORIZONTAL; if (pal.sense) bottomMargin = dp(4) })
             // swipe-up handle (Sense has the ring instead)
             if (!pal.sense) addView(View(this@MainActivity).apply { background = round(0x99FFFFFF.toInt(), 2) },
                 LinearLayout.LayoutParams(dp(36), dp(4)).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(2); bottomMargin = dp(12) })
-            addView(dockRow, LinearLayout.LayoutParams(-1, if (pal.sense) dp(92) else -2).apply { if (pal.sense) setMargins(0, 0, 0, 0) else if (pal.classic) setMargins(0, 0, 0, 0) else setMargins(dp(16), 0, dp(16), dp(16)) })
+            addView(dockRow, LinearLayout.LayoutParams(-1, if (pal.sense) dp(148) else -2).apply { if (pal.sense) setMargins(0, 0, 0, 0) else if (pal.classic) setMargins(0, 0, 0, 0) else setMargins(dp(16), 0, dp(16), dp(16)) })
         }
         addView(homeContent, FrameLayout.LayoutParams(-1, -1))
         rebuildDock()
@@ -580,7 +584,7 @@ class MainActivity : Activity() {
         setOnClickListener { if (input.hasFocus()) { hideKeyboard(); input.clearFocus() } }
 
         // Swipe up opens the drawer, unless the page's content can still scroll that way.
-        canStart = { !activeScroll().canScrollVertically(1) }
+        canStart = { !pal.sense && !activeScroll().canScrollVertically(1) } // Sense: only the ring opens the drawer
         onDrag = { dy -> drawer.visibility = View.VISIBLE; drawer.translationY = (screenH - dy).coerceIn(0f, screenH); applyDrawerProgress() }
         onRelease = { vy, dragged ->
             if (dragged) {
@@ -652,8 +656,16 @@ class MainActivity : Activity() {
         }
     }
 
+    /** The dock only needs redrawing when one of its apps' badge counts changes (and never while a finger is on the ring), or the touch would be cancelled. */
+    private var lastDockSignature = ""
+    private fun dockSignature(): String {
+        val saved = dockSaved()
+        return (0 until dockSlots).joinToString(",") { slot -> dotCount(dockEntry(slot, saved[slot])?.component?.packageName).toString() }
+    }
+
     private val notificationsChanged: () -> Unit = {
-        rebuildDock()
+        val sig = dockSignature()
+        if (sig != lastDockSignature && ringGhost == null) rebuildDock()
         apps.notifyDataSetChanged()
         framesPage?.refresh()
         updateHubBadge()
@@ -804,16 +816,17 @@ class MainActivity : Activity() {
 
     private fun rebuildDock() {
         if (!::dockRow.isInitialized) return
+        lastDockSignature = dockSignature()
         dockRow.removeAllViews()
         val saved = dockSaved()
         for (slot in 0 until dockSlots) {
             // Sense: the ring sits in the middle of the dock; tap it or pull it up for the apps
-            if (pal.sense && slot == dockSlots / 2) dockRow.addView(ai.nanosearch.launcher.ui.SenseRing(this, -dp(52).toFloat()) { x, y -> openDrawer(x, y) }.apply { contentDescription = "All apps (pull up)" }, LinearLayout.LayoutParams(dp(96), dp(96)))
+            if (pal.sense && slot == dockSlots / 2) dockRow.addView(ai.nanosearch.launcher.ui.SenseRing(this, -dp(50).toFloat(), ringListener).also { senseRing = it }.apply { contentDescription = "All apps (pull up)" }, LinearLayout.LayoutParams(dp(132), dp(132)))
             if (saved[slot] == DOCK_EMPTY) { dockRow.addView(emptyDockSlot(slot), LinearLayout.LayoutParams(0, dp(56), 1f)); continue }
             val entry = dockEntry(slot, saved[slot]) ?: continue
             val show = dockCell(entry.icon, entry.label, entry.component?.packageName)
             show.apply {
-                pressScale()
+                if (!pal.sense) pressScale()
                 setOnClickListener { v -> entry.component?.let { AppUsage.note(this@MainActivity, it.flattenToString()) }; launchIntent(entry.launch, v) }
                 setOnLongClickListener { v ->
                     val pkg = entry.component?.packageName
@@ -825,7 +838,9 @@ class MainActivity : Activity() {
                     true
                 }
             }
-                        dockRow.addView(show, LinearLayout.LayoutParams(0, dp(if (pal.sense) 58 else if (pal.classic) 66 else 56), 1f))
+            // Sense: hold the app and drag it onto the ring to open it, as on the original
+            if (pal.sense) senseDragToRing(show) { ring -> entry.component?.let { AppUsage.note(this@MainActivity, it.flattenToString()) }; launchIntent(entry.launch, ring) }
+            dockRow.addView(show, LinearLayout.LayoutParams(0, dp(if (pal.sense) 58 else if (pal.classic) 66 else 56), 1f))
         }
     }
 
@@ -993,9 +1008,10 @@ class MainActivity : Activity() {
             val header = LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 background = android.graphics.drawable.LayerDrawable(arrayOf(
-                    GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0xFF3A3C3F.toInt(), 0xFF1D1E20.toInt())),
-                    android.graphics.drawable.ColorDrawable(0x66000000),
-                )).apply { setLayerHeight(1, dp(1)); setLayerGravity(1, Gravity.BOTTOM) }
+                    GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0xFF45474B.toInt(), 0xFF202123.toInt())),
+                    ai.nanosearch.launcher.ui.BrushedMetal(this@MainActivity, 60),
+                    android.graphics.drawable.ColorDrawable(0x88000000.toInt()),
+                )).apply { setLayerHeight(2, dp(1)); setLayerGravity(2, Gravity.BOTTOM) }
                 addView(senseTitle, LinearLayout.LayoutParams(0, -1, 1f))
                 addView(lens, LinearLayout.LayoutParams(dp(52), dp(52)))
             }
@@ -1324,18 +1340,145 @@ class MainActivity : Activity() {
         input.post { (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(input, 0) }
     }
 
-    private fun openDrawer(cx: Float, cy: Float) {
-        drawerOpen = true
-        updateSenseSearch()
-        updateBars(true)
-        drawer.translationY = 0f
-        drawer.visibility = View.VISIBLE
-        revealOrigin = cx to cy
-        android.view.ViewAnimationUtils.createCircularReveal(drawer, cx.toInt(), cy.toInt(), 0f, revealRadius(cx, cy)).apply {
-            duration = 480
-            interpolator = DecelerateInterpolator(1.3f)
-            addListener(object : android.animation.AnimatorListenerAdapter() { override fun onAnimationEnd(a: android.animation.Animator) { if (drawerOpen) home.visibility = View.INVISIBLE } })
-            start()
+    private var senseRing: ai.nanosearch.launcher.ui.SenseRing? = null
+    private var ringGhost: ai.nanosearch.launcher.ui.RingArt? = null
+    private var ringHome = 0f to 0f
+
+    /** Shows [drawer] only inside a circle of radius [r] round ([cx], [cy]); a negative radius takes the clip away. */
+    private fun setDrawerClip(r: Float, cx: Float, cy: Float) {
+        if (r < 0f) { drawer.clipToOutline = false; drawer.outlineProvider = android.view.ViewOutlineProvider.BACKGROUND; return }
+        drawer.clipToOutline = true
+        drawer.outlineProvider = object : android.view.ViewOutlineProvider() {
+            override fun getOutline(v: View, o: android.graphics.Outline) {
+                if (r <= 0.5f) o.setEmpty() else o.setOval((cx - r).toInt(), (cy - r).toInt(), (cx + r).toInt(), (cy + r).toInt())
+            }
+        }
+        drawer.invalidateOutline()
+    }
+
+    private fun endRingDrag() {
+        ringGhost?.let { overlayHost.removeView(it) }
+        ringGhost = null
+        senseRing?.alpha = 1f
+        searchLayer.alpha = 1f
+    }
+
+    /**
+     * The ring follows the finger as far as the top of the screen, with the app drawer growing out of it as a circle. Let go past a quarter of the screen
+     * (or with a flick) and the circle fills the screen; let go sooner and it shrinks back into the ring.
+     */
+    private val ringListener = object : ai.nanosearch.launcher.ui.SenseRing.Listener {
+        override fun onStart(ring: ai.nanosearch.launcher.ui.SenseRing, cx: Float, cy: Float) {
+            if (drawerOpen) return
+            ringHome = cx to cy
+            ring.alpha = 0f
+            val size = ring.width
+            val ghost = ai.nanosearch.launcher.ui.RingArt(this@MainActivity).apply { glow = 1f }
+            overlayHost.addView(ghost, FrameLayout.LayoutParams(size, size))
+            ghost.x = cx - size / 2f; ghost.y = cy - size / 2f
+            ringGhost = ghost
+            drawer.translationY = 0f
+            drawer.visibility = View.VISIBLE
+            searchLayer.alpha = 0f // the strip would show through the drawer's title bar while it grows
+            setDrawerClip(0f, cx, cy)
+        }
+
+        override fun onPull(pull: Float, cx: Float, cy: Float) {
+            val ghost = ringGhost ?: return
+            ghost.y = cy - ghost.height / 2f
+            val frac = (pull / (resources.displayMetrics.heightPixels * 0.55f)).coerceIn(0f, 1f)
+            setDrawerClip(frac * revealRadius(ringHome.first, ringHome.second), cx, cy)
+            homeContent.alpha = 1f - 0.7f * frac
+        }
+
+        override fun onRelease(pull: Float, velocityY: Float): Boolean {
+            val ghost = ringGhost ?: return false
+            val h = resources.displayMetrics.heightPixels
+            val open = pull > h * 0.25f || velocityY < -1500f
+            val full = revealRadius(ringHome.first, ringHome.second)
+            val cx = ringHome.first; val cy = ringHome.second - pull
+            val from = (pull / (h * 0.55f)).coerceIn(0f, 1f) * full
+            if (open) {
+                drawerOpen = true
+                revealOrigin = ringHome
+                updateBars(true)
+                updateSenseSearch()
+                ObjectAnimator.ofFloat(from, full * 1.05f).apply {
+                    duration = 280
+                    interpolator = DecelerateInterpolator(1.4f)
+                    addUpdateListener { setDrawerClip(it.animatedValue as Float, cx, cy); ghost.alpha = 1f - it.animatedFraction }
+                    addListener(object : android.animation.AnimatorListenerAdapter() {
+                        override fun onAnimationEnd(a: android.animation.Animator) {
+                            setDrawerClip(-1f, 0f, 0f)
+                            if (drawerOpen) home.visibility = View.INVISIBLE
+                            applyDrawerProgress()
+                            endRingDrag()
+                        }
+                    })
+                    start()
+                }
+            } else {
+                ObjectAnimator.ofFloat(1f, 0f).apply {
+                    duration = 240
+                    interpolator = DecelerateInterpolator(1.4f)
+                    addUpdateListener {
+                        val k = it.animatedValue as Float
+                        setDrawerClip(from * k, cx, cy + (ringHome.second - cy) * (1f - k))
+                        ghost.y = cy + (ringHome.second - cy) * (1f - k) - ghost.height / 2f
+                        homeContent.alpha = 1f - 0.7f * (pull / (h * 0.55f)).coerceIn(0f, 1f) * k
+                    }
+                    addListener(object : android.animation.AnimatorListenerAdapter() {
+                        override fun onAnimationEnd(a: android.animation.Animator) {
+                            setDrawerClip(-1f, 0f, 0f)
+                            drawer.visibility = View.INVISIBLE; drawer.translationY = screenH
+                            homeContent.alpha = 1f
+                            endRingDrag()
+                        }
+                    })
+                    start()
+                }
+            }
+            return open
+        }
+    }
+
+    /** Hold a dock app and drag it onto the ring: the ring lights, and letting go there opens the app out of the ring. Taps and long-presses work as ever. */
+    private fun senseDragToRing(v: View, onDrop: (View) -> Unit) {
+        var sx = 0f; var sy = 0f; var dragging = false
+        val slop = android.view.ViewConfiguration.get(this).scaledTouchSlop * 2
+        fun overRing(): Boolean {
+            val ring = senseRing ?: return false
+            val a = IntArray(2); v.getLocationOnScreen(a)
+            val b = IntArray(2); ring.getLocationOnScreen(b)
+            val dx = (a[0] + v.width / 2f) - (b[0] + ring.width / 2f)
+            val dy = (a[1] + v.height / 2f) - (b[1] + ring.height / 2f)
+            return kotlin.math.hypot(dx, dy) < ring.width * 0.42f
+        }
+        v.setOnTouchListener { view, e ->
+            when (e.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> { sx = e.rawX; sy = e.rawY; dragging = false; view.animate().scaleX(1.1f).scaleY(1.1f).setDuration(120).start(); false }
+                android.view.MotionEvent.ACTION_MOVE -> {
+                    val dx = e.rawX - sx; val dy = e.rawY - sy
+                    if (!dragging && kotlin.math.hypot(dx, dy) > slop) {
+                        dragging = true; view.cancelLongPress(); view.isPressed = false
+                        view.parent?.requestDisallowInterceptTouchEvent(true)
+                        view.translationZ = dp(20).toFloat()
+                    }
+                    if (dragging) { view.translationX = dx; view.translationY = dy; senseRing?.hot = overRing(); true } else false
+                }
+                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                    view.animate().scaleX(1f).scaleY(1f).setDuration(150).start()
+                    if (dragging) {
+                        val hit = e.actionMasked == android.view.MotionEvent.ACTION_UP && overRing()
+                        senseRing?.hot = false
+                        view.animate().translationX(0f).translationY(0f).setDuration(220).withEndAction { view.translationZ = 0f }.start()
+                        if (hit) senseRing?.let { onDrop(it) }
+                        dragging = false
+                        true
+                    } else false
+                }
+                else -> false
+            }
         }
     }
 

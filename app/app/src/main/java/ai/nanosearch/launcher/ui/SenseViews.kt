@@ -18,74 +18,103 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 
-/**
- * The ring: a thick brushed-silver bezel with nothing inside it, floating above the Sense dock. Pull it up to open the app drawer (a tap does nothing, as on
- * the original lock screen). [rest] is where it sits; [onOpen] gets the ring's centre on the screen, so the drawer can open outwards from it.
- */
-class SenseRing(context: Context, private val rest: Float, private val onOpen: (Float, Float) -> Unit) : View(context) {
-    private val d = resources.displayMetrics.density
+/** The ring itself: a thick brushed-silver bezel with nothing inside it. [glow] lights it green; [hot] is the stronger glow when an app is held over it. */
+open class RingArt(context: Context) : View(context) {
+    protected val d = resources.displayMetrics.density
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private var downY = 0f
-    private var pull = 0f
-    private var glow = 0f
-
-    init { translationY = rest }
-
-    private fun release(open: Boolean) {
-        if (open) {
-            performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
-            val at = IntArray(2); getLocationOnScreen(at)
-            onOpen(at[0] + width / 2f, at[1] + height / 2f)
-        }
-        animate().translationY(rest).setDuration(300).setInterpolator(android.view.animation.OvershootInterpolator(2f)).start()
-        android.animation.ValueAnimator.ofFloat(glow, 0f).apply { duration = 300; addUpdateListener { glow = it.animatedValue as Float; invalidate() } }.start()
-    }
-
-    override fun onTouchEvent(e: android.view.MotionEvent): Boolean {
-        when (e.actionMasked) {
-            android.view.MotionEvent.ACTION_DOWN -> { downY = e.rawY; pull = 0f; glow = 1f; parent?.requestDisallowInterceptTouchEvent(true); animate().cancel(); invalidate(); return true }
-            android.view.MotionEvent.ACTION_MOVE -> {
-                pull = (downY - e.rawY).coerceIn(0f, 60f * d)
-                translationY = rest - pull
-                if (pull > 34 * d && glow < 1.5f) { glow = 1.5f; invalidate() }
-            }
-            android.view.MotionEvent.ACTION_UP -> release(open = pull > 34 * d)
-            android.view.MotionEvent.ACTION_CANCEL -> release(open = false)
-        }
-        return true
-    }
+    var glow = 0f
+        set(v) { field = v; invalidate() }
+    var hot = false
+        set(v) { field = v; invalidate() }
 
     override fun onDraw(c: Canvas) {
         val cx = width / 2f; val cy = height / 2f
-        val r = minOf(width, height) / 2f - 3 * d
-        val band = 10 * d
-        // soft shadow under the bezel
-        paint.shader = RadialGradient(cx, cy + 5 * d, r * 1.25f, 0x66000000, 0x00000000, Shader.TileMode.CLAMP)
-        c.drawCircle(cx, cy + 5 * d, r * 1.25f, paint)
-        // a green glow while it is held
-        if (glow > 0f) {
-            paint.shader = RadialGradient(cx, cy, r * 1.5f, ((0x55 * glow.coerceAtMost(1.5f)).toInt().coerceAtMost(0xAA) shl 24) or 0xB7F25A, 0x00B7F25A, Shader.TileMode.CLAMP)
-            c.drawCircle(cx, cy, r * 1.5f, paint)
+        val r = minOf(width, height) / 2f - 4 * d
+        val band = 15 * d
+        // shadow under the bezel
+        paint.shader = RadialGradient(cx, cy + 7 * d, r * 1.22f, 0x88000000.toInt(), 0x00000000, Shader.TileMode.CLAMP)
+        c.drawCircle(cx, cy + 7 * d, r * 1.22f, paint)
+        val lit = if (hot) 1f else glow
+        if (lit > 0f) {
+            val gr = width / 2f // the glow must fade out inside the view's own bounds, or it shows as a square
+            val peak = ((if (hot) 0xCC else 0x88) * lit).toInt().coerceIn(0, 255) shl 24 or 0xB7F25A
+            paint.shader = RadialGradient(cx, cy, gr, intArrayOf(0x00B7F25A, 0x00B7F25A, peak, 0x00B7F25A), floatArrayOf(0f, (r - band) / gr, (r - band * 0.2f) / gr, 1f), Shader.TileMode.CLAMP) // a halo round the bezel; the middle stays clear
+            c.drawCircle(cx, cy, gr, paint)
         }
-        // the inside is clear; only a soft dark edge just inside the bezel gives it thickness
-        paint.shader = RadialGradient(cx, cy, r - band, intArrayOf(0x00000000, 0x00000000, 0x55000000), floatArrayOf(0f, 0.8f, 1f), Shader.TileMode.CLAMP)
+        // the clear middle: only a soft dark edge just inside the bezel gives it thickness
+        paint.shader = RadialGradient(cx, cy, r - band, intArrayOf(0x00000000, 0x00000000, 0x66000000), floatArrayOf(0f, 0.78f, 1f), Shader.TileMode.CLAMP)
         c.drawCircle(cx, cy, r - band, paint)
-        // the brushed bezel: a sweep of light and dark, so it catches the light all the way round
-        val metal = intArrayOf(0xFFF7F9FA.toInt(), 0xFF8B9299.toInt(), 0xFFE6EAEC.toInt(), 0xFF565C63.toInt(), 0xFFEEF1F3.toInt(), 0xFF7B828A.toInt(), 0xFFF7F9FA.toInt())
-        paint.shader = android.graphics.SweepGradient(cx, cy, metal, floatArrayOf(0f, 0.18f, 0.34f, 0.52f, 0.7f, 0.86f, 1f))
+        // the brushed bezel, light and dark all the way round
+        val metal = intArrayOf(0xFFFFFFFF.toInt(), 0xFF8B9299.toInt(), 0xFFEFF2F4.toInt(), 0xFF4D535A.toInt(), 0xFFF3F5F7.toInt(), 0xFF747B83.toInt(), 0xFFFFFFFF.toInt())
+        paint.shader = android.graphics.SweepGradient(cx, cy, metal, floatArrayOf(0f, 0.17f, 0.33f, 0.52f, 0.7f, 0.86f, 1f))
         paint.style = Paint.Style.STROKE; paint.strokeWidth = band
         c.drawCircle(cx, cy, r - band / 2f, paint)
+        // a turned groove down the middle of the bezel, and bright and dark hairlines either side
         paint.shader = null
-        paint.strokeWidth = 1.2f * d; paint.color = 0xCCFFFFFF.toInt()
-        c.drawCircle(cx, cy, r - 0.6f * d, paint)
-        paint.color = 0xAA000000.toInt()
+        paint.strokeWidth = 1.1f * d; paint.color = 0x66000000
+        c.drawCircle(cx, cy, r - band / 2f, paint)
+        paint.strokeWidth = 1.4f * d; paint.color = 0xE6FFFFFF.toInt()
+        c.drawCircle(cx, cy, r - 0.7f * d, paint)
+        paint.color = 0xBB000000.toInt()
         c.drawCircle(cx, cy, r - band, paint)
         paint.style = Paint.Style.FILL
     }
 }
 
+/**
+ * The dock's ring. Grab it and pull up: it follows your finger as far as the top of the screen, and the app drawer grows round it. A tap does nothing.
+ * [listener] is told where the ring is, so the screen can follow it; it decides, on release, whether the drawer opens.
+ */
+class SenseRing(context: Context, private val rest: Float, private val listener: Listener) : RingArt(context) {
+    interface Listener {
+        fun onStart(ring: SenseRing, cx: Float, cy: Float)
+        fun onPull(pull: Float, cx: Float, cy: Float)
+        /** Returns true if the drawer opened (the ring then settles back quietly). */
+        fun onRelease(pull: Float, velocityY: Float): Boolean
+    }
+
+    private var downY = 0f
+    private var pull = 0f
+    private var tracker: android.view.VelocityTracker? = null
+    private var startX = 0f
+    private var startY = 0f
+
+    init { translationY = rest }
+
+    fun screenCentre(): Pair<Float, Float> { val at = IntArray(2); getLocationOnScreen(at); return at[0] + width / 2f to at[1] + height / 2f }
+
+    override fun onTouchEvent(e: android.view.MotionEvent): Boolean {
+        when (e.actionMasked) {
+            android.view.MotionEvent.ACTION_DOWN -> {
+                downY = e.rawY; pull = 0f
+                tracker?.recycle(); tracker = android.view.VelocityTracker.obtain().also { it.addMovement(e) }
+                parent?.requestDisallowInterceptTouchEvent(true)
+                animate().cancel()
+                val (cx, cy) = screenCentre(); startX = cx; startY = cy
+                glow = 1f
+                listener.onStart(this, cx, cy)
+                return true
+            }
+            android.view.MotionEvent.ACTION_MOVE -> {
+                tracker?.addMovement(e)
+                pull = (downY - e.rawY).coerceAtLeast(0f)
+                listener.onPull(pull, startX, startY - pull)
+            }
+            android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                tracker?.addMovement(e); tracker?.computeCurrentVelocity(1000)
+                val vy = tracker?.yVelocity ?: 0f
+                tracker?.recycle(); tracker = null
+                glow = 0f
+                val opened = listener.onRelease(if (e.actionMasked == android.view.MotionEvent.ACTION_CANCEL) 0f else pull, vy)
+                if (!opened) performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+            }
+        }
+        return true
+    }
+}
+
 /** The Sense dock: a dark glossy bar whose top edge rises in an arch to the middle, with a bright rim along the arch. */
-class SenseArch(context: Context) : android.graphics.drawable.Drawable() {
+class SenseArch(context: Context, private val topInset: Float = 0f) : android.graphics.drawable.Drawable() {
     private val d = context.resources.displayMetrics.density
     private val rise = 24 * d
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -94,15 +123,29 @@ class SenseArch(context: Context) : android.graphics.drawable.Drawable() {
     private val edge = android.graphics.Path()
 
     override fun onBoundsChange(b: android.graphics.Rect) {
-        val side = b.top + rise
-        edge.reset(); edge.moveTo(b.left.toFloat(), side); edge.quadTo(b.exactCenterX(), b.top - rise, b.right.toFloat(), side)
+        val apex = b.top + topInset          // the arch's crown; the space above it belongs to the ring
+        val side = apex + rise
+        edge.reset(); edge.moveTo(b.left.toFloat(), side); edge.quadTo(b.exactCenterX(), apex - rise, b.right.toFloat(), side)
         body.reset(); body.moveTo(b.left.toFloat(), b.bottom.toFloat()); body.lineTo(b.left.toFloat(), side)
-        body.quadTo(b.exactCenterX(), b.top - rise, b.right.toFloat(), side); body.lineTo(b.right.toFloat(), b.bottom.toFloat()); body.close()
-        fill.shader = LinearGradient(0f, b.top.toFloat(), 0f, b.bottom.toFloat(), intArrayOf(0xF2454A4F.toInt(), 0xF2191B1E.toInt(), 0xFF08090A.toInt()), floatArrayOf(0f, 0.4f, 1f), Shader.TileMode.CLAMP)
+        body.quadTo(b.exactCenterX(), apex - rise, b.right.toFloat(), side); body.lineTo(b.right.toFloat(), b.bottom.toFloat()); body.close()
+        fill.shader = LinearGradient(0f, apex, 0f, b.bottom.toFloat(), intArrayOf(0xF2454A4F.toInt(), 0xF2191B1E.toInt(), 0xFF08090A.toInt()), floatArrayOf(0f, 0.4f, 1f), Shader.TileMode.CLAMP)
         rim.shader = LinearGradient(b.left.toFloat(), 0f, b.right.toFloat(), 0f, intArrayOf(0x66FFFFFF, 0xEEFFFFFF.toInt(), 0x66FFFFFF), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
     }
 
-    override fun draw(c: Canvas) { c.drawPath(body, fill); c.drawPath(edge, rim) }
+    private val dots = Paint().apply { shader = SenseMaterial.dots(context) }
+    private val brushed = Paint().apply { shader = SenseMaterial.brushed(context); alpha = 60 }
+    private val gloss = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    override fun draw(c: Canvas) {
+        c.drawPath(body, fill)
+        c.save(); c.clipPath(body)
+        c.drawRect(bounds, dots)       // perforated carbon over the glossy dark
+        c.restore()
+        // a soft light rolling off the crown of the arch
+        gloss.shader = LinearGradient(0f, bounds.top + topInset, 0f, bounds.top + topInset + 32 * d, 0x30FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP)
+        c.save(); c.clipPath(body); c.drawRect(bounds.left.toFloat(), bounds.top + topInset, bounds.right.toFloat(), bounds.top + topInset + 34 * d, gloss); c.restore()
+        c.drawPath(edge, rim)
+    }
     override fun setAlpha(alpha: Int) = Unit
     override fun setColorFilter(cf: android.graphics.ColorFilter?) = Unit
     @Deprecated("Drawable API") override fun getOpacity() = android.graphics.PixelFormat.TRANSLUCENT
@@ -115,6 +158,7 @@ class SenseTabBar(context: Context, private val tabs: List<Triple<String, String
     private val d = resources.displayMetrics.density
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private var selected = tabs.first().first
+    private val brush = Paint().apply { shader = SenseMaterial.brushed(context) }
 
     fun select(key: String) { selected = key; invalidate() }
 
@@ -130,18 +174,21 @@ class SenseTabBar(context: Context, private val tabs: List<Triple<String, String
         val w = width.toFloat(); val h = height.toFloat()
         paint.shader = LinearGradient(0f, 0f, 0f, h, 0xFF2A2C2F.toInt(), 0xFF0C0D0E.toInt(), Shader.TileMode.CLAMP)
         c.drawRect(0f, 0f, w, h, paint); paint.shader = null
-        paint.color = 0x55FFFFFF; c.drawRect(0f, 0f, w, 1f * d, paint)
+        brush.alpha = 55; c.drawRect(0f, 0f, w, h, brush)
+        paint.color = 0x77FFFFFF; c.drawRect(0f, 0f, w, 1f * d, paint)
         val cell = w / tabs.size
         tabs.forEachIndexed { i, (key, label, icon) ->
             val x0 = i * cell
             val on = key == selected
             if (on) {
-                val r = android.graphics.RectF(x0 + 3 * d, 4 * d, x0 + cell - 3 * d, h + 12 * d)
-                paint.shader = LinearGradient(0f, r.top, 0f, r.bottom, 0xFF5A5D62.toInt(), 0xFF202225.toInt(), Shader.TileMode.CLAMP)
+                // the chosen tab is a raised glass key, lit and bordered all the way round
+                val r = android.graphics.RectF(x0 + 3 * d, 4 * d, x0 + cell - 3 * d, h - 4 * d)
+                paint.shader = LinearGradient(0f, r.top, 0f, r.bottom, intArrayOf(0xFF74777C.toInt(), 0xFF4A4D52.toInt(), 0xFF2C2E31.toInt()), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
                 c.drawRoundRect(r, 12 * d, 12 * d, paint); paint.shader = null
-                paint.style = Paint.Style.STROKE; paint.strokeWidth = 1f * d; paint.color = 0x77FFFFFF
-                c.drawRoundRect(r, 12 * d, 12 * d, paint); paint.style = Paint.Style.FILL
-            } else if (i > 0) { paint.color = 0x33FFFFFF; c.drawRect(x0, 8 * d, x0 + 1f * d, h - 8 * d, paint) }
+                paint.style = Paint.Style.STROKE; paint.strokeWidth = 1.4f * d
+                paint.shader = LinearGradient(0f, r.top, 0f, r.bottom, 0xFFFFFFFF.toInt(), 0x99FFFFFF.toInt(), Shader.TileMode.CLAMP)
+                c.drawRoundRect(r, 12 * d, 12 * d, paint); paint.shader = null; paint.style = Paint.Style.FILL
+            } else if (i > 0) { paint.color = 0x33FFFFFF; c.drawRect(x0, 10 * d, x0 + 1f * d, h - 10 * d, paint) }
             drawIcon(c, icon, x0 + cell / 2f, h * 0.38f, 11 * d, on)
             paint.color = if (on) 0xFFFFFFFF.toInt() else 0xFFC4C8CC.toInt(); paint.textSize = 11.5f * d; paint.textAlign = Paint.Align.CENTER
             paint.typeface = android.graphics.Typeface.create("sans-serif", if (on) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
