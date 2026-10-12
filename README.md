@@ -20,9 +20,12 @@ answers questions, and listens when you speak. Small language models run entirel
 - **Models you choose:** pick, download, test or import the model for each job in Settings > Models.
 - **Adapts to the phone:** it detects the CPU core layout and RAM, measures once in the background which core grouping runs the models fastest, and sizes how long models stay loaded to the available memory. Settings > Advanced shows what it chose and lets you override it.
 - **Optional GPU (experimental):** Settings > Advanced can try running the language models on the GPU through Vulkan. It is off by default, only used if an on-device test shows it is faster, and switches itself off if it fails or crashes.
-- **Classic style (optional):** a second look for the whole launcher, chosen in Settings > Appearance. Flat charcoal and white with one blue accent,
+- **Old School style (optional):** a second look for the whole launcher, chosen in Settings > Appearance, in two eras. **Spirit** (the former Classic) is flat charcoal and white with one blue accent,
   squarer corners, a labelled dock bar, and an original set of glossy drawn icons (a handset, an envelope, a camera, a calendar page that shows today's date).
-  Apps without a drawn icon keep their own, set on a matching dark tile. Modern, the default, is unchanged.
+  Apps without a drawn icon keep their own, set on a matching dark tile. **Sense** is graphite and silver with a green accent, glass icon tiles, an arc that shows which home page you are on,
+  a flip clock, its own wallpapers and sounds, and a lock screen with a pull ring and four shortcuts. Modern, the default, is unchanged.
+- **Flip clock and Steel Dial:** two clock widgets drawn by the launcher, also usable as a live wallpaper behind the lock screen. The flip clock can show the weather, which is off by default (see Privacy).
+- **Sense sounds:** a chime, a ping, a ringtone and an unlock sweep, synthesised in the app (no sound files), which Settings can add to the phone's own sound lists.
 - **Translucent drawer in Classic:** the wallpaper shows through the app drawer, and each app sits in a boxed tile with its name on a darker strip along the foot, in the manner of the later
   BlackBerry 10 icon style.
 - **Hub:** one list for texts, missed calls, upcoming events and the notifications of your other apps, with filters, replying in place where an app allows it,
@@ -30,7 +33,7 @@ answers questions, and listens when you speak. Small language models run entirel
   notifications are held in memory only and are never saved or sent anywhere. Texts, calls and events work without it.
 - **Dots on icons, Active Frames and tabs:** a count on an app's icon while it has notifications; a page to the left of home with your recent apps as live tiles;
   and, in Classic, All / Recent / Favourites tabs in the drawer and named home pages. Each is its own switch, and Classic turns them on by default.
-- **Classic wallpapers:** eight original wallpapers drawn on the spot at your screen's size (blue and violet light ribbons, woven carbon, brushed steel, aurora, embers, graphite and a pale
+- **Old School wallpapers:** eight original Spirit wallpapers (plus five Sense scenes: dusk, meadow, ripple, bokeh, skyline) drawn on the spot at your screen's size (blue and violet light ribbons, woven carbon, brushed steel, aurora, embers, graphite and a pale
   glacier for the light theme), in the wallpaper screen, with the usual crop and Home / Lock / Both choice. Swipe any Hub item away, or tap Clear all.
 - **Peek, snooze and pin:** drag the Hub in from the left edge and it follows your finger; let go early and it slides back, or past a third and it stays. A swipe up and to the left from the bottom of home opens
   it too. Press and hold a row to pin it, snooze it for an hour or until the morning, show only that app, or hide that app from the Hub. A Priority view picks out missed calls, texts from real people and wording that asks for a reply,
@@ -42,7 +45,7 @@ answers questions, and listens when you speak. Small language models run entirel
 ## Privacy
 
 Everything is indexed into a private database inside the app. Models run on the CPU. The app has the INTERNET permission for one
-reason only: downloading models when you tap Download. Notification access, if you allow it for the Hub, only reads notifications on the phone. Downloads are checked against a SHA-256 before they are used, and
+reason only: downloading models when you tap Download, and, if you switch on the flip clock's weather and choose a city, fetching that city's current weather from Open-Meteo (the city's coordinates are the only thing sent). Notification access, if you allow it for the Hub, only reads notifications on the phone. Downloads are checked against a SHA-256 before they are used, and
 "Download on Wi-Fi only" is on by default. Each search source (contacts, messages, calls, calendar, files, photos) can be switched off
 in Settings, and "Clear and rebuild" empties the index.
 
@@ -116,4 +119,4 @@ Nano Search is licensed under the [Apache License 2.0](LICENSE). The models it d
 - Place names come from [GeoNames](https://www.geonames.org), licensed CC BY 4.0.
 - Models are the work of their authors under the licences in the table above.
 
-The Classic style uses the Source Sans 3 typeface (SIL Open Font License, copyright Adobe), bundled with its licence.
+The Old School style uses the Source Sans 3 typeface (SIL Open Font License, copyright Adobe), bundled with its licence. The flip clock uses Play (SIL OFL, Playtype) and the Steel Dial uses Barlow (SIL OFL, The Barlow Project Authors), each bundled with its licence. Weather data comes from [Open-Meteo](https://open-meteo.com) (CC BY 4.0).

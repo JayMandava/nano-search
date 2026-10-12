@@ -321,6 +321,7 @@ private fun StyleCard() {
                         val n = SenseTones.install(context)
                         android.widget.Toast.makeText(context, if (n > 0) "Added $n Sense sounds. Pick them in Sound settings." else "Sense sounds are already on this phone.", android.widget.Toast.LENGTH_LONG).show()
                     }) { Text("Add to phone") }
+                    FilledTonalButton(onClick = { context.startActivity(Intent(context, SenseLockActivity::class.java)) }) { Text("Lock screen") }
                 }
             }
             Text(

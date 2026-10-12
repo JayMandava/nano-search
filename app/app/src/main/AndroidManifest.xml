@@ -64,6 +64,18 @@
             </intent-filter>
         </service>
 
+        <!-- The Sense lock screen: shows over the lock screen; the system lock (a PIN, if set) is still asked for before anything opens. -->
+        <activity
+            android:name=".SenseLockActivity"
+            android:exported="true"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:screenOrientation="portrait"
+            android:taskAffinity="ai.nanosearch.launcher.lock"
+            android:theme="@style/Theme.Home" />
+
         <activity
             android:name=".SetupActivity"
             android:taskAffinity="ai.nanosearch.launcher.settings"
