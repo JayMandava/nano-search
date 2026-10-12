@@ -41,11 +41,14 @@ class SenseLockActivity : Activity() {
     private fun unlock(target: ComponentName?) {
         SenseTones.play(this, SenseTones.Tone.UNLOCK)
         val km = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
+        fun open() {
+            if (target != null) runCatching { startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(target).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            finish()
+        }
+        if (!km.isKeyguardLocked) return open()
         km.requestDismissKeyguard(this, object : KeyguardManager.KeyguardDismissCallback() {
-            override fun onDismissSucceeded() {
-                if (target != null) runCatching { startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(target).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-                finish()
-            }
+            override fun onDismissSucceeded() = open()
+            override fun onDismissError() = open()
             override fun onDismissCancelled() = Unit
         })
     }
@@ -77,8 +80,10 @@ private class RingView(context: Context, private val apps: List<ComponentName>, 
     private val homeY get() = height - 130 * d
 
     private fun slot(i: Int): Pair<Float, Float> {
-        val dx = listOf(-2.55f, -1.45f, 1.45f, 2.55f)[i.coerceIn(0, 3)] * ringR * 1.0f
-        return cx + dx * 1.15f to homeY
+        val inner = ringR + iconR + 12 * d
+        val outer = inner + 2 * iconR + 8 * d
+        val dx = listOf(-outer, -inner, inner, outer)[i.coerceIn(0, 3)]
+        return cx + dx to homeY
     }
 
     override fun onDraw(c: Canvas) {
