@@ -66,10 +66,13 @@ object SenseTones {
     /** A very short soft bell at [freq], for the Hub's cues. */
     fun tick(freq: Double): ShortArray = pack(FloatArray(RATE * 120 / 1000).also { bell(it, 0.0, freq, 0.12, 1.0, 30.0) }).also { for (i in it.indices) it[i] = (it[i] * 0.3f).toInt().toShort() }
 
-    fun play(context: Context, data: ShortArray) {
+    /** [media]: play on the media volume (a preview you asked for); otherwise on the system sounds volume, which silent mode mutes. */
+    fun play(context: Context, data: ShortArray, media: Boolean = false) {
+        val attrs = if (media) AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build()
+        else AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
         runCatching {
             val track = AudioTrack.Builder()
-                .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
+                .setAudioAttributes(attrs)
                 .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(RATE).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
                 .setBufferSizeInBytes(data.size * 2).setTransferMode(AudioTrack.MODE_STATIC).build()
             track.write(data, 0, data.size)
@@ -82,7 +85,7 @@ object SenseTones {
         }
     }
 
-    fun play(context: Context, tone: Tone) = play(context, pcm(tone))
+    fun play(context: Context, tone: Tone) = play(context, pcm(tone), media = true)
 
     fun wav(data: ShortArray): ByteArray {
         val bytes = ByteBuffer.allocate(data.size * 2).order(ByteOrder.LITTLE_ENDIAN).also { b -> data.forEach { b.putShort(it) } }.array()
