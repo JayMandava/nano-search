@@ -6,11 +6,11 @@ import android.content.Context
 import android.content.Intent
 
 /**
- * The clock live wallpaper is optional: the launcher only offers it when the build includes it (it lives in the local `src/personal` source set,
+ * The clock live wallpaper is optional: the launcher only offers it when the build includes it (it lives in the `clocks` package,
  * next to the clocks it draws). These are the choices it reads from the launcher's preferences, and the way to open Android's own live wallpaper preview for it.
  */
 object LockClock {
-    private const val SERVICE = "ai.nanosearch.launcher.personal.ClockWallpaperService"
+    private const val SERVICE = "ai.nanosearch.launcher.clocks.ClockWallpaperService"
 
     val CLOCKS = listOf("steel" to "Steel Dial", "flip" to "Flip clock")
     val BACKGROUNDS = ClassicWallpapers.ALL.map { it.id to it.name } + ("black" to "Black")

@@ -21,6 +21,8 @@
     <!-- Lets the file index see documents and downloads, not just media. Granted by the user in Settings. -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 
+    <uses-feature android:name="android.software.live_wallpaper" android:required="false" />
+
     <queries>
         <intent><action android:name="android.speech.RecognitionService" /></intent>
     </queries>
@@ -93,5 +95,16 @@
             android:label="Settings"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.Settings" />
+        <!-- The clocks as a live wallpaper, so they can sit behind the lock screen. -->
+        <service
+            android:name=".clocks.ClockWallpaperService"
+            android:exported="true"
+            android:label="Nano Clock"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data android:name="android.service.wallpaper" android:resource="@xml/clock_wallpaper" />
+        </service>
     </application>
 </manifest>
