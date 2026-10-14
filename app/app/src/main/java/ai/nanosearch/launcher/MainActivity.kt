@@ -1062,7 +1062,7 @@ class MainActivity : Activity() {
             if (!pal.sense) { elevation = dp(8).toFloat(); clipToOutline = true }
             for ((key, label, icon) in tabs) {
                 val tab = NText(context).apply {
-                    text = label; textSize = 11f; gravity = Gravity.CENTER; compoundDrawablePadding = dp(3); if (pal.sense) setPadding(0, dp(6), 0, dp(4)) else setPadding(0, dp(11), 0, 0) // Spirit: the icon and its name start below the top of the highlight, so the pair sits in the middle of it
+                    text = label; textSize = 11f; gravity = Gravity.CENTER; compoundDrawablePadding = dp(1); if (pal.sense) setPadding(0, dp(6), 0, dp(4)) else setPadding(0, dp(10), 0, 0) // Spirit: the icon and its name start below the top of the highlight, so the pair sits in the middle of it
                     setCompoundDrawablesRelativeWithIntrinsicBounds(null, getDrawable(icon)!!.mutate().apply { setBounds(0, 0, dp(22), dp(22)) }, null, null)
                     setOnClickListener { drawerTab = key; styleTabs(); search() }
                 }
@@ -1082,7 +1082,7 @@ class MainActivity : Activity() {
             tab.compoundDrawablesRelative[1]?.mutate()?.setTint(if (on) Color.WHITE else pal.onVariant)
             // the chosen tab is a blue gel button set into the bar
             tab.background = if (on) android.graphics.drawable.InsetDrawable(spiritGlass(8f, ai.nanosearch.launcher.ui.SpiritGlass.Look.ACCENT), dp(14), dp(5), dp(14), dp(8)) else null
-            tab.setPadding(0, dp(11), 0, 0) // a background's own padding would replace the view's, and move the icon and name
+            tab.setPadding(0, dp(10), 0, 0) // a background's own padding would replace the view's, and move the icon and name
         }
     }
 
