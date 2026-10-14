@@ -218,7 +218,10 @@ class FramesPage(
                 for (l in shown) body.addView(text(l, 12.5f, pal.onVariant, if (shown.size == 1 && note.picture == null) 3 else 1), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(2) })
             }
             live != null -> {
-                live.big?.let { body.addView(text(it, 30f, pal.onSurface, 1, bold = false).apply { typeface = Typeface.create("sans-serif-light", Typeface.NORMAL) }) }
+                live.big?.let { body.addView(text(it, 30f, pal.onSurface, 1, bold = false).apply {
+                    // the same face as the lines under it, and pulled left by the gap the first digit leaves, so the figure and the lines share one edge
+                    val b = android.graphics.Rect(); paint.getTextBounds(it, 0, 1, b); translationX = -b.left.toFloat()
+                }) }
                 live.bigSub?.let { body.addView(text(it, 12.5f, pal.onVariant, 1), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(4) }) }
                 if (live.photos.isNotEmpty()) {
                     val strip = LinearLayout(activity)
