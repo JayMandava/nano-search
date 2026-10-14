@@ -262,14 +262,15 @@ class Overlays(private val activity: Activity, private val host: FrameLayout, pr
             override fun getItemId(position: Int) = position.toLong()
             override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
                 val a = shown[position]
-                return (convertView as? LinearLayout) ?: LinearLayout(activity).apply {
+                // a recycled row is filled in again every time: binding only a freshly built row would leave each reused row showing the app it had before
+                val row = (convertView as? LinearLayout) ?: LinearLayout(activity).apply {
                     orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(24), dp(8), dp(24), dp(8))
                     addView(ImageView(activity), LinearLayout.LayoutParams(dp(40), dp(40)))
                     addView(NText(activity).apply { setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f); setTextColor(pal.onSurface); setPadding(dp(16), 0, 0, 0); maxLines = 1 }, LinearLayout.LayoutParams(-2, -2))
-                }.also { }.apply {
-                    (getChildAt(0) as ImageView).setImageDrawable(a.icon)
-                    (getChildAt(1) as TextView).text = a.title
                 }
+                (row.getChildAt(0) as ImageView).setImageDrawable(a.icon)
+                (row.getChildAt(1) as TextView).text = a.title
+                return row
             }
         }
         val search = NEdit(activity).apply {
