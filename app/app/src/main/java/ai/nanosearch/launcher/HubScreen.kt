@@ -89,7 +89,7 @@ class HubScreen(
         val screenW = activity.resources.displayMetrics.widthPixels
         val width = (screenW * 0.9f).toInt()
 
-        title = NText(activity).apply { text = "Hub"; textSize = 26f; setTextColor(pal.onSurface); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) }
+        title = NText(activity).apply { text = "Hub"; textSize = if (spirit) 24f else 26f; setTextColor(pal.onSurface); if (spirit) setShadowLayer(3f, 0f, 2f, 0xCC000000.toInt()); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) }
         clearButton = NText(activity).apply {
             text = "Clear all"; textSize = 14f; setTextColor(pal.primary); gravity = Gravity.CENTER; setPadding(dp(12), 0, dp(12), 0)
             setOnClickListener { clearAll() }
@@ -97,7 +97,7 @@ class HubScreen(
         val close = NText(activity).apply { text = "✕"; textSize = 18f; setTextColor(pal.onVariant); gravity = Gravity.CENTER; setOnClickListener { dismiss() } }
         val header = LinearLayout(activity).apply {
             gravity = Gravity.CENTER_VERTICAL
-            if (spirit) setPadding(dp(8), 0, dp(4), 0) // just the title: no bar, no close button (Back or a tap beside the panel closes it)
+            if (spirit) setPadding(dp(18), 0, dp(10), 0) // just the title and Clear all, no close button (Back or a tap beside the panel closes it)
             addView(title, LinearLayout.LayoutParams(-2, -2))
             // the unread count is a small pill beside the title, not part of it
             countBadge = NText(activity).apply {
@@ -135,7 +135,7 @@ class HubScreen(
 
         listView = ListView(activity).apply {
             adapter = rows
-            if (spirit) { divider = android.graphics.drawable.ColorDrawable(0); dividerHeight = dp(8); clipToPadding = false; setPadding(dp(2), dp(6), dp(2), bottom + dp(12)) }
+            if (spirit) { divider = android.graphics.drawable.ColorDrawable(0); dividerHeight = dp(8); clipToPadding = false; setPadding(dp(10), dp(6), dp(10), bottom + dp(12)) }
             else { divider = android.graphics.drawable.ColorDrawable(pal.outline); dividerHeight = dp(1); clipToPadding = false; setPadding(0, 0, 0, bottom + dp(12)) }
             emptyView = null
         }
@@ -150,10 +150,16 @@ class HubScreen(
             } else setBackgroundColor(pal.panel or 0xFF000000.toInt())
             isClickable = true
             elevation = dp(16).toFloat()
-            if (spirit) setPadding(dp(8), top, dp(8), 0) else setPadding(dp(16), top + dp(8), dp(8), 0)
+            if (spirit) setPadding(0, top, 0, 0) else setPadding(dp(16), top + dp(8), dp(8), 0)
             addView(header, LinearLayout.LayoutParams(-1, if (spirit) dp(48) else -2))
-            addView(chipScroll, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(if (spirit) 12 else 6); bottomMargin = dp(10); if (spirit) marginStart = dp(2) })
-            addView(banner, LinearLayout.LayoutParams(-1, dp(38)).apply { bottomMargin = dp(8); marginEnd = dp(if (spirit) 2 else 8); if (spirit) marginStart = dp(2) })
+            if (spirit) { // a chrome rule under the title: a bright line over a dark one, fading out at both ends
+                addView(View(activity).apply {
+                    background = android.graphics.drawable.GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(0x00FFFFFF, 0x88FFFFFF.toInt(), 0x88FFFFFF.toInt(), 0x00FFFFFF))
+                }, LinearLayout.LayoutParams(-1, dp(1)).apply { marginStart = dp(10); marginEnd = dp(10) })
+                addView(View(activity).apply { setBackgroundColor(0x99000000.toInt()) }, LinearLayout.LayoutParams(-1, dp(1)).apply { marginStart = dp(10); marginEnd = dp(10) })
+            }
+            addView(chipScroll, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(if (spirit) 12 else 6); bottomMargin = dp(10); if (spirit) marginStart = dp(10) })
+            addView(banner, LinearLayout.LayoutParams(-1, dp(38)).apply { bottomMargin = dp(8); marginEnd = dp(if (spirit) 10 else 8); if (spirit) marginStart = dp(10) })
             addView(listView, LinearLayout.LayoutParams(-1, 0, 1f))
         }
         val scrim = View(activity).apply { setBackgroundColor(pal.scrim); alpha = 0f; setOnClickListener { dismiss() } }

@@ -46,7 +46,13 @@ class FramesPage(
             Thread {
                 val m = runCatching { LiveFrames.media(activity) }.getOrDefault(emptyList())
                 val e = runCatching { HubData.load(activity) }.getOrDefault(emptyList())
-                activity.runOnUiThread { loading = false; if (m.map { it.title + it.playing } != media.map { it.title + it.playing } || e.size != extras.size) { media = m; extras = e; draw() } }
+                val map = HashMap<String, LiveFrames.Live>()
+                for (f in runCatching { collect(m) }.getOrDefault(emptyList())) runCatching { LiveFrames.live(activity, f.cn.packageName, f.label, e) }.getOrNull()?.let { map[f.cn.packageName] = it }
+                val sig = map.entries.sortedBy { it.key }.joinToString(";") { it.key + it.value.signature }
+                activity.runOnUiThread {
+                    loading = false
+                    if (m.map { it.title + it.playing } != media.map { it.title + it.playing } || sig != liveSig) { media = m; extras = e; liveByPkg = map; liveSig = sig; draw() }
+                }
             }.start()
         }
         draw()
@@ -87,7 +93,7 @@ class FramesPage(
     }
 
     /** Apps with something to say first (newest notification first), then the rest by when they were last opened. */
-    private fun collect(): List<Frame> {
+    private fun collect(playing: List<LiveFrames.Media> = media): List<Frame> {
         val out = ArrayList<Frame>()
         val seen = HashSet<String>()
         val recents = AppUsage.recents(activity)
@@ -97,7 +103,7 @@ class FramesPage(
             val label = runCatching { pm.getActivityInfo(cn, 0).loadLabel(pm).toString() }.getOrNull() ?: return
             out.add(Frame(cn, label, note, openedAt[cn.packageName] ?: 0L))
         }
-        if (spirit) for (m in media) add(pm.getLaunchIntentForPackage(m.pkg)?.component, null) // whatever is playing leads
+        if (spirit) for (m in playing) add(pm.getLaunchIntentForPackage(m.pkg)?.component, null) // whatever is playing leads
         if (AppSettings.dots(activity) || AppSettings.hub(activity)) {
             for (n in HubStore.snapshot()) add(pm.getLaunchIntentForPackage(n.pkg)?.component, n)
         }
@@ -116,24 +122,11 @@ class FramesPage(
     private var extras: List<HubData.Item> = emptyList()
     private var media: List<LiveFrames.Media> = emptyList()
     private var loading = false
+    private var liveSig = ""
 
     private fun mediaFor(f: Frame) = media.firstOrNull { it.pkg == f.cn.packageName }
 
-    /** What a frame can say beyond its notification: a few lines of real content from the app's own data. */
-    private fun liveLines(f: Frame): List<String> {
-        val kind = AppIcons.kindOf(f.cn.packageName, f.label)
-        val clock = android.text.format.DateFormat.getTimeFormat(activity)
-        return when (kind) {
-            "calendar" -> extras.filter { it.kind == "event" }.take(3).map { e ->
-                val day = DateUtils.formatDateTime(activity, e.whenMs, DateUtils.FORMAT_SHOW_WEEKDAY or DateUtils.FORMAT_ABBREV_WEEKDAY)
-                val sameDay = DateUtils.isToday(e.whenMs)
-                (if (sameDay) clock.format(java.util.Date(e.whenMs)) else "$day ${clock.format(java.util.Date(e.whenMs))}") + "  " + e.title
-            }
-            "phone" -> extras.filter { it.kind == "call" }.take(3).map { "Missed: ${it.title}" }
-            "message" -> extras.filter { it.kind == "message" && it.pkg == f.cn.packageName }.take(3).map { "${it.title}: ${it.body}" }
-            else -> emptyList()
-        }
-    }
+    private var liveByPkg: Map<String, LiveFrames.Live> = emptyMap()
 
     private fun glassButton(label: String, onClick: () -> Unit) = NText(activity).apply {
         text = label; textSize = 13f; setTextColor(0xFFFFFFFF.toInt()); gravity = Gravity.CENTER
@@ -177,7 +170,7 @@ class FramesPage(
 
         val m = mediaFor(f)
         val note = f.note
-        val lines = liveLines(f)
+        val live = liveByPkg[f.cn.packageName]
         when {
             m != null -> { // now playing: the cover, the track and the transport buttons
                 val row = LinearLayout(activity).apply { gravity = Gravity.CENTER_VERTICAL }
@@ -202,8 +195,31 @@ class FramesPage(
                 val shown = if (note.lines.size > 1) note.lines.takeLast(3) else listOf(note.body).filter { it.isNotBlank() }
                 for (l in shown) body.addView(text(l, 12.5f, pal.onVariant, if (shown.size == 1 && note.picture == null) 3 else 1), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(2) })
             }
-            lines.isNotEmpty() -> for (l in lines) body.addView(text(l, 13f, pal.onSurface, 1), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(3) })
-            else -> body.addView(text("Nothing new", 13f, pal.onVariant, 1))
+            live != null -> {
+                live.big?.let { body.addView(text(it, 30f, pal.onSurface, 1, bold = false).apply { typeface = Typeface.create("sans-serif-light", Typeface.NORMAL) }) }
+                live.bigSub?.let { body.addView(text(it, 12.5f, pal.onVariant, 1), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(4) }) }
+                if (live.photos.isNotEmpty()) {
+                    val strip = LinearLayout(activity)
+                    for ((i, bmp) in live.photos.withIndex()) strip.addView(ImageView(activity).apply {
+                        setImageBitmap(bmp); scaleType = ImageView.ScaleType.CENTER_CROP; clipToOutline = true
+                        outlineProvider = object : android.view.ViewOutlineProvider() { override fun getOutline(v: View, o: android.graphics.Outline) = o.setRoundRect(0, 0, v.width, v.height, dp(6).toFloat()) }
+                    }, LinearLayout.LayoutParams(0, dp(if (wide) 84 else 56), 1f).apply { if (i > 0) marginStart = dp(5) })
+                    body.addView(strip, LinearLayout.LayoutParams(-1, -2))
+                }
+                for (l in live.lines) body.addView(text(l, 13f, pal.onSurface, 1), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(3) })
+                for (sc in live.shortcuts) body.addView(LinearLayout(activity).apply {
+                    gravity = Gravity.CENTER_VERTICAL
+                    background = ai.nanosearch.launcher.ui.SpiritGlass(activity, 8f, ai.nanosearch.launcher.ui.SpiritGlass.Look.DARK, pal.primary)
+                    setPadding(dp(8), dp(4), dp(8), dp(4))
+                    sc.icon?.let { addView(ImageView(activity).apply { setImageDrawable(it) }, LinearLayout.LayoutParams(dp(22), dp(22)).apply { marginEnd = dp(8) }) }
+                    addView(text(sc.label, 12.5f, pal.onSurface, 1), LinearLayout.LayoutParams(0, -2, 1f))
+                    setOnClickListener { sc.open() }
+                }, LinearLayout.LayoutParams(-1, dp(32)).apply { bottomMargin = dp(4) })
+            }
+            else -> { // nothing the app lets us read: its gem, standing in for the frame's picture
+                body.gravity = Gravity.CENTER
+                body.addView(ImageView(activity).apply { setImageDrawable(AppIcons.get(activity, f.cn)); alpha = 0.85f }, LinearLayout.LayoutParams(dp(60), dp(60)))
+            }
         }
         card.addView(body, LinearLayout.LayoutParams(-1, 0, 1f))
         card.addView(NText(activity).apply { text = if (m != null) (if (m.playing) "Playing" else "Paused") else whenOf(f); textSize = 11f; setTextColor(pal.onVariant); setPadding(dp(12), dp(4), dp(12), dp(9)); gravity = Gravity.END }, LinearLayout.LayoutParams(-1, -2))
