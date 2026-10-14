@@ -24,7 +24,7 @@ import kotlin.math.sin
  * shadow. An app gets one when its name or package says what it is; every other app keeps its own icon, set on a matching dark glossy tile.
  */
 object AppIcons {
-    private const val SIZE = 192
+    internal const val SIZE = 192
     private val cache = LruCache<String, Drawable>(160)
 
     fun clear() = cache.evictAll()
@@ -34,15 +34,19 @@ object AppIcons {
         val pm = context.packageManager
         val own = runCatching { pm.getActivityIcon(cn) }.getOrNull() ?: pm.defaultActivityIcon
         val label = runCatching { pm.getActivityInfo(cn, 0).loadLabel(pm).toString() }.getOrDefault("")
-        val kind = kindOf(cn.packageName, label)
-        val day = if (kind == "calendar") Calendar.getInstance().get(Calendar.DAY_OF_MONTH) else 0
-        val key = "g|${cn.flattenToShortString()}|$kind|$day"
-        return cache.get(key) ?: BitmapDrawable(context.resources, spiritIcon(own, kind, day)).also { cache.put(key, it) }
+        val pack = IconPacks.active(context)
+        // a known app gets its own drawing; otherwise its kind of app (a handset, a camera...); otherwise a game's controller; otherwise its own picture
+        var brand = BrandIcons.find(context, cn.packageName)
+        val kind = if (brand != null) null else kindOf(cn.packageName, label)
+        if (brand == null && kind == null && runCatching { pm.getActivityInfo(cn, 0).applicationInfo.category == android.content.pm.ApplicationInfo.CATEGORY_GAME }.getOrDefault(false)) brand = BrandIcons.GAME
+        val day = if (kind == "calendar" || pack.isNotEmpty()) Calendar.getInstance().get(Calendar.DAY_OF_MONTH) else 0
+        val key = "g|$pack|${cn.flattenToShortString()}|${brand?.id}|$kind|$day"
+        return cache.get(key) ?: BitmapDrawable(context.resources, IconPacks.themed(context, cn, own, day) ?: spiritIcon(own, kind, day, brand)).also { cache.put(key, it) }
     }
 
     private val KINDS = listOf(
         "calendar" to "calendar", "clock" to "clock|alarm", "calculator" to "calculator", "camera" to "camera", "gallery" to "gallery|photos",
-        "phone" to "dialer|\\bphone\\b|telephone|incallui", "message" to "messag|\\bsms\\b|\\bmms\\b", "email" to "gmail|\\bmail\\b|email|outlook|proton",
+        "phone" to "dialer|\\bphone\\b|telephone|incallui", "message" to "messag|\\bsms\\b|\\bmms\\b", "email" to "gmail|\\bmail\\b|email|outlook|protonmail|proton mail",
         "browser" to "browser|chrome|brave|firefox|opera|vivaldi|duckduckgo|\\bedge\\b", "music" to "music|podcast|spotify|\\bplayer\\b",
         "contacts" to "contacts|\\bpeople\\b", "files" to "\\bfiles\\b|documents|file manager|filemanager|downloads", "settings" to "settings",
         "maps" to "maps|navigation", "notes" to "\\bnotes?\\b|\\bkeep\\b|memo", "store" to "play store|vending|app store|market",
@@ -58,16 +62,16 @@ object AppIcons {
 
     // ---------------------------------------------------------------- painting kit
 
-    private fun paint() = Paint(Paint.ANTI_ALIAS_FLAG)
-    private fun lin(y0: Float, y1: Float, a: Int, b: Int) = LinearGradient(0f, y0, 0f, y1, a, b, Shader.TileMode.CLAMP)
-    private fun lin3(y0: Float, y1: Float, a: Int, b: Int, c: Int) = LinearGradient(0f, y0, 0f, y1, intArrayOf(a, b, c), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+    internal fun paint() = Paint(Paint.ANTI_ALIAS_FLAG)
+    internal fun lin(y0: Float, y1: Float, a: Int, b: Int) = LinearGradient(0f, y0, 0f, y1, a, b, Shader.TileMode.CLAMP)
+    internal fun lin3(y0: Float, y1: Float, a: Int, b: Int, c: Int) = LinearGradient(0f, y0, 0f, y1, intArrayOf(a, b, c), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
 
-    private fun Canvas.shadowOf(path: Path, dy: Float = 6f, blur: Float = 7f, alpha: Int = 0x70) {
+    internal fun Canvas.shadowOf(path: Path, dy: Float = 6f, blur: Float = 7f, alpha: Int = 0x70) {
         val p = paint().apply { color = alpha shl 24; maskFilter = BlurMaskFilter(blur, BlurMaskFilter.Blur.NORMAL) }
         save(); translate(0f, dy); drawPath(path, p); restore()
     }
 
-    private fun Canvas.glossy(path: Path, top: Int, bottom: Int, y0: Float, y1: Float, shadow: Boolean = true, edge: Boolean = true) {
+    internal fun Canvas.glossy(path: Path, top: Int, bottom: Int, y0: Float, y1: Float, shadow: Boolean = true, edge: Boolean = true) {
         if (shadow) shadowOf(path)
         drawPath(path, paint().apply { shader = lin(y0, y1, top, bottom) })
         if (edge) {
@@ -75,16 +79,16 @@ object AppIcons {
         }
     }
 
-    private fun rr(l: Float, t: Float, r: Float, b: Float, rad: Float) = Path().apply { addRoundRect(RectF(l, t, r, b), rad, rad, Path.Direction.CW) }
+    internal fun rr(l: Float, t: Float, r: Float, b: Float, rad: Float) = Path().apply { addRoundRect(RectF(l, t, r, b), rad, rad, Path.Direction.CW) }
 
     /** A soft white sheen over the upper part of [path], the "glass" look. */
-    private fun Canvas.sheen(path: Path, y0: Float, y1: Float, alpha: Int = 0x66) {
+    internal fun Canvas.sheen(path: Path, y0: Float, y1: Float, alpha: Int = 0x66) {
         save(); clipPath(path)
         drawRect(0f, y0, SIZE.toFloat(), y1, paint().apply { shader = lin(y0, y1, (alpha shl 24) or 0xFFFFFF, 0x00FFFFFF) })
         restore()
     }
 
-    private fun bitmap(block: (Canvas) -> Unit): Bitmap = Bitmap.createBitmap(SIZE, SIZE, Bitmap.Config.ARGB_8888).also { block(Canvas(it)) }
+    internal fun bitmap(block: (Canvas) -> Unit): Bitmap = Bitmap.createBitmap(SIZE, SIZE, Bitmap.Config.ARGB_8888).also { block(Canvas(it)) }
 
     // ---------------------------------------------------------------- Spirit: the glossy gem
 
@@ -110,8 +114,9 @@ object AppIcons {
     }
 
     /** An app's gem: a drawn object on a coloured one, or another app's own picture on a gem tinted from its colours. */
-    private fun spiritIcon(own: Drawable, kind: String?, day: Int): Bitmap =
-        if (kind != null) gem((GEM_COLOURS[kind] ?: 0xFF3B4048).toInt(), draw(kind, day), 0.66f)
+    private fun spiritIcon(own: Drawable, kind: String?, day: Int, brand: BrandIcons.Brand? = null): Bitmap =
+        if (brand != null) gem(BrandIcons.tint(brand), BrandIcons.draw(brand), 0.66f)
+        else if (kind != null) gem((GEM_COLOURS[kind] ?: 0xFF3B4048).toInt(), draw(kind, day), 0.66f)
         else {
             val emblem = Bitmap.createBitmap(144, 144, Bitmap.Config.ARGB_8888)
             own.setBounds(0, 0, 144, 144); own.draw(Canvas(emblem))
@@ -144,7 +149,7 @@ object AppIcons {
      * A glossy gem: a rounded tile that is lit from above (light at the top, deep at the bottom), a bevelled rim, light bouncing up from its foot, a curved
      * gloss over its upper half, and the [emblem] standing on it.
      */
-    private fun gem(base: Int, emblem: Bitmap, scale: Float, shadow: Boolean = false): Bitmap = bitmap { c ->
+    internal fun gem(base: Int, emblem: Bitmap, scale: Float, shadow: Boolean = false): Bitmap = bitmap { c ->
         val l = 14f; val t = 10f; val r = 178f; val b = 174f
         val tile = rr(l, t, r, b, 42f)
         val hi = ai.nanosearch.launcher.ui.SpiritGlass.lighten(base, 0.30f); val lo = ai.nanosearch.launcher.ui.SpiritGlass.darken(base, 0.5f)
@@ -200,7 +205,7 @@ object AppIcons {
     val ALL = listOf("phone", "message", "email", "browser", "camera", "gallery", "music", "clock", "calendar", "calculator", "contacts", "files", "settings", "maps", "notes", "store", "video", "recorder", "weather", "wallet", "tasks")
 
     /** The "ask" gem's emblem: a large and a small four-pointed spark. */
-    private fun ask(c: Canvas) {
+    internal fun ask(c: Canvas) {
         fun spark(cx: Float, cy: Float, outer: Float, inner: Float): Path = Path().apply {
             for (i in 0 until 8) {
                 val a = Math.toRadians(i * 45.0 - 90.0); val r = if (i % 2 == 0) outer else inner

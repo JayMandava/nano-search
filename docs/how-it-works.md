@@ -23,9 +23,19 @@ Numbers below were measured on a mid-range 2023 phone (8 GB RAM, CPU only). Othe
 - **Icons.** `AppIcons.kt` draws about twenty icons in code (handset, speech bubble, envelope, globe, camera, photo cards, notes, alarm clock, calendar page with today's date, calculator,
   address book, filing cabinet, gear, map, notepad, shopping bag, screen with a play button, microphone, sun and cloud, wallet, clipboard). An app gets one when its package or label says what it is; every
   other app keeps its own icon on a dark glossy tile. All of it is original artwork.
+- **Brand icons.** `BrandIcons.kt` holds about forty more drawings (shield, onion, flame, paper plane, chat bubbles, play screen, headphones, cloud, page, basket, key, controller, spark and others, plus bold
+  letter marks); a table of package-name patterns picks one per well-known app. Each is our own drawing of what the app is about, not a copy of its logo, in a colour that suggests the app; the gem under it is
+  that colour muted, so the grid stays graphite with a hint of hue. The order is: a known app's drawing, then the category icon, then a controller for anything Android files under games, then the app's own picture.
+  Which app gets which drawing is data, not code: `assets/brand_icons.tsv` has one line per app (a package-name pattern, a tab, a drawing), first match wins. A `brand_icons.tsv` in the launcher's files
+  folder holds the user's own lines and is read first, so a new app can be added without a rebuild (restart the launcher to pick it up). The format is described at the top of the file; bad lines are skipped.
 - **Hub.** `NotificationHub` is a notification listener; it feeds `HubStore`, which keeps the notifications in memory only (nothing is written to disk) and tells the screen when they change. `HubData` adds
   recent texts, missed calls and the next week's events from the same providers search already reads, and skips a text that a notification has already shown. `HubScreen` lists them with filters, replies in
   place through the notification's own reply action, and dismisses. Swipe in from the left edge (the strip excludes itself from the system Back gesture) or use the button by the search bar.
+- **Icon packs.** `IconPacks.kt` finds installed packs by the intent actions packs declare (the ones most launchers agree on) and reads their `appfilter.xml` (from the pack's xml resources or its assets): `item`
+  lines map a component to a picture, `calendar` lines name a prefix for a page per day, and `iconback`, `iconmask`, `iconupon` and `scale` say how to dress the apps it does not list. With a pack chosen in
+  Settings (Appearance), `AppIcons.get` asks it first: an exact component, then another activity of the same app, then its calendar page; an unlisted app is wrapped in the pack's back, mask and front if it has
+  them, and otherwise falls through to the built-in drawings. The pack's own pictures are shown as drawn, without the gem. A pack that is removed or unreadable is ignored, and the choice is part of the key that
+  makes the home screen redraw when Settings closes.
 - **Dots, Frames, favourites.** Icons show a count from `HubStore`. Active Frames (`FramesPage.kt`) is a page to the left of home. In Spirit each frame is a glass card with live content read from what the app exposes (`LiveFrames.kt`): the track and transport buttons of a media session, a notification's picture and lines, the next events, missed calls or texts, the latest photos, battery and storage, the time and next alarm, what an app has running in the shade, or the shortcuts it publishes; apps with nothing readable get a compact card. Android does not let a launcher snapshot another app's window, so there are no live thumbnails. Frames list apps with something to say first, then the apps opened last
   (`AppUsage.kt` keeps the last twelve and the starred ones). Hub, dots and Frames are each a switch, on until you choose otherwise.
 

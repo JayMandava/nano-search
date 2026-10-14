@@ -1,0 +1,87 @@
+# Brand icons: which app gets which drawing.
+# One line per pattern: <package-name regex> <TAB> <drawing>. The first matching line wins, so specific lines go above broad ones.
+# <drawing> is a preset name (EMBER, PLANE, LOCK_PURPLE ...) or  emblem:text:TOPHEX:BOTTOMHEX  (text only for letter, coin and page marks).
+# Emblems: shield shieldlock onion flame ring wave plane chatphone chatdots mail frame play arcs bars headphones cloud page cart bag fork car coin key
+#          controller spark terminal download scan videocall ghost pinmark alien gallerymark note letter
+# Your own lines go in brand_icons.tsv in the launcher's files folder and are read first.
+^com\.brave\.	EMBER
+^org\.torproject\.torbrowser|^org\.torproject\.android	ONION
+^org\.mozilla\.(firefox|fenix|fennec|focus|klar)|^us\.spotco\.fennec|^io\.github\.forkmaintainers\.iceraven|^org\.mozilla\.rocket	FLAME
+^com\.opera\.	RING_RED
+^com\.vivaldi\.	RING_RED
+^com\.microsoft\.emmx	WAVE_BLUE
+^com\.duckduckgo\.	shield::FFFFA25C:FFD2480F
+^com\.sec\.android\.app\.sbrowser	RING_BLUE
+^com\.android\.chrome|^com\.chrome\.|^org\.chromium\.|^org\.bromite|^com\.kiwibrowser	RING_ORANGE
+^org\.telegram\.|^org\.thunderdog\.challegram|^nekox|^com\.exteragram	PLANE
+^com\.whatsapp	CHAT_GREEN
+^org\.thoughtcrime\.securesms|^network\.loki\.messenger	CHAT_BLUE
+^com\.facebook\.orca|^com\.facebook\.mlite	CHAT_PURPLE
+^com\.discord	PAD_PURPLE
+^com\.slack	letter:#:FFE9A3FF:FF7B2FA8
+^com\.microsoft\.teams|^com\.microsoft\.skype	VIDEOCALL_BLUE
+^us\.zoom\.|^com\.skype\.|^com\.google\.android\.apps\.tachyon|^com\.google\.android\.apps\.meetings	VIDEOCALL_BLUE
+^jp\.naver\.line|^com\.tencent\.mm	CHAT_GREEN
+^com\.viber\.	CHAT_PURPLE
+^im\.vector\.|^org\.matrix\.	CHAT_TEAL
+^com\.snapchat\.	GHOST
+^org\.signal|^im\.molly	CHAT_BLUE
+^com\.instagram\.android|^com\.instagram\.lite	FRAME
+^com\.instagram\.barcelona	letter:@:FFE0E0E0:FF55595F
+^com\.facebook\.(katana|lite)	letter:f:FF7FB0FF:FF1F4FC8
+^com\.twitter\.android|^com\.x\.android	letter:X:FFFFFFFF:FFA9AFB8
+^com\.reddit\.|^com\.rubenmayayo\.reddit|^io\.syncapps\.lemmy|^me\.edgan\.redreader|^free\.reddit\.news	alien::FFFF9A5E:FFD4400F
+^com\.zhiliaoapp\.musically|^com\.ss\.android\.ugc	note::FF37E8F0:FFFF2D6F
+^com\.linkedin\.	letter:in:FF8EC5FF:FF1F5FB5
+^com\.pinterest	letter:P:FFFF8C86:FFC4161E
+^com\.tumblr	letter:t:FF9BC0E8:FF2B4A70
+^org\.joinmastodon\.|^org\.mozilla\.social|^com\.keylesspalace	letter:M:FFB7A8FF:FF4A3FC0
+^com\.google\.android\.youtube($|\.tv)|^app\.revanced\.android\.youtube|^com\.vanced\.	PLAY_RED
+^org\.schabi\.newpipe|^org\.polymorphicshade\.tubular|^com\.github\.libretube|^free\.rm\.skytube|^org\.skytubeteam	play::FFFF9D6B:FFD2360F
+^com\.google\.android\.apps\.youtube\.music|^com\.vanced\.android\.apps\.youtube\.music|^app\.revanced\.android\.apps\.youtube\.music	RING_RED
+^com\.spotify\.	NOTE_GREEN
+^com\.netflix\.	letter:N:FFFF6B6B:FFB5121B
+^com\.amazon\.avod|^com\.amazon\.aiv|^in\.startv\.hotstar|^com\.disney\.|^com\.hotstar|^com\.jio\.jioplay|^tv\.twitch\.|^com\.sonyliv|^com\.graymatrix\.did|^com\.mxtech	PLAY_BLUE
+^org\.videolan\.vlc|^org\.xbmc\.|^com\.plexapp\.|^is\.xyz\.mpv|^org\.jellyfin|^app\.jellyfin|^com\.brouken\.player|^com\.mxtech\.	PLAY_ORANGE
+^com\.maxmpz\.	BARS
+^org\.lineageos\.twelve|^com\.google\.android\.apps\.youtube\.music	PHONES
+^com\.soundcloud\.|^com\.audible\.|^com\.google\.android\.apps\.podcasts|^de\.danoeh\.antennapod|^fm\.player|^au\.com\.shiftyjelly\.pocketcasts|^com\.stitcher	PHONES
+^com\.apple\.android\.music|^deezer\.android|^com\.jio\.media\.jiobeats|^com\.gaana|^com\.tidal|^com\.aspiro|^com\.amazon\.mp3|^com\.shazam|^org\.oxycblt\.auxio|^it\.vfsfitvnm\.vimusic	MUSIC_PINK
+^com\.google\.android\.apps\.docs$|^me\.proton\.android\.drive|^com\.dropbox\.|^com\.microsoft\.skydrive|^com\.nextcloud\.|^com\.owncloud\.|^mega\.privacy|^com\.box\.|^com\.syncthing|^com\.futurice\.android\.syncthing|^com\.nutomic\.syncthingandroid	CLOUD_BLUE
+^com\.google\.android\.apps\.docs\.editors\.docs|^com\.microsoft\.office\.word|^org\.libreoffice|^com\.collabora	DOC_BLUE
+^com\.google\.android\.apps\.docs\.editors\.sheets|^com\.microsoft\.office\.excel	SHEET_GREEN
+^com\.google\.android\.apps\.docs\.editors\.slides|^com\.microsoft\.office\.powerpoint	SLIDE_YELLOW
+^com\.adobe\.reader|^com\.xodo|^com\.foxit|^org\.readera|^com\.artifex|^org\.opendroidpdf|^app\.cash\.pdf|^com\.shockwave	DOC_RED
+^com\.microsoft\.office\.officehub|^com\.microsoft\.office\.onenote|^com\.evernote|^com\.notion|^md\.obsidian|^com\.todoist|^com\.ticktick|^com\.trello|^com\.asana|^com\.anydo|^com\.google\.android\.apps\.tasks|^org\.standardnotes	DOC_ORANGE
+^com\.google\.android\.googlequicksearchbox	letter:G:FFFFFFFF:FFB0B6BE
+^com\.google\.android\.apps\.translate	letter:A:FF9CC4FF:FF2D5FC4
+^com\.google\.android\.apps\.bard|^com\.google\.android\.apps\.gemini	SPARK_BLUE
+^com\.google\.android\.apps\.photos	gallerymark::FFFFC857:FFE0780F
+^com\.google\.android\.apps\.nbu\.paisa|^com\.phonepe|^net\.one97\.paytm|^in\.org\.npci|^com\.dreamplug|^com\.paypal|^com\.coinbase|^com\.mobikwik|^com\.freecharge|^com\.amazon\.mShop\.android\.payments|^com\.squareup|^com\.venmo|^com\.revolut|^com\.wise|^com\.monzo|^com\.snapwork|^com\.csam\.|^com\.sbi\.|^com\.axis\.|^com\.infrasofttech|^com\.upi\.|^com\.kotak|^com\.hdfc|^com\.icici|^net\.one97\.	COIN
+^com\.phonepe	COIN_PURPLE
+^in\.amazon\.mShop|^com\.amazon\.mShop|^com\.flipkart|^com\.ebay|^com\.alibaba|^com\.aliexpress|^com\.meesho|^com\.shopee|^com\.walmart|^com\.target|^com\.jio\.ajio|^in\.tata	CART
+^com\.myntra|^com\.nykaa|^com\.ril\.ajio|^com\.lenskart|^com\.zara|^com\.hm\.|^com\.nike|^com\.adidas|^com\.jabong|^com\.tatacliq|^com\.limeroad	BAG
+^in\.swiggy|^com\.application\.zomato|^com\.zeptoconsumerapp|^com\.grofers|^com\.bigbasket|^com\.dominos|^com\.mcdonalds|^com\.starbucks|^com\.ubercab\.eats|^com\.deliveroo|^com\.doordash|^com\.instacart|^com\.blinkit	FOOD
+^com\.ubercab|^com\.olacabs|^com\.rapido|^com\.lyft|^com\.grab|^com\.bolt|^com\.didi|^in\.redbus|^com\.makemytrip|^com\.goibibo|^com\.ixigo|^cris\.org\.in|^com\.irctc|^in\.railyatri|^com\.airbnb|^com\.booking|^com\.tripadvisor|^com\.expedia|^com\.yatra|^com\.cleartrip|^com\.google\.android\.apps\.travel|^net\.skyscanner|^com\.delta|^com\.indigo|^in\.goindigo|^com\.airindia|^com\.fly	CAR
+^ch\.protonvpn	LOCK_PURPLE
+^ch\.protonmail|^me\.proton\.android\.mail	MAIL_PURPLE
+^com\.nordvpn|^com\.expressvpn|^com\.windscribe|^net\.mullvad|^com\.cloudflare\.onedotonedotonedotone|^com\.wireguard|^de\.blinkt\.openvpn|^net\.openvpn|^org\.strongswan|^com\.privateinternetaccess|^com\.surfshark|^com\.tunnelbear|^com\.cyberghost|^free\.vpn|^com\.psiphon|^org\.outline|^com\.lantern|^app\.intra|^com\.celzero\.bravedns|^com\.protonvpn	LOCK_BLUE
+^com\.x8bit\.bitwarden|^com\.bitwarden|^com\.agilebits|^com\.lastpass|^com\.dashlane|^org\.keepassdroid|^keepass2android|^com\.kunzisoft\.keepass|^com\.beemdevelopment\.aegis|^com\.google\.android\.apps\.authenticator|^org\.fedorahosted\.freeotp|^org\.shadowice\.flocke\.andotp|^com\.authy|^com\.azure\.authenticator|^proton\.android\.pass|^com\.twofasapp|^app\.passwordstore|^com\.yubico|^com\.stratumauth	KEY
+^org\.adaway|^com\.celzero|^org\.getlantern|^com\.malwarebytes|^com\.avast|^com\.kaspersky|^com\.bitdefender|^com\.lookout|^org\.torproject\.android	LOCK_GREEN
+^com\.google\.android\.gm	MAIL_RED
+^com\.fsck\.k9|^net\.thunderbird|^org\.mozilla\.thunderbird|^eu\.faircode\.email|^com\.fsck\.k9\.material	MAIL_BLUE
+^com\.microsoft\.office\.outlook|^com\.yahoo\.mobile\.client\.android\.mail|^com\.tutanota|^de\.tutao|^com\.samsung\.android\.email|^com\.mail\.mobile|^ru\.mail|^com\.zoho\.mail|^com\.fastmail|^com\.readdle\.spark|^io\.mail\.app|^com\.my\.mail	MAIL_GREEN
+^com\.openai\.|^com\.openai\.chatgpt	SPARK_GREEN
+^com\.anthropic\.	SPARK_ORANGE
+^ai\.perplexity|^com\.microsoft\.copilot|^ai\.x\.grok|^com\.deepseek|^com\.mistral|^ai\.character|^com\.quora\.poe|^co\.hotpot	SPARK_BLUE
+^com\.termux|^jackpal\.androidterm|^com\.offsec\.nethunter|^org\.connectbot|^com\.sonelli|^com\.github\.android|^com\.github\.andreyasadchy	TERM
+^org\.proninyaroslav\.libretorrent|^com\.utorrent|^com\.bittorrent|^com\.frostwire|^org\.qbittorrent|^com\.gianlu\.aria2|^com\.dv\.adm|^idm\.internet|^com\.tachibana\.downloader|^com\.android\.providers\.downloads\.ui|^org\.transdroid|^com\.transmission	DOWN
+^ai\.bonsen\.docscan|^com\.adobe\.scan|^com\.microsoft\.office\.officelens|^com\.google\.android\.apps\.docs\.scanner|^com\.camscanner|^com\.intsig|^com\.simplemobiletools\.scanner|^org\.opencv|^com\.googlecode\.zxing|^com\.google\.zxing|^com\.journeyapps|^me\.dm7\.barcodescanner|^com\.gamma\.scanner|^com\.tapscanner	SCAN
+^com\.rockstargames|^com\.ubisoft|^com\.supercell|^com\.activision|^com\.tencent\.ig|^com\.dts\.freefire|^com\.mojang|^com\.valvesoftware|^com\.epicgames|^com\.king\.|^com\.mihoyo|^com\.garena|^com\.gameloft|^com\.ea\.|^com\.nianticlabs|^com\.roblox|^com\.innersloth|^com\.kiloo|^com\.halfbrick|^com\.miniclip|^com\.zynga|^com\.nintendo|^com\.blizzard|^com\.krafton|^com\.pubg|^jp\.konami|^com\.sega|^com\.squareenix|^com\.netease|^com\.playrix|^com\.outfit7	PAD
+# fitness, health, reading, learning and navigation
+^com\.strava|^com\.fitbit|^com\.garmin|^com\.google\.android\.apps\.fitness|^com\.sec\.android\.app\.shealth|^com\.samsung\.android\.app\.health|^fit\.cure|^com\.myfitnesspal|^com\.nike\.ntc|^com\.healthifyme|^com\.polar|^com\.huawei\.health|^com\.xiaomi\.hm\.health|^com\.oneplus\.health	heart::FFFF8FA3:FFC4184F
+^com\.amazon\.kindle|^org\.readera|^com\.duolingo|^com\.google\.android\.apps\.books|^com\.goodreads|^com\.moonreader|^org\.koreader|^org\.geometerplus|^com\.kobo|^com\.pocketbook|^io\.legado|^com\.wattpad|^com\.coursera|^org\.khanacademy|^com\.byjus|^com\.unacademy|^org\.edx|^com\.udemy|^com\.busuu|^com\.babbel|^com\.memrise|^org\.ankidroid|^com\.ichi2\.anki	book::FF9BC9FF:FF2461C9
+^com\.waze|^net\.osmand|^app\.organicmaps|^com\.mapswithme|^com\.here\.|^org\.openstreetmap|^de\.westnordost\.streetcomplete|^com\.sygic|^com\.mapbox|^ru\.yandex\.yandexmaps|^com\.tomtom|^com\.waze\.	pinmark::FFFF7F7F:FFC4202A
+^com\.jio\.media\.ondemand|^com\.zee5|^com\.balaji|^tv\.hoichoi|^com\.voot|^com\.sonyliv|^com\.hbo|^com\.hbo\.hbonow|^com\.crunchyroll|^com\.funimation|^com\.paramount|^com\.peacocktv|^com\.apple\.atve|^com\.apple\.tv|^com\.discovery|^com\.curiosity|^com\.mubi|^com\.vimeo	play::FF7FC4FF:FF1D5FC4
+^com\.truecaller|^com\.hiya|^com\.callapp|^com\.eyecon	chatphone::FF6FA8FF:FF2147C9
+^org\.fossify\.musicplayer|^org\.fossify\.voicerecorder|^code\.name\.monkey\.retromusic|^com\.kabouzeid\.gramophone|^org\.lineageos\.eleven|^com\.mardous|^com\.poupa\.vinylmusicplayer	headphones::FFFFB35C:FFD9560B

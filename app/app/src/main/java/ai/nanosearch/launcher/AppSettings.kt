@@ -21,6 +21,10 @@ object AppSettings {
     fun sourceEnabled(c: Context, kind: String) = prefs(c).getBoolean("source_$kind", true)
     fun setSourceEnabled(c: Context, kind: String, on: Boolean) = prefs(c).edit().putBoolean("source_$kind", on).apply()
 
+    /** The installed icon pack in use (its package name), or "" for this launcher's own icons. */
+    fun iconPack(c: Context): String = prefs(c).getString("iconPack", "") ?: ""
+    fun setIconPack(c: Context, pkg: String) { prefs(c).edit().putString("iconPack", pkg).apply(); IconPacks.reset() }
+
     /** "system", "light" or "dark". */
     fun themeMode(c: Context) = prefs(c).getString("themeMode", "system") ?: "system"
     fun setThemeMode(c: Context, mode: String) = prefs(c).edit().putString("themeMode", mode).apply()

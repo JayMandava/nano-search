@@ -20,6 +20,7 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -41,7 +42,9 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
@@ -275,8 +278,47 @@ private fun AppearanceCard() {
                     ) { Text(label) }
                 }
             }
+            IconPackRow()
         }
     }
+}
+
+/** Which installed icon pack dresses the app icons: none (this launcher's own), or any pack found on the phone. */
+@Composable
+private fun IconPackRow() {
+    val context = LocalContext.current
+    var chosen by remember { mutableStateOf(AppSettings.iconPack(context)) }
+    var open by remember { mutableStateOf(false) }
+    val packs = remember(open) { if (open) IconPacks.installed(context) else emptyList() }
+    val name = remember(chosen) {
+        if (chosen.isEmpty()) "Built in"
+        else runCatching { context.packageManager.let { it.getApplicationLabel(it.getApplicationInfo(chosen, 0)).toString() } }.getOrDefault("Not installed")
+    }
+    Column(Modifier.fillMaxWidth().clickable { open = true }, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text("Icon pack", style = MaterialTheme.typography.titleSmall)
+        Text(name, style = MaterialTheme.typography.bodyMedium)
+        Text("Dress app icons with an installed icon pack. Apps the pack does not cover keep Nano Search's own icons.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    if (open) AlertDialog(
+        onDismissRequest = { open = false },
+        confirmButton = { TextButton(onClick = { open = false }) { Text("Close") } },
+        title = { Text("Icon pack") },
+        text = {
+            Column {
+                val options = listOf("" to "Built in") + packs.map { it.pkg to it.label }
+                options.forEach { (pkg, label) ->
+                    Row(
+                        Modifier.fillMaxWidth().clickable { chosen = pkg; AppSettings.setIconPack(context, pkg); SettingsTheme.bump(); open = false },
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = chosen == pkg, onClick = null)
+                        Text(label, Modifier.padding(start = 12.dp, top = 12.dp, bottom = 12.dp))
+                    }
+                }
+                if (packs.isEmpty()) Text("No icon packs are installed.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+            }
+        },
+    )
 }
 
 private fun hasPermission(context: Context, p: String?) = p == null || context.checkSelfPermission(p) == PackageManager.PERMISSION_GRANTED

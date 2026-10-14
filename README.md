@@ -21,7 +21,7 @@ answers questions, and listens when you speak. Small language models run entirel
 - **Adapts to the phone:** it detects the CPU core layout and RAM, measures once in the background which core grouping runs the models fastest, and sizes how long models stay loaded to the available memory. Settings > Advanced shows what it chose and lets you override it.
 - **Optional GPU (experimental):** Settings > Advanced can try running the language models on the GPU through Vulkan. It is off by default, only used if an on-device test shows it is faster, and switches itself off if it fails or crashes.
 - **Spirit, the one look:** flat charcoal and white with one blue accent and small rounded corners, in the manner of the physical-keyboard phones of around 2011. A steel dial clock sits on home above a labelled glass dock that runs behind the navigation bar;
-  the search bar, its buttons, menus, cards and tabs are glossy glass with a lit upper half, a bright top edge and a dark border. Icons are original glossy gems (a handset, an envelope, a camera, a calendar page that shows today's date) cut from three restrained metals;
+  the search bar, its buttons, menus, cards and tabs are glossy glass with a lit upper half, a bright top edge and a dark border. Icons are original glossy gems (a handset, an envelope, a camera, a calendar page that shows today's date) cut from three restrained metals, and well-known apps (browsers, chat, mail, social, streaming, office, cloud, payments, shopping, rides, VPNs, password managers, AI assistants, games) each get a drawing of their own, in a colour that suggests them;
   an app without a drawn icon keeps its own picture on a graphite gem tinted by its colour. The Hub is a glass list of cards, and Active Frames are live glass cards: now-playing with controls, a notification's picture and lines, your next events, battery and storage, an app's shortcuts.
   Pair it with [Bold Keys](https://github.com/JayMandava/bold-keys), the matching keyboard.
 - **Steel Dial:** a clock widget drawn by the launcher, also usable as a live wallpaper behind the lock screen, over one of the drawn wallpapers, black, or a photo from your gallery.
@@ -37,6 +37,7 @@ answers questions, and listens when you speak. Small language models run entirel
   using plain rules on the phone. An optional soft tick (and a haptic one) marks opening, dismissing and clearing.
 - **Full screen:** an optional mode that hides the status bar and navigation bar; a swipe from the top or bottom edge brings them back for a moment.
 - **Type to search:** with a hardware keyboard, start typing anywhere on home and the keys go to the search bar.
+- **Icon packs:** any installed icon pack (the format other launchers use) can dress the app icons, chosen in Settings under Appearance; apps a pack does not cover keep the built-in icons.
 - **Settings:** Material 3 Expressive components in Spirit's colours, light, dark or system, and an adaptive icon.
 
 ## Privacy

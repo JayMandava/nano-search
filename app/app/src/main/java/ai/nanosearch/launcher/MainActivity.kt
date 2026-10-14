@@ -164,7 +164,7 @@ class MainActivity : Activity() {
 
     /** Material 3 colours for everything the launcher paints itself; rebuilt if the user changes the theme in Settings. */
     private val pal by lazy { Palette.of(this) }
-    private val themeKey get() = AppSettings.themeMode(this) + AppSettings.hub(this) + AppSettings.dots(this) + AppSettings.frames(this) + AppSettings.fullScreen(this) + resources.configuration.uiMode
+    private val themeKey get() = AppSettings.themeMode(this) + AppSettings.hub(this) + AppSettings.dots(this) + AppSettings.frames(this) + AppSettings.fullScreen(this) + AppSettings.iconPack(this) + resources.configuration.uiMode
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
     /** A flat full-width bar with a hairline along its top edge. */
@@ -1017,6 +1017,7 @@ class MainActivity : Activity() {
 
     /** Apps can be updated while the launcher is not looking (the receiver below only listens on screen), so its cached icons are dropped on every return too. */
     private fun refreshIcons() {
+        IconPacks.reset()
         AppIcons.clear()
         results.clearIcons()
         apps.clearIcons()
