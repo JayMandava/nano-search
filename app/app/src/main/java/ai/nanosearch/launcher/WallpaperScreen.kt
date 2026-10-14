@@ -175,7 +175,7 @@ class WallpaperScreen(
             sameSwitch.isEnabled = true
         }
 
-        addClassicWallpapers(col)
+        addSpiritWallpapers(col)
         col.addView(row(R.drawable.ic_menu_wallpaper, "Choose a photo") { pendingTarget = null; pickPhoto() })
         col.addView(row(R.drawable.ic_menu_wallpaper, "Wallpaper & style") { openSystemApp() })
         col.addView(row(R.drawable.ic_menu_apps, "Live wallpapers") { openLive() })
@@ -188,11 +188,11 @@ class WallpaperScreen(
     }
 
     /** A strip of wallpapers, drawn on the spot at the screen's size. Tap one to crop it and choose where it goes, like a photo. */
-    private fun addClassicWallpapers(col: LinearLayout) {
+    private fun addSpiritWallpapers(col: LinearLayout) {
         col.addView(label("Wallpapers", 14f, pal.onVariant).apply { setPadding(dp(4), 0, 0, dp(8)) })
         val tw = dp(92); val th = (tw * screenH.toFloat() / screenW).toInt()
         val strip = LinearLayout(activity)
-        for (paper in ClassicWallpapers.ALL) {
+        for (paper in SpiritWallpapers.ALL) {
             val img = thumbView().apply { setOnClickListener { useClassic(paper.id) } }
             strip.addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.VERTICAL
@@ -200,7 +200,7 @@ class WallpaperScreen(
                 addView(label(paper.name, 12f, pal.onVariant).apply { gravity = Gravity.CENTER_HORIZONTAL; setPadding(0, dp(4), 0, 0) }, LinearLayout.LayoutParams(tw, -2))
             }, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(10) })
             io.execute {
-                val bmp = runCatching { ClassicWallpapers.render(paper.id, 216, (216 * screenH.toFloat() / screenW).toInt()) }.getOrNull()
+                val bmp = runCatching { SpiritWallpapers.render(paper.id, 216, (216 * screenH.toFloat() / screenW).toInt()) }.getOrNull()
                 activity.runOnUiThread { if (layer != null && bmp != null) img.setImageBitmap(bmp) }
             }
         }
@@ -210,7 +210,7 @@ class WallpaperScreen(
     private fun useClassic(id: String) {
         pendingTarget = null
         io.execute {
-            val bmp = runCatching { ClassicWallpapers.render(id, screenW, screenH) }.onFailure { Log.w(TAG, "cannot draw wallpaper $id: $it") }.getOrNull()
+            val bmp = runCatching { SpiritWallpapers.render(id, screenW, screenH) }.onFailure { Log.w(TAG, "cannot draw wallpaper $id: $it") }.getOrNull()
             activity.runOnUiThread {
                 if (layer == null) return@runOnUiThread
                 if (bmp == null) Toast.makeText(activity, "Couldn't draw that wallpaper", Toast.LENGTH_SHORT).show() else showCrop(bmp)

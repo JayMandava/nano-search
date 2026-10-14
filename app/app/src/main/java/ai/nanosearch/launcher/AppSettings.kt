@@ -25,26 +25,12 @@ object AppSettings {
     fun themeMode(c: Context) = prefs(c).getString("themeMode", "system") ?: "system"
     fun setThemeMode(c: Context, mode: String) = prefs(c).edit().putString("themeMode", mode).apply()
 
-    /** Colours taken from the wallpaper (Material You) when true, the Nano Search violet when false. */
-    fun dynamicColor(c: Context) = prefs(c).getBoolean("dynamicColor", true)
-    fun setDynamicColor(c: Context, on: Boolean) = prefs(c).edit().putBoolean("dynamicColor", on).apply()
-
-    /** "modern" (Material 3 Expressive, the default) or "classic": flat and dark with a blue accent, glossy drawn icons and a Hub. */
-    fun style(c: Context) = prefs(c).getString("style", "modern") ?: "modern"
-    /** Old School: the flat, dark styles. The stored value stays "classic" so existing installs keep their look. */
-    fun isClassic(c: Context) = style(c) == "classic"
-    /** Which Old School era: "spirit" (the default) or "sense". */
-    fun era(c: Context) = prefs(c).getString("era", "spirit") ?: "spirit"
-    fun isSense(c: Context) = isClassic(c) && era(c) == "sense"
-    fun setEra(c: Context, era: String) = prefs(c).edit().putString("era", era).apply()
-    fun setStyle(c: Context, style: String) = prefs(c).edit().putString("style", style).apply()
-
-    // Features that Classic turns on by default but that work in either style. Once the user touches one, their choice wins.
-    private fun feature(c: Context, key: String) = if (prefs(c).contains(key)) prefs(c).getBoolean(key, false) else isClassic(c)
+    // Features Spirit turns on by default. Once the user touches one, their choice wins.
+    private fun feature(c: Context, key: String) = prefs(c).getBoolean(key, true)
     private fun setFeature(c: Context, key: String, on: Boolean) = prefs(c).edit().putBoolean(key, on).apply()
 
     /** The Hub: one list for messages, missed calls, events and notifications. */
-    fun hub(c: Context) = !isSense(c) && feature(c, "hub") // Sense has no Hub
+    fun hub(c: Context) = feature(c, "hub")
     fun setHub(c: Context, on: Boolean) = setFeature(c, "hub", on)
 
     /** A small dot or count on an app's icon while it has notifications. */
@@ -52,12 +38,8 @@ object AppSettings {
     fun setDots(c: Context, on: Boolean) = setFeature(c, "dots", on)
 
     /** Active Frames: the apps you used last, as live tiles on the first home page. */
-    fun frames(c: Context) = !isSense(c) && feature(c, "frames") // nor Active Frames
+    fun frames(c: Context) = feature(c, "frames")
     fun setFrames(c: Context, on: Boolean) = setFeature(c, "frames", on)
-
-    /** Sense: a small tick when the ring is grabbed, when it passes the point where letting go finishes the move, and when an app is dropped on it. On by default. */
-    fun ringHaptics(c: Context) = prefs(c).getBoolean("ringHaptics", true)
-    fun setRingHaptics(c: Context, on: Boolean) = prefs(c).edit().putBoolean("ringHaptics", on).apply()
 
     /** Full screen: the status bar and navigation bar are hidden and slide in when you swipe from the top or bottom edge. */
     fun fullScreen(c: Context) = prefs(c).getBoolean("fullScreen", false)

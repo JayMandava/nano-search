@@ -76,7 +76,7 @@ class HubScreen(
     private fun round(color: Int, radius: Int) = GradientDrawable().apply { setColor(color); cornerRadius = dp(pal.radius(radius)).toFloat() }
 
     /** Spirit gives the Hub glass: a glossy header bar, glass filter pills and card rows. */
-    private val spirit = pal.classic && !pal.sense
+    private val spirit = true
     private fun glass(radiusDp: Float, look: ai.nanosearch.launcher.ui.SpiritGlass.Look = ai.nanosearch.launcher.ui.SpiritGlass.Look.DARK): android.graphics.drawable.Drawable =
         ai.nanosearch.launcher.ui.SpiritGlass(activity, radiusDp, look, pal.primary)
 

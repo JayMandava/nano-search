@@ -30,7 +30,7 @@ class FramesPage(
     private val pm = activity.packageManager
 
     /** Spirit: each frame is a glass card with a header bar, a shadow and a bevelled edge. */
-    private val spirit = pal.classic && !pal.sense
+    private val spirit = true
 
     private val column = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(12), dp(4), dp(12), dp(24)); clipChildren = false; clipToPadding = false }
     val scroll = ScrollView(activity).apply { isVerticalScrollBarEnabled = false; clipChildren = false; clipToPadding = false; addView(column) }
@@ -250,7 +250,7 @@ class FramesPage(
     private fun tile(f: Frame): View {
         val box = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            background = round(pal.card, 12).also { if (pal.classic) it.setStroke(dp(1), pal.outline) }
+            background = round(pal.card, 12).also { it.setStroke(dp(1), pal.outline) }
             setPadding(dp(12), dp(10), dp(12), dp(8))
             setOnClickListener { launch(f.cn, it) }
             setOnLongClickListener { menu(f.cn, it); true }

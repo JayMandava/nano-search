@@ -3,7 +3,6 @@
 package ai.nanosearch.launcher.ui
 
 import ai.nanosearch.launcher.AppSettings
-import android.os.Build
 import android.content.Context
 import android.content.res.Configuration
 import androidx.compose.material3.ColorScheme
@@ -16,20 +15,14 @@ import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
-private val Violet = Color(0xFF6B4EE6)
-private val LightColors = lightColorScheme(primary = Violet, secondary = Color(0xFF5E5C71), tertiary = Color(0xFF00897B))
-private val DarkColors = darkColorScheme(primary = Color(0xFFCBBEFF), secondary = Color(0xFFC9C3DC), tertiary = Color(0xFF6FD9C8))
-
-// Classic: charcoal and white, one blue accent, no tint from the wallpaper.
+// Spirit: charcoal and white, one blue accent, no tint from the wallpaper.
 private val Blue = Color(0xFF00A3E0)
-private val ClassicDark = darkColorScheme(
+private val SpiritDark = darkColorScheme(
     primary = Blue, onPrimary = Color.White, primaryContainer = Color(0xFF0B3D55), onPrimaryContainer = Color(0xFFBFE8FA),
     secondary = Color(0xFF9FB0BA), onSecondary = Color(0xFF10181C), secondaryContainer = Color(0xFF2A3338), onSecondaryContainer = Color(0xFFDDE6EA),
     tertiary = Color(0xFF7BC96F), onTertiary = Color(0xFF0C1A0A), tertiaryContainer = Color(0xFF26391F), onTertiaryContainer = Color(0xFFD3F0CB),
@@ -38,7 +31,7 @@ private val ClassicDark = darkColorScheme(
     surfaceContainerLowest = Color(0xFF0D0E0F), surfaceContainerLow = Color(0xFF171819), surfaceContainer = Color(0xFF1C1E1F),
     surfaceContainerHigh = Color(0xFF232627), surfaceContainerHighest = Color(0xFF2C3032),
 )
-private val ClassicLight = lightColorScheme(
+private val SpiritLight = lightColorScheme(
     primary = Color(0xFF0088BF), onPrimary = Color.White, primaryContainer = Color(0xFFD3EEFA), onPrimaryContainer = Color(0xFF063447),
     secondary = Color(0xFF55646D), onSecondary = Color.White, secondaryContainer = Color(0xFFE3E9EC), onSecondaryContainer = Color(0xFF1B262C),
     tertiary = Color(0xFF3E8E35), onTertiary = Color.White, tertiaryContainer = Color(0xFFD9F0D5), onTertiaryContainer = Color(0xFF0B2A07),
@@ -48,16 +41,6 @@ private val ClassicLight = lightColorScheme(
     surfaceContainerHigh = Color(0xFFE5E8E9), surfaceContainerHighest = Color(0xFFDFE2E4),
 )
 
-// Sense: graphite and silver, a fresh green accent.
-private val Green = Color(0xFF8CC63F)
-private val SenseDark = ClassicDark.copy(
-    primary = Green, onPrimary = Color(0xFF0E1A04), primaryContainer = Color(0xFF2B4012), onPrimaryContainer = Color(0xFFDDF3BD),
-    background = Color(0xFF0F1011), surface = Color(0xFF131415), surfaceContainerHigh = Color(0xFF212325), surfaceContainerHighest = Color(0xFF2A2D2F),
-)
-private val SenseLight = ClassicLight.copy(
-    primary = Color(0xFF5E9A1F), primaryContainer = Color(0xFFE0F2C8), onPrimaryContainer = Color(0xFF1B2E05),
-)
-
 /** True when the user chose dark, or chose "system" and the system is dark. */
 fun isDark(context: Context): Boolean = when (AppSettings.themeMode(context)) {
     "light" -> false
@@ -65,20 +48,11 @@ fun isDark(context: Context): Boolean = when (AppSettings.themeMode(context)) {
     else -> (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
 }
 
-/** The colours for the user's choices: wallpaper colours (Material You) or the Nano Search violet, light or dark. */
-fun nanoColorScheme(context: Context): ColorScheme {
-    val dark = isDark(context)
-    return when {
-        AppSettings.isSense(context) -> if (dark) SenseDark else SenseLight
-        AppSettings.isClassic(context) -> if (dark) ClassicDark else ClassicLight
-        AppSettings.dynamicColor(context) && Build.VERSION.SDK_INT >= 31 -> if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        dark -> DarkColors
-        else -> LightColors
-    }
-}
+/** The colours: Spirit's, light or dark. */
+fun nanoColorScheme(context: Context): ColorScheme = if (isDark(context)) SpiritDark else SpiritLight
 
-/** Classic text: Source Sans 3 at each weight. */
-private fun classicTypography(context: Context): Typography {
+/** Spirit text: Source Sans 3 at each weight. */
+private fun spiritTypography(context: Context): Typography {
     fun f(w: Int) = Font("SourceSans3.ttf", context.assets, FontWeight(w), variationSettings = FontVariation.Settings(FontVariation.weight(w)))
     val family = FontFamily(f(300), f(400), f(500), f(600), f(700))
     val base = Typography()
@@ -92,13 +66,9 @@ private fun classicTypography(context: Context): Typography {
     )
 }
 
-/** Material 3 Expressive: springy motion, colours from the wallpaper (or the Nano Search violet), light, dark or system. In Classic, flat colours and its own typeface. */
+/** Spirit's colours and typeface, with Material 3 Expressive's springy motion. */
 @Composable
 fun NanoTheme(content: @Composable () -> Unit) {
     val context = LocalContext.current
-    if (AppSettings.isClassic(context)) {
-        MaterialExpressiveTheme(colorScheme = nanoColorScheme(context), typography = classicTypography(context), motionScheme = MotionScheme.expressive(), content = content)
-    } else {
-        MaterialExpressiveTheme(colorScheme = nanoColorScheme(context), motionScheme = MotionScheme.expressive(), content = content)
-    }
+    MaterialExpressiveTheme(colorScheme = nanoColorScheme(context), typography = spiritTypography(context), motionScheme = MotionScheme.expressive(), content = content)
 }

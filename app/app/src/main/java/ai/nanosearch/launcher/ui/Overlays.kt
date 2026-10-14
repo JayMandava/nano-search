@@ -90,7 +90,7 @@ class Overlays(private val activity: Activity, private val host: FrameLayout, pr
         layer.addView(scrim, FrameLayout.LayoutParams(-1, -1))
         scrim.animate().alpha(1f).setDuration(200).start()
 
-        val spirit = pal.classic && !pal.sense
+        val spirit = true
         val card = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             elevation = dpf(if (spirit) 10 else 6)
@@ -138,14 +138,14 @@ class Overlays(private val activity: Activity, private val host: FrameLayout, pr
     }
 
     private fun cornerRadii(i: Int, n: Int, outer: Int, inner: Int): FloatArray {
-        if (n == 1) return FloatArray(8) { dpf(if (pal.classic) pal.radius(28) else 100) } // a lone row is a full pill
+        if (n == 1) return FloatArray(8) { dpf(pal.radius(28)) } // a lone row is a full pill
         val top = if (i == 0) dpf(pal.radius(outer)) else dpf(pal.radius(inner))
         val bottom = if (i == n - 1) dpf(pal.radius(outer)) else dpf(pal.radius(inner))
         return floatArrayOf(top, top, top, top, bottom, bottom, bottom, bottom)
     }
 
     private fun menuRow(item: MenuItem, radii: FloatArray): View {
-        val spirit = pal.classic && !pal.sense
+        val spirit = true
         val ink = if (item.destructive) pal.error else pal.onSurface
         val bg = GradientDrawable().apply { setColor(if (spirit) Color.TRANSPARENT else pal.card); cornerRadii = if (spirit) FloatArray(8) else radii }
         val mask = GradientDrawable().apply { setColor(Color.WHITE); cornerRadii = radii }

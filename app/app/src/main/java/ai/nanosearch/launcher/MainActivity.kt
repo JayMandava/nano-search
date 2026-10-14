@@ -60,7 +60,6 @@ import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.ProgressBar
 import android.widget.ScrollView
-import android.widget.TextClock
 import android.widget.TextView
 import android.widget.Toast
 import androidx.viewpager.widget.PagerAdapter
@@ -94,11 +93,7 @@ class MainActivity : Activity() {
     /** Active Frames, when on, is a page of its own to the left of the home pages; everything that counts pages allows for it. */
     private val pageOffset get() = if (framesPage != null) 1 else 0
     private var pageLabel: TextView? = null
-    private var senseTitle: TextView? = null
-    private var senseHeader: View? = null
-    private var senseTabs: ai.nanosearch.launcher.ui.SenseTabBar? = null
-    private var senseSearchOpen = false
-    private var drawerTab = "all" // Classic: "all", "recent" or "fav"
+    private var drawerTab = "all" // "all", "recent" or "fav"
     private var tabViews: Map<String, TextView> = emptyMap()
     private lateinit var drawerEmpty: TextView
     private val widgetHost by lazy { AppWidgetHost(this, HomeWidgets.HOST_ID) }
@@ -110,7 +105,6 @@ class MainActivity : Activity() {
     // search
     private lateinit var input: EditText
     private lateinit var mic: ImageView
-    private lateinit var clockBlock: LinearLayout
     private lateinit var resultsPanel: LinearLayout
     private lateinit var list: ListView
     private lateinit var divider: View
@@ -170,25 +164,20 @@ class MainActivity : Activity() {
 
     /** Material 3 colours for everything the launcher paints itself; rebuilt if the user changes the theme in Settings. */
     private val pal by lazy { Palette.of(this) }
-    private val themeKey get() = AppSettings.themeMode(this) + AppSettings.dynamicColor(this) + AppSettings.style(this) + AppSettings.era(this) + AppSettings.hub(this) + AppSettings.dots(this) + AppSettings.frames(this) + AppSettings.fullScreen(this) + resources.configuration.uiMode
+    private val themeKey get() = AppSettings.themeMode(this) + AppSettings.hub(this) + AppSettings.dots(this) + AppSettings.frames(this) + AppSettings.fullScreen(this) + resources.configuration.uiMode
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
-    /** A flat full-width bar with a hairline along its top edge (the Classic dock). */
+    /** A flat full-width bar with a hairline along its top edge. */
     private fun flatBar(fill: Int, line: Int): Drawable =
         android.graphics.drawable.LayerDrawable(arrayOf(android.graphics.drawable.ColorDrawable(fill), android.graphics.drawable.ColorDrawable(line))).apply {
             setLayerHeight(1, dp(1)); setLayerGravity(1, Gravity.TOP)
         }
 
     private var navBottom = 0
-    /** Classic: the dock bar runs down behind the navigation bar, so it carries the bar's height as padding instead of the home layer. */
+    /** The dock bar runs down behind the navigation bar, so it carries the bar's height as padding instead of the home layer. */
     private fun applyDockPadding() {
         if (!::dockRow.isInitialized) return
-        if (pal.sense) { // the arch runs down behind the navigation bar; the apps sit in the bar below its top edge
-            dockRow.setPadding(dp(18), dp(84), dp(18), navBottom) // 60 dp for the ring above the arch, then the arch's 24
-            dockRow.layoutParams = (dockRow.layoutParams as LinearLayout.LayoutParams).apply { height = dp(148) + navBottom }
-            return
-        }
-        dockRow.setPadding(dp(8), dp(if (pal.classic) 8 else 10), dp(8), dp(if (pal.classic) 6 else 10) + if (pal.classic) navBottom else 0)
+        dockRow.setPadding(dp(8), dp(8), dp(8), dp(6) + navBottom)
     }
 
     private fun round(color: Int, radiusDp: Int) = GradientDrawable().apply {
@@ -196,24 +185,13 @@ class MainActivity : Activity() {
         cornerRadius = dp(pal.radius(radiusDp)).toFloat()
     }
 
-    /** Sense: smoked glass with a crisp sheen across its upper half and a bright rim. */
-    private fun senseGlass(radiusDp: Int): Drawable = ai.nanosearch.launcher.ui.SenseGloss(this, radiusDp)
-
-    /** The search bar and its buttons: Sense glass, a flat outlined bar in Spirit, a soft rounded one in Modern. */
-    private fun barBg(radiusDp: Int): Drawable = if (pal.sense) senseGlass(9) else if (pal.classic) spiritGlass(9f) else round(pal.bar, radiusDp)
+    /** The search bar and its buttons: glass. */
+    private fun barBg(@Suppress("UNUSED_PARAMETER") radiusDp: Int): Drawable = spiritGlass(9f)
 
     /** Spirit: glossy glass with a lit upper half, a bright top edge and a dark border; with an elevation it casts a soft shadow. */
     private fun spiritGlass(radiusDp: Float, look: ai.nanosearch.launcher.ui.SpiritGlass.Look = ai.nanosearch.launcher.ui.SpiritGlass.Look.DARK, accent: Int = pal.primary, opacity: Float = 1f, topOnly: Boolean = false): Drawable =
         ai.nanosearch.launcher.ui.SpiritGlass(this, radiusDp, look, accent, opacity, topOnly)
 
-    /** A glossy dark band with a bright edge along its top (the tab bar of the Sense drawer). */
-    private fun senseDock(): Drawable = android.graphics.drawable.LayerDrawable(arrayOf(
-        GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0xF5404549.toInt(), 0xFA1A1C1F.toInt(), 0xFF0A0B0C.toInt())),
-        android.graphics.drawable.ColorDrawable(0x88E3E8EC.toInt()),
-    )).apply { setLayerHeight(1, dp(1)); setLayerGravity(1, Gravity.TOP) }
-
-    /** The thin text clock at the top of home, in Modern. Spirit and Sense start with a clock widget instead, which is resized or removed like any widget. */
-    private val clockKey get() = "showClock"
 
     // ---------------------------------------------------------------- setup
 
@@ -256,9 +234,9 @@ class MainActivity : Activity() {
                 val barSpace = dp(BAR_SPACE_DP)
                 searchLayer.setPadding(bars.left, sys.top, bars.right, bars.bottom)
                 navBottom = sys.bottom
-                home.setPadding(bars.left, sys.top + barSpace, bars.right, if (pal.classic) 0 else sys.bottom)
+                home.setPadding(bars.left, sys.top + barSpace, bars.right, 0)
                 applyDockPadding()
-                drawer.setPadding(bars.left, if (pal.sense) sys.top else sys.top + barSpace, bars.right, bars.bottom)
+                drawer.setPadding(bars.left, sys.top + barSpace, bars.right, bars.bottom)
                 insets
             }
         }
@@ -274,7 +252,6 @@ class MainActivity : Activity() {
         i.getStringExtra("fakenote")?.let { i.removeExtra("fakenote"); val p = it.split('|'); if (p.size >= 3) HubStore.debugInject(p[0], p[1], p[2]) }
         if (i.hasExtra("hub")) { i.removeExtra("hub"); ui.postDelayed({ openHub() }, 600) }
         i.getStringExtra("fullscreen")?.let { i.removeExtra("fullscreen"); AppSettings.setFullScreen(this, it == "on"); recreate() }
-        i.getStringExtra("style")?.let { i.removeExtra("style"); AppSettings.setStyle(this, it); recreate() }
         if (i.hasExtra("bench")) { i.removeExtra("bench"); runBench() }
         if (i.hasExtra("tune")) { i.removeExtra("tune"); CpuTuner.run(this, force = true, dryRunWith = CpuPlan.candidates + CpuPlan.Plan((1L shl CpuPlan.coreCount) - 1, 6, "all cores, 6 threads", "all")) }
         if (i.hasExtra("askbench")) { i.removeExtra("askbench"); runAskBench() }
@@ -432,21 +409,21 @@ class MainActivity : Activity() {
         divider = View(this).apply { setBackgroundColor(pal.outline); visibility = View.GONE }
         resultsPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            if (pal.classic && !pal.sense) background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0xFF1E2125.toInt(), 0xFF101113.toInt())) else setBackgroundColor(pal.panel)
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0xFF1E2125.toInt(), 0xFF101113.toInt()))
             visibility = View.GONE
             isClickable = true // swallow touches so nothing underneath reacts
             addView(card, LinearLayout.LayoutParams(-1, -2).apply { setMargins(dp(12), dp(8), dp(12), 0) })
             addView(divider, LinearLayout.LayoutParams(-1, dp(1)).apply { setMargins(dp(20), dp(12), dp(20), dp(4)) })
             addView(list, LinearLayout.LayoutParams(-1, 0, 1f))
         }
-        if (pal.classic) { // raised glass: the strip and its buttons cast a soft shadow
+        run { // raised glass: the strip and its buttons cast a soft shadow
             bar.clipChildren = false
             input.elevation = dp(6).toFloat(); mic.elevation = dp(6).toFloat()
             (hubButton?.parent as? View)?.elevation = dp(6).toFloat()
         }
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            if (pal.classic) clipChildren = false
+            clipChildren = false
             addView(bar, LinearLayout.LayoutParams(-1, -2).apply { setMargins(dp(16), dp(10), dp(16), dp(6)) })
             addView(resultsPanel, LinearLayout.LayoutParams(-1, 0, 1f))
         }
@@ -507,42 +484,17 @@ class MainActivity : Activity() {
     // ---- home
 
     private fun buildHome(): DragLayout = DragLayout(this, up = true).apply {
-        if (pal.sense) clipChildren = false
-        val clock = TextClock(this@MainActivity).apply {
-            format12Hour = "h:mm"
-            format24Hour = "HH:mm"
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 76f)
-            typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
-            setTextColor(Color.WHITE)
-            setShadowLayer(8f, 0f, 2f, 0x66000000)
-        }
-        val date = TextClock(this@MainActivity).apply {
-            format12Hour = "EEEE, d MMMM"
-            format24Hour = "EEEE, d MMMM"
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-            setTextColor(0xEEFFFFFF.toInt())
-            setShadowLayer(6f, 0f, 1f, 0x66000000)
-        }
         dockRow = LinearLayout(this@MainActivity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            background = if (pal.sense) ai.nanosearch.launcher.ui.SenseArch(this@MainActivity, dp(60).toFloat()) else if (pal.classic) spiritGlass(12f, ai.nanosearch.launcher.ui.SpiritGlass.Look.DOCK, topOnly = true) else round(pal.dock, 36)
-            if (pal.sense) { clipChildren = false; clipToPadding = false } // the ring stands up out of the panel
-            if (pal.classic && !pal.sense) elevation = dp(10).toFloat() // the dock stands proud of the wallpaper, with a shadow above it
-            setPadding(dp(8), dp(if (pal.classic) 8 else 10), dp(8), dp(if (pal.classic) 6 else 10))
+            background = spiritGlass(12f, ai.nanosearch.launcher.ui.SpiritGlass.Look.DOCK, topOnly = true)
+            elevation = dp(10).toFloat() // the dock stands proud of the wallpaper, with a shadow above it
+            setPadding(dp(8), dp(8), dp(8), dp(6))
         }
         pager = ViewPager(this@MainActivity).apply {
             setPageTransformer(false) { page, pos ->
                 val a = kotlin.math.min(kotlin.math.abs(pos), 1f)
-                if (pal.sense) {
-                    // Sense's carousel: the pages swing round a vertical edge as they pass
-                    page.cameraDistance = 14000f * resources.displayMetrics.density
-                    page.pivotX = if (pos < 0) page.width.toFloat() else 0f
-                    page.pivotY = page.height / 2f
-                    page.rotationY = -pos.coerceIn(-1f, 1f) * 32f
-                    page.scaleX = 1f - a * 0.1f; page.scaleY = 1f - a * 0.1f
-                    page.alpha = 1f - a * 0.65f
-                } else page.alpha = 1f - a * 0.5f
+                page.alpha = 1f - a * 0.5f
             }
             val vp = this
             addOnPageChangeListener(object : ViewPager.SimpleOnPageChangeListener() {
@@ -558,32 +510,20 @@ class MainActivity : Activity() {
                 }
             })
         }
-        dots = PageDots(this@MainActivity, Color.WHITE, arc = pal.sense, accent = pal.primary).apply { if (pal.sense) setOnClickListener { leap() } }
-        clockBlock = LinearLayout(this@MainActivity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(28), dp(4), dp(28), dp(8))
-            if (!pal.classic) { addView(clock); addView(date) }
-            visibility = if (!pal.classic && prefs.getBoolean(clockKey, true)) View.VISIBLE else View.GONE
-            var lx = 0f; var ly = 0f
-            setOnTouchListener { _, e -> if (e.actionMasked == android.view.MotionEvent.ACTION_DOWN) { lx = e.rawX; ly = e.rawY }; false }
-            setOnLongClickListener {
-                overlays.popup(lx, ly, ly, listOf(listOf(MenuItem(R.drawable.ic_menu_remove, "Remove clock") { setClockShown(false) })))
-                true
-            }
-        }
+        dots = PageDots(this@MainActivity, Color.WHITE, accent = pal.primary)
         homeContent = LinearLayout(this@MainActivity).apply {
             orientation = LinearLayout.VERTICAL
-            if (pal.classic) clipChildren = false // the ring (Sense) and the dock's shadow (Spirit) reach out of the dock
+            clipChildren = false // the dock's shadow reaches out of the dock
             addView(pager, LinearLayout.LayoutParams(-1, 0, 1f))
-            if (pal.classic && !pal.sense) {
+            run {
                 pageLabel = NText(this@MainActivity).apply { textSize = 12f; setTextColor(pal.onVariant); gravity = Gravity.CENTER; setShadowLayer(6f, 0f, 1f, 0x99000000.toInt()); letterSpacing = 0.06f }
                 addView(pageLabel, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.CENTER_HORIZONTAL })
             }
-            addView(dots, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.CENTER_HORIZONTAL; if (pal.sense) bottomMargin = dp(4) })
-            // swipe-up handle (Sense has the ring instead)
-            if (!pal.sense) addView(View(this@MainActivity).apply { background = round(0x99FFFFFF.toInt(), 2) },
+            addView(dots, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.CENTER_HORIZONTAL })
+            // the swipe-up handle
+            addView(View(this@MainActivity).apply { background = round(0x99FFFFFF.toInt(), 2) },
                 LinearLayout.LayoutParams(dp(36), dp(4)).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(2); bottomMargin = dp(12) })
-            addView(dockRow, LinearLayout.LayoutParams(-1, if (pal.sense) dp(148) else -2).apply { if (pal.sense) setMargins(0, 0, 0, 0) else if (pal.classic) setMargins(0, 0, 0, 0) else setMargins(dp(16), 0, dp(16), dp(16)) })
+            addView(dockRow, LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, 0) })
         }
         addView(homeContent, FrameLayout.LayoutParams(-1, -1))
         rebuildDock()
@@ -597,7 +537,7 @@ class MainActivity : Activity() {
         setOnClickListener { if (input.hasFocus()) { hideKeyboard(); input.clearFocus() } }
 
         // Swipe up opens the drawer, unless the page's content can still scroll that way.
-        canStart = { !pal.sense && !activeScroll().canScrollVertically(1) } // Sense: only the ring opens the drawer
+        canStart = { !activeScroll().canScrollVertically(1) }
         onDrag = { dy -> drawer.visibility = View.VISIBLE; drawer.translationY = (screenH - dy).coerceIn(0f, screenH); applyDrawerProgress() }
         onRelease = { vy, dragged ->
             if (dragged) {
@@ -679,7 +619,7 @@ class MainActivity : Activity() {
 
     private val notificationsChanged: () -> Unit = {
         val sig = dockSignature()
-        if (sig != lastDockSignature && ringGhost == null) rebuildDock()
+        if (sig != lastDockSignature) rebuildDock()
         apps.notifyDataSetChanged()
         framesPage?.refresh()
         updateHubBadge()
@@ -725,21 +665,16 @@ class MainActivity : Activity() {
 
     private fun pageIds(): List<String> = prefs.getString("pages", "0")!!.split(',').filter { it.isNotBlank() }.ifEmpty { listOf("0") }
 
-    /** (Re)builds every page from what is saved. The clock rides at the top of whichever page is first. */
+    /** (Re)builds every page from what is saved. */
     private fun buildPages(showIndex: Int) {
-        (clockBlock.parent as? ViewGroup)?.removeView(clockBlock)
         pages = pageIds().mapIndexed { index, id ->
             HomePage(this, id, widgetHost, overlays, pal,
                 onEmptyLongPress = { x, y -> showHomeMenu(x, y) },
                 launch = { cn, v -> launchComponent(cn, v) },
                 appInfo = { cn -> showAppInfo(cn.packageName) },
             ).also { page ->
-                // Spirit and Sense each start with their own clock on the first page (a widget to resize or remove like any other); another style's default clock is taken off
-                if (index == 0) {
-                    if (pal.sense) { page.widgets.dropDefault("seeded_steel"); page.widgets.seedDefault("seeded_flip", "flipclock", 232) }
-                    else if (pal.classic) { page.widgets.dropDefault("seeded_flip"); page.widgets.seedDefault("seeded_steel", "steeldial", 270) }
-                    else { page.widgets.dropDefault("seeded_flip"); page.widgets.dropDefault("seeded_steel") }
-                }
+                // Spirit starts with its steel dial on the first page (a widget to resize or remove like any other)
+                if (index == 0) page.widgets.seedDefault("seeded_steel", "steeldial", 270)
                 page.restore()
             }
         }
@@ -749,7 +684,6 @@ class MainActivity : Activity() {
                 MenuItem(R.drawable.ic_menu_remove, "Remove from frames") { AppUsage.forget(this, cn.flattenToString()); framesPage?.refresh() },
             )))
         }).also { it.refresh() } else null
-        pages.first().root.addView(clockBlock, 0, LinearLayout.LayoutParams(-1, -2))
         val offset = pageOffset
         pager.adapter = object : PagerAdapter() {
             override fun getCount() = pages.size + offset
@@ -812,9 +746,8 @@ class MainActivity : Activity() {
         Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA),
     )
 
-    /** Sense keeps its own dock: just two apps, one each side of the ring. */
-    private val dockSlots get() = if (pal.sense) 2 else DOCK_SLOTS
-    private val dockKey get() = if (pal.sense) "dock_sense" else "dock"
+    private val dockSlots get() = DOCK_SLOTS
+    private val dockKey get() = "dock"
 
     private fun dockSaved(): MutableList<String> {
         val saved = prefs.getString(dockKey, "")!!.split(';').toMutableList()
@@ -830,7 +763,7 @@ class MainActivity : Activity() {
         if (custom != null && runCatching { packageManager.getActivityInfo(custom, 0) }.isSuccess) {
             return DockEntry(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(custom), AppIcons.get(this, custom), custom, packageManager.getActivityInfo(custom, 0).loadLabel(packageManager).toString())
         }
-        val i = defaultDock[if (pal.sense) listOf(0, 3)[slot] else slot] // Sense: the phone on the left, the camera on the right
+        val i = defaultDock[slot]
         val ri = packageManager.resolveActivity(i, PackageManager.MATCH_DEFAULT_ONLY) ?: return null
         val cn = ri.activityInfo?.let { ComponentName(it.packageName, it.name) }
         return DockEntry(i, if (cn != null) AppIcons.get(this, cn) else ri.loadIcon(packageManager), cn, ri.loadLabel(packageManager).toString())
@@ -842,13 +775,11 @@ class MainActivity : Activity() {
         dockRow.removeAllViews()
         val saved = dockSaved()
         for (slot in 0 until dockSlots) {
-            // Sense: the ring sits in the middle of the dock; tap it or pull it up for the apps
-            if (pal.sense && slot == dockSlots / 2) dockRow.addView(ai.nanosearch.launcher.ui.SenseRing(this, -dp(50).toFloat(), ringListener).also { senseRing = it }.apply { contentDescription = "All apps (pull up)" }, LinearLayout.LayoutParams(dp(132), dp(132)))
             if (saved[slot] == DOCK_EMPTY) { dockRow.addView(emptyDockSlot(slot), LinearLayout.LayoutParams(0, dp(56), 1f)); continue }
             val entry = dockEntry(slot, saved[slot]) ?: continue
             val show = dockCell(entry.icon, entry.label, entry.component?.packageName)
             show.apply {
-                if (!pal.sense) pressScale()
+                pressScale()
                 setOnClickListener { v -> entry.component?.let { AppUsage.note(this@MainActivity, it.flattenToString()) }; launchIntent(entry.launch, v) }
                 setOnLongClickListener { v ->
                     val pkg = entry.component?.packageName
@@ -860,27 +791,23 @@ class MainActivity : Activity() {
                     true
                 }
             }
-            // Sense: hold the app and drag it onto the ring to open it, as on the original
-            if (pal.sense) senseDragToRing(show) { ring -> entry.component?.let { AppUsage.note(this@MainActivity, it.flattenToString()) }; launchIntent(entry.launch, ring) }
-            dockRow.addView(show, LinearLayout.LayoutParams(0, dp(if (pal.sense) 58 else if (pal.classic) 66 else 56), 1f))
+            dockRow.addView(show, LinearLayout.LayoutParams(0, dp(66), 1f))
         }
     }
 
-    /** A dock icon: just the picture in Modern, the picture with its name underneath in Classic. */
+    /** A dock icon: the picture with its name underneath. */
     private fun dockCell(icon: Drawable, label: String, pkg: String?): View {
         val content = dockContent(icon, label)
         val count = dotCount(pkg)
         if (count == 0) return content
         return FrameLayout(this).apply {
             addView(content, FrameLayout.LayoutParams(-1, -1))
-            addView(badgeView(count), FrameLayout.LayoutParams(-2, dp(18), Gravity.TOP or Gravity.END).apply { topMargin = dp(if (pal.classic) 2 else 0); marginEnd = dp(if (pal.classic) 12 else 6) })
+            addView(badgeView(count), FrameLayout.LayoutParams(-2, dp(18), Gravity.TOP or Gravity.END).apply { topMargin = dp(2); marginEnd = dp(12) })
         }
     }
 
     private fun dockContent(icon: Drawable, label: String): View =
-        if (pal.sense) ImageView(this).apply { setImageDrawable(icon) } // no names and no tile on the Sense dock
-        else if (!pal.classic) ImageView(this).apply { setImageDrawable(icon) }
-        else LinearLayout(this).apply {
+        LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             addView(ImageView(context).apply { setImageDrawable(icon) }, LinearLayout.LayoutParams(dp(42), dp(42)))
@@ -921,11 +848,6 @@ class MainActivity : Activity() {
         overlays.appPicker(title, apps) { onPick(it.key) }
     }
 
-    private fun setClockShown(shown: Boolean) {
-        prefs.edit().putBoolean(clockKey, shown).apply()
-        clockBlock.visibility = if (shown) View.VISIBLE else View.GONE
-    }
-
     private fun openSettings() = startActivity(Intent(this, SettingsActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
 
     private fun showAppInfo(pkg: String) {
@@ -934,19 +856,16 @@ class MainActivity : Activity() {
 
     /** The menu for long-pressing empty home space, in the order Android's own launchers use. */
     private fun showHomeMenu(x: Float, y: Float) {
-        val clockShown = clockBlock.visibility == View.VISIBLE
         val groups = mutableListOf(
             listOf(
                 MenuItem(R.drawable.ic_menu_wallpaper, "Wallpaper & style") { changeWallpaper() },
                 MenuItem(R.drawable.ic_menu_widgets, "Widgets") { currentPage().widgets.pick() },
                 MenuItem(R.drawable.ic_menu_apps, "Apps list") { openDrawer() },
-                *(if (pal.sense) arrayOf(MenuItem(R.drawable.ic_menu_page_add, "Leap view") { leap() }) else emptyArray()),
                 *(if (AppSettings.hub(this)) arrayOf(MenuItem(R.drawable.ic_hub, "Hub") { openHub() }) else emptyArray()),
-                *(if (!pal.classic) arrayOf(MenuItem(R.drawable.ic_menu_clock, if (clockShown) "Remove clock" else "Add clock") { setClockShown(!clockShown) }) else emptyArray()),
             ),
             buildList {
                 if (pages.size < MAX_PAGES) add(MenuItem(R.drawable.ic_menu_page_add, "Add page") { addPage() })
-                if (pal.classic && pager.currentItem >= pageOffset) add(MenuItem(R.drawable.ic_menu_wallpaper, "Name this page") { renamePage() })
+                if (pager.currentItem >= pageOffset) add(MenuItem(R.drawable.ic_menu_wallpaper, "Name this page") { renamePage() })
                 if (pages.size > 1 && pager.currentItem >= pageOffset) add(MenuItem(R.drawable.ic_menu_delete, "Remove this page", destructive = true) { removeCurrentPage() })
             },
             listOf(
@@ -990,12 +909,12 @@ class MainActivity : Activity() {
         grid = GridView(this@MainActivity).apply {
             numColumns = 4
             adapter = apps
-            verticalSpacing = dp(if (pal.classic) 10 else 14)
-            if (pal.classic) horizontalSpacing = dp(10)
+            verticalSpacing = dp(10)
+            horizontalSpacing = dp(10)
             stretchMode = GridView.STRETCH_COLUMN_WIDTH
             selector = android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)
             clipToPadding = false
-            setPadding(dp(if (pal.classic) 12 else 8), dp(8), dp(if (pal.classic) 12 else 8), dp(24))
+            setPadding(dp(12), dp(8), dp(12), dp(24))
             setOnItemClickListener { _, view, position, _ -> open(apps.getItem(position), view) }
             setOnItemLongClickListener { _, view, position, _ -> appMenu(apps.getItem(position), view); true }
         }
@@ -1013,43 +932,8 @@ class MainActivity : Activity() {
         addView(banner, FrameLayout.LayoutParams(-1, dp(38), Gravity.TOP).apply { setMargins(dp(16), dp(4), dp(16), 0) })
         drawerEmpty = NText(this@MainActivity).apply { textSize = 15f; setTextColor(pal.onVariant); gravity = Gravity.CENTER; visibility = View.GONE }
         addView(drawerEmpty, FrameLayout.LayoutParams(-1, -2, Gravity.CENTER))
-        if (pal.classic && !pal.sense) {
-            grid.setPadding(dp(8), dp(8), dp(8), dp(24) + dp(66))
-            addView(buildTabBar(), FrameLayout.LayoutParams(-1, dp(66), Gravity.BOTTOM))
-        }
-        if (pal.sense) {
-            // Sense's drawer: a charcoal page under a title bar, the grid, and three glossy tabs along the bottom
-            setBackgroundColor(0xFF19191B.toInt())
-            grid.setPadding(dp(8), dp(60), dp(8), dp(24) + dp(70) + dp(40))
-            banner.layoutParams = (banner.layoutParams as FrameLayout.LayoutParams).apply { topMargin = dp(58) }
-            senseTitle = NText(this@MainActivity).apply { text = "All apps"; textSize = 19f; setTextColor(Color.WHITE); gravity = Gravity.CENTER_VERTICAL; setPadding(dp(16), 0, 0, 0) }
-            val lens = ImageView(this@MainActivity).apply {
-                setImageResource(R.drawable.ic_search); imageTintList = android.content.res.ColorStateList.valueOf(0xFFD5D9DD.toInt()); setPadding(dp(14), dp(14), dp(14), dp(14))
-                contentDescription = "Search"; setOnClickListener { openSenseSearch() }
-            }
-            val header = LinearLayout(this@MainActivity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                background = android.graphics.drawable.LayerDrawable(arrayOf(
-                    GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0xFF45474B.toInt(), 0xFF202123.toInt())),
-                    ai.nanosearch.launcher.ui.BrushedMetal(this@MainActivity, 60),
-                    android.graphics.drawable.ColorDrawable(0x88000000.toInt()),
-                )).apply { setLayerHeight(2, dp(1)); setLayerGravity(2, Gravity.BOTTOM) }
-                addView(senseTitle, LinearLayout.LayoutParams(0, -1, 1f))
-                addView(lens, LinearLayout.LayoutParams(dp(52), dp(52)))
-            }
-            senseHeader = header
-            addView(header, FrameLayout.LayoutParams(-1, dp(52), Gravity.TOP))
-            senseTabs = ai.nanosearch.launcher.ui.SenseTabBar(this@MainActivity,
-                listOf(Triple("all", "All apps", 0), Triple("recent", "Frequent", 1), Triple("dl", "Downloaded", 2)), pal.primary) { key ->
-                drawerTab = key; senseTabs?.select(key)
-                senseTitle?.text = mapOf("all" to "All apps", "recent" to "Frequent", "dl" to "Downloaded")[key]
-                search()
-            }
-            // the ring peeks up from behind the tab bar; pulling it closes the drawer
-            drawerRing = ai.nanosearch.launcher.ui.SenseRing(this@MainActivity, 0f, drawerRingListener).apply { contentDescription = "Home (pull up)"; alpha = 0f }
-            addView(drawerRing, FrameLayout.LayoutParams(dp(132), dp(132), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = -dp(18) })
-            addView(senseTabs, FrameLayout.LayoutParams(-1, dp(70), Gravity.BOTTOM))
-        }
+        grid.setPadding(dp(8), dp(8), dp(8), dp(24) + dp(66))
+        addView(buildTabBar(), FrameLayout.LayoutParams(-1, dp(66), Gravity.BOTTOM))
 
         // Pull down to close, but only when the app grid is scrolled to the top.
         canStart = { !grid.canScrollVertically(-1) }
@@ -1061,18 +945,17 @@ class MainActivity : Activity() {
         }
     }
 
-    /** Classic: a bar along the bottom of the drawer with a tab for all apps, the recent ones and the starred ones. */
+    /** A bar along the bottom of the drawer with a tab for all apps, the recent ones and the starred ones. */
     private fun buildTabBar(): View {
-        val tabs = if (pal.sense) listOf(Triple("all", "All apps", R.drawable.ic_menu_apps), Triple("recent", "Frequent", R.drawable.ic_menu_clock), Triple("dl", "Downloaded", R.drawable.ic_menu_download))
-        else listOf(Triple("all", "All", R.drawable.ic_menu_apps), Triple("recent", "Recent", R.drawable.ic_menu_clock), Triple("fav", "Favourites", R.drawable.ic_star))
+        val tabs = listOf(Triple("all", "All", R.drawable.ic_menu_apps), Triple("recent", "Recent", R.drawable.ic_menu_clock), Triple("fav", "Favourites", R.drawable.ic_star))
         val views = LinkedHashMap<String, TextView>()
         val bar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            background = if (pal.sense) senseDock() else spiritGlass(10f, ai.nanosearch.launcher.ui.SpiritGlass.Look.DOCK, topOnly = true)
-            if (!pal.sense) { elevation = dp(8).toFloat(); clipToOutline = true }
+            background = spiritGlass(10f, ai.nanosearch.launcher.ui.SpiritGlass.Look.DOCK, topOnly = true)
+            elevation = dp(8).toFloat(); clipToOutline = true
             for ((key, label, icon) in tabs) {
                 val tab = NText(context).apply {
-                    text = label; textSize = 11f; gravity = Gravity.CENTER; compoundDrawablePadding = dp(1); if (pal.sense) setPadding(0, dp(6), 0, dp(4)) else setPadding(0, dp(10), 0, 0) // Spirit: the icon and its name start below the top of the highlight, so the pair sits in the middle of it
+                    text = label; textSize = 11f; gravity = Gravity.CENTER; compoundDrawablePadding = dp(1); setPadding(0, dp(10), 0, 0) // Spirit: the icon and its name start below the top of the highlight, so the pair sits in the middle of it
                     setCompoundDrawablesRelativeWithIntrinsicBounds(null, getDrawable(icon)!!.mutate().apply { setBounds(0, 0, dp(22), dp(22)) }, null, null)
                     setOnClickListener { drawerTab = key; styleTabs(); search() }
                 }
@@ -1249,55 +1132,9 @@ class MainActivity : Activity() {
         return super.onKeyDown(keyCode, event)
     }
 
-    // ---- Leap view (Sense): every page at once
-
-    private var leapView: ai.nanosearch.launcher.ui.LeapView? = null
-
-    private fun leap() {
-        if (leapView != null || drawerOpen) return
-        val total = pages.size + pageOffset
-        val thumbs = (0 until total).map { i ->
-            val v = if (i < pageOffset) framesPage!!.root else pages[i - pageOffset].root
-            runCatching {
-                if (v.width <= 0 || v.height <= 0) null else {
-                    val scale = 320f / v.width
-                    android.graphics.Bitmap.createBitmap(320, (v.height * scale).toInt().coerceAtLeast(1), android.graphics.Bitmap.Config.ARGB_8888).also { b ->
-                        val c = android.graphics.Canvas(b); c.scale(scale, scale); v.draw(c)
-                    }
-                }
-            }.getOrNull()
-        }
-        val view = ai.nanosearch.launcher.ui.LeapView(this, pal, (0 until total).map { pageName(it) }, thumbs, pager.currentItem,
-            onPick = { i -> pager.setCurrentItem(i, false); closeLeap() }, onClose = { closeLeap() })
-        leapView = view
-        val host = home.parent as ViewGroup
-        host.addView(view, host.indexOfChild(overlayHost), FrameLayout.LayoutParams(-1, -1))
-    }
-
-    private fun closeLeap() {
-        val v = leapView ?: return
-        leapView = null
-        v.dismiss { (v.parent as? ViewGroup)?.removeView(v) }
-    }
-
-    private var pinchScale = 1f
-    private val pinch by lazy {
-        android.view.ScaleGestureDetector(this, object : android.view.ScaleGestureDetector.SimpleOnScaleGestureListener() {
-            override fun onScaleBegin(d: android.view.ScaleGestureDetector): Boolean { pinchScale = 1f; return true }
-            override fun onScale(d: android.view.ScaleGestureDetector): Boolean { pinchScale *= d.scaleFactor; return true }
-            override fun onScaleEnd(d: android.view.ScaleGestureDetector) { if (pinchScale < 0.8f && !overlays.isShowing && !hubScreen.isShowing && !wallpaperScreen.isShowing) leap() }
-        })
-    }
-
-    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
-        if (pal.sense && leapView == null) pinch.onTouchEvent(ev)
-        return super.dispatchTouchEvent(ev)
-    }
-
     @Deprecated("Launcher: back never leaves home")
     override fun onBackPressed() {
         when {
-            leapView != null -> closeLeap()
             hubScreen.isShowing -> hubScreen.back()
             wallpaperScreen.isShowing -> wallpaperScreen.back()
             overlays.isShowing -> overlays.dismissAll()
@@ -1356,274 +1193,8 @@ class MainActivity : Activity() {
         }.start()
     }
 
-    /** Sense: the drawer opens outwards from the ring as a growing circle, and closes back into it. */
-    private var revealOrigin: Pair<Float, Float>? = null
-
-    private fun revealRadius(cx: Float, cy: Float): Float {
-        val dm = resources.displayMetrics
-        return kotlin.math.hypot(maxOf(cx, dm.widthPixels - cx), maxOf(cy, dm.heightPixels - cy))
-    }
-
-    /** Sense: the drawer has a title bar instead of the search strip; the magnifier in it brings the strip (and the keyboard) back. */
-    private fun updateSenseSearch() {
-        if (!pal.sense || !::searchLayer.isInitialized) return
-        syncRings()
-        searchLayer.visibility = if (drawerOpen && !searchActive && !senseSearchOpen) View.INVISIBLE else View.VISIBLE
-        senseHeader?.visibility = if (drawerOpen && (senseSearchOpen || searchActive)) View.INVISIBLE else View.VISIBLE // the strip takes the title bar's place
-    }
-
-    private fun openSenseSearch() {
-        senseSearchOpen = true
-        updateSenseSearch()
-        input.requestFocus()
-        input.post { (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(input, 0) }
-    }
-
-    private var senseRing: ai.nanosearch.launcher.ui.SenseRing? = null
-    private var ringGhost: ai.nanosearch.launcher.ui.RingArt? = null
-    private var activeRing: ai.nanosearch.launcher.ui.SenseRing? = null
-    private var drawerRing: ai.nanosearch.launcher.ui.SenseRing? = null
-    private var ringHome = 0f to 0f
-
-    /** Shows [drawer] only inside a circle of radius [r] round ([cx], [cy]); a negative radius takes the clip away. */
-    private fun setDrawerClip(r: Float, cx: Float, cy: Float) {
-        if (r < 0f) { drawer.clipToOutline = false; drawer.outlineProvider = android.view.ViewOutlineProvider.BACKGROUND; return }
-        drawer.clipToOutline = true
-        drawer.outlineProvider = object : android.view.ViewOutlineProvider() {
-            override fun getOutline(v: View, o: android.graphics.Outline) {
-                if (r <= 0.5f) o.setEmpty() else o.setOval((cx - r).toInt(), (cy - r).toInt(), (cx + r).toInt(), (cy + r).toInt())
-            }
-        }
-        drawer.invalidateOutline()
-    }
-
-    private fun centreOf(v: View): Pair<Float, Float> { val at = IntArray(2); v.getLocationOnScreen(at); return at[0] + v.width / 2f to at[1] + v.height / 2f }
-
-    /** There is one ring on screen at a time: the dock's on home, the drawer's once the drawer is open. The other waits invisible, and the ghost carries it between them. */
-    private fun syncRings() {
-        drawerRing?.alpha = if (drawerOpen && ringGhost == null) 1f else 0f
-    }
-
-    private fun endRingDrag() {
-        ringGhost?.let { overlayHost.removeView(it) }
-        ringGhost = null
-        activeRing?.alpha = 1f
-        activeRing = null
-        searchLayer.alpha = 1f
-        syncRings()
-    }
-
-    /**
-     * The ring follows the finger as far as the top of the screen, with the app drawer growing out of it as a circle. Let go past a quarter of the screen
-     * (or with a flick) and the circle fills the screen; let go sooner and it shrinks back into the ring.
-     */
-    private val ringListener = object : ai.nanosearch.launcher.ui.SenseRing.Listener {
-        override fun threshold() = 0.25f * resources.displayMetrics.heightPixels
-        override fun onStart(ring: ai.nanosearch.launcher.ui.SenseRing, cx: Float, cy: Float) {
-            if (drawerOpen) return
-            ringHome = cx to cy
-            activeRing = ring
-            ring.alpha = 0f
-            val size = ring.width
-            val ghost = ai.nanosearch.launcher.ui.RingArt(this@MainActivity).apply { glow = 1f }
-            overlayHost.addView(ghost, FrameLayout.LayoutParams(size, size))
-            ghost.x = cx - size / 2f; ghost.y = cy - size / 2f
-            ringGhost = ghost
-            drawer.translationY = 0f
-            drawer.visibility = View.VISIBLE
-            searchLayer.alpha = 0f // the strip would show through the drawer's title bar while it grows
-            setDrawerClip(0f, cx, cy)
-        }
-
-        override fun onPull(pull: Float, cx: Float, cy: Float) {
-            val ghost = ringGhost ?: return
-            ghost.y = cy - ghost.height / 2f
-            val frac = (pull / (resources.displayMetrics.heightPixels * 0.55f)).coerceIn(0f, 1f)
-            setDrawerClip(frac * revealRadius(ringHome.first, ringHome.second), cx, cy)
-            homeContent.alpha = 1f - 0.7f * frac
-        }
-
-        override fun onRelease(pull: Float, velocityY: Float): Boolean {
-            val ghost = ringGhost ?: return false
-            val h = resources.displayMetrics.heightPixels
-            val open = pull > h * 0.25f || velocityY < -1500f
-            val full = revealRadius(ringHome.first, ringHome.second)
-            val cx = ringHome.first; val cy = ringHome.second - pull
-            val from = (pull / (h * 0.55f)).coerceIn(0f, 1f) * full
-            if (open) {
-                drawerOpen = true
-                revealOrigin = ringHome
-                updateBars(true)
-                updateSenseSearch()
-                val settleY = drawerRing?.let { centreOf(it).second - ghost.height / 2f } ?: ghost.y
-                val startY = ghost.y
-                ObjectAnimator.ofFloat(from, full * 1.05f).apply {
-                    duration = 280
-                    interpolator = DecelerateInterpolator(1.4f)
-                    addUpdateListener { setDrawerClip(it.animatedValue as Float, cx, cy); ghost.y = startY + (settleY - startY) * it.animatedFraction }
-                    addListener(object : android.animation.AnimatorListenerAdapter() {
-                        override fun onAnimationEnd(a: android.animation.Animator) {
-                            setDrawerClip(-1f, 0f, 0f)
-                            if (drawerOpen) home.visibility = View.INVISIBLE
-                            applyDrawerProgress()
-                            endRingDrag()
-                        }
-                    })
-                    start()
-                }
-            } else {
-                ObjectAnimator.ofFloat(1f, 0f).apply {
-                    duration = 240
-                    interpolator = DecelerateInterpolator(1.4f)
-                    addUpdateListener {
-                        val k = it.animatedValue as Float
-                        setDrawerClip(from * k, cx, cy + (ringHome.second - cy) * (1f - k))
-                        ghost.y = cy + (ringHome.second - cy) * (1f - k) - ghost.height / 2f
-                        homeContent.alpha = 1f - 0.7f * (pull / (h * 0.55f)).coerceIn(0f, 1f) * k
-                    }
-                    addListener(object : android.animation.AnimatorListenerAdapter() {
-                        override fun onAnimationEnd(a: android.animation.Animator) {
-                            setDrawerClip(-1f, 0f, 0f)
-                            drawer.visibility = View.INVISIBLE; drawer.translationY = screenH
-                            homeContent.alpha = 1f
-                            endRingDrag()
-                        }
-                    })
-                    start()
-                }
-            }
-            return open
-        }
-    }
-
-    /** Puts the home screen back as it was and shuts the drawer, with no animation of its own (the ring's drag has just played one). */
-    private fun finishCloseDrawer() {
-        drawerOpen = false
-        senseSearchOpen = false
-        revealOrigin = null
-        updateSenseSearch()
-        updateBars(resultsPanel.visibility == View.VISIBLE)
-        home.visibility = View.VISIBLE
-        hideKeyboard()
-        input.setText("")
-        drawer.visibility = View.INVISIBLE
-        drawer.translationY = screenH
-        setDrawerClip(-1f, 0f, 0f)
-        applyDrawerProgress()
-    }
-
-    /**
-     * The ring that peeks up above the tab bar inside the drawer: the same pull that opened the drawer closes it. The drawer shrinks into a circle round the
-     * ring as it is pulled, and the home screen shows through the space it leaves.
-     */
-    private val drawerRingListener = object : ai.nanosearch.launcher.ui.SenseRing.Listener {
-        private var origin = 0f to 0f
-        override fun threshold() = 0.25f * resources.displayMetrics.heightPixels
-
-        override fun onStart(ring: ai.nanosearch.launcher.ui.SenseRing, cx: Float, cy: Float) {
-            if (!drawerOpen) return
-            origin = cx to cy
-            activeRing = ring
-            ring.alpha = 0f
-            senseRing?.alpha = 0f // the dock's ring stays out of sight until the ghost reaches it
-            val size = ring.width
-            val ghost = ai.nanosearch.launcher.ui.RingArt(this@MainActivity).apply { glow = 1f }
-            overlayHost.addView(ghost, FrameLayout.LayoutParams(size, size))
-            ghost.x = cx - size / 2f; ghost.y = cy - size / 2f
-            ringGhost = ghost
-            home.visibility = View.VISIBLE
-            hideKeyboard()
-            setDrawerClip(revealRadius(cx, cy), cx, cy)
-        }
-
-        override fun onPull(pull: Float, cx: Float, cy: Float) {
-            val ghost = ringGhost ?: return
-            ghost.y = cy - ghost.height / 2f
-            val frac = (pull / (resources.displayMetrics.heightPixels * 0.55f)).coerceIn(0f, 1f)
-            setDrawerClip((1f - frac) * revealRadius(origin.first, origin.second), cx, cy)
-            homeContent.alpha = 0.15f + 0.85f * frac
-        }
-
-        override fun onRelease(pull: Float, velocityY: Float): Boolean {
-            val ghost = ringGhost ?: return false
-            val h = resources.displayMetrics.heightPixels
-            val close = pull > h * 0.25f || velocityY < -1500f
-            val full = revealRadius(origin.first, origin.second)
-            val cx = origin.first; val cy = origin.second - pull
-            val from = (1f - (pull / (h * 0.55f)).coerceIn(0f, 1f)) * full
-            val to = if (close) 0f else full
-            val startY = ghost.y
-            val endY = (if (close) senseRing?.let { centreOf(it).second } else origin.second)?.minus(ghost.height / 2f) ?: startY
-            ObjectAnimator.ofFloat(from, to).apply {
-                duration = 240
-                interpolator = DecelerateInterpolator(1.4f)
-                addUpdateListener {
-                    setDrawerClip(it.animatedValue as Float, cx, cy)
-                    ghost.y = startY + (endY - startY) * it.animatedFraction
-                }
-                addListener(object : android.animation.AnimatorListenerAdapter() {
-                    override fun onAnimationEnd(a: android.animation.Animator) {
-                        if (close) finishCloseDrawer() else { setDrawerClip(-1f, 0f, 0f); home.visibility = View.INVISIBLE; applyDrawerProgress() }
-                        senseRing?.alpha = 1f
-                        endRingDrag()
-                    }
-                })
-                start()
-            }
-            return close
-        }
-    }
-
-    /** Hold a dock app and drag it onto the ring: the ring lights, and letting go there opens the app out of the ring. Taps and long-presses work as ever. */
-    private fun senseDragToRing(v: View, onDrop: (View) -> Unit) {
-        var sx = 0f; var sy = 0f; var dragging = false
-        val slop = android.view.ViewConfiguration.get(this).scaledTouchSlop * 2
-        fun overRing(): Boolean {
-            val ring = senseRing ?: return false
-            val a = IntArray(2); v.getLocationOnScreen(a)
-            val b = IntArray(2); ring.getLocationOnScreen(b)
-            val dx = (a[0] + v.width / 2f) - (b[0] + ring.width / 2f)
-            val dy = (a[1] + v.height / 2f) - (b[1] + ring.height / 2f)
-            return kotlin.math.hypot(dx, dy) < ring.width * 0.42f
-        }
-        v.setOnTouchListener { view, e ->
-            when (e.actionMasked) {
-                android.view.MotionEvent.ACTION_DOWN -> { sx = e.rawX; sy = e.rawY; dragging = false; view.animate().scaleX(1.1f).scaleY(1.1f).setDuration(120).start(); false }
-                android.view.MotionEvent.ACTION_MOVE -> {
-                    val dx = e.rawX - sx; val dy = e.rawY - sy
-                    if (!dragging && kotlin.math.hypot(dx, dy) > slop) {
-                        dragging = true; view.cancelLongPress(); view.isPressed = false
-                        view.parent?.requestDisallowInterceptTouchEvent(true)
-                        view.translationZ = dp(20).toFloat()
-                    }
-                    if (dragging) {
-                        view.translationX = dx; view.translationY = dy
-                        val over = overRing()
-                        if (over && senseRing?.hot == false) senseRing?.buzz(android.view.HapticFeedbackConstants.CLOCK_TICK)
-                        senseRing?.hot = over
-                        true
-                    } else false
-                }
-                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
-                    view.animate().scaleX(1f).scaleY(1f).setDuration(150).start()
-                    if (dragging) {
-                        val hit = e.actionMasked == android.view.MotionEvent.ACTION_UP && overRing()
-                        senseRing?.hot = false
-                        view.animate().translationX(0f).translationY(0f).setDuration(220).withEndAction { view.translationZ = 0f }.start()
-                        if (hit) senseRing?.let { it.buzz(android.view.HapticFeedbackConstants.CONFIRM); onDrop(it) }
-                        dragging = false
-                        true
-                    } else false
-                }
-                else -> false
-            }
-        }
-    }
-
     private fun openDrawer() {
-        revealOrigin = null
         drawerOpen = true
-        updateSenseSearch()
         updateBars(true)
         drawer.visibility = View.VISIBLE
         animateDrawer(0f, 420) { if (drawerOpen) home.visibility = View.INVISIBLE } // nothing ghosts through the drawer
@@ -1631,25 +1202,10 @@ class MainActivity : Activity() {
 
     private fun closeDrawer(clear: Boolean) {
         drawerOpen = false
-        senseSearchOpen = false
-        updateSenseSearch()
         updateBars(resultsPanel.visibility == View.VISIBLE)
         home.visibility = View.VISIBLE
         hideKeyboard()
         if (clear) input.setText("")
-        val origin = revealOrigin
-        revealOrigin = null
-        if (pal.sense && origin != null && drawer.visibility == View.VISIBLE && drawer.translationY == 0f) {
-            android.view.ViewAnimationUtils.createCircularReveal(drawer, origin.first.toInt(), origin.second.toInt(), revealRadius(origin.first, origin.second), 0f).apply {
-                duration = 360
-                interpolator = android.view.animation.AccelerateDecelerateInterpolator()
-                addListener(object : android.animation.AnimatorListenerAdapter() {
-                    override fun onAnimationEnd(a: android.animation.Animator) { if (!drawerOpen) { drawer.visibility = View.INVISIBLE; drawer.translationY = screenH; applyDrawerProgress() } }
-                })
-                start()
-            }
-            return
-        }
         animateDrawer(screenH, 300) { if (!drawerOpen) { drawer.visibility = View.INVISIBLE; applyDrawerProgress() } }
     }
 
@@ -1692,7 +1248,6 @@ class MainActivity : Activity() {
         // The whole layer, including the status and navigation bar areas its padding leaves, gets the panel colour while results show.
         searchLayer.setBackgroundColor(if (active) pal.panel else Color.TRANSPARENT)
         updateBars(active || drawerOpen)
-        updateSenseSearch()
         home.visibility = if (active || drawerOpen) View.INVISIBLE else View.VISIBLE // nothing ghosts through the panel
         updateBanner()
     }
@@ -2291,28 +1846,13 @@ class MainActivity : Activity() {
                         if (bmp != null) { thumbs.put(item.key, bmp); ui.post { if (h.boundKey == item.key) h.icon.setImageBitmap(bmp) } }
                     }
                 }
-            } else if (pal.classic && !pal.sense) {
+            } else {
                 // Spirit: the same glossy gems as the apps (a contact is the address book, a text is the messaging gem, and so on)
                 h.glyph.visibility = View.GONE
                 h.icon.visibility = View.VISIBLE
                 h.icon.scaleType = ImageView.ScaleType.FIT_CENTER
                 val gemKind = mapOf("contact" to "contacts", "message" to "message", "call" to "phone", "event" to "calendar", "file" to "files", "setting" to "settings", "ask" to "ask")[item.kind] ?: "files"
                 h.icon.setImageDrawable(AppIcons.kindGem(this@MainActivity, gemKind, if (gemKind == "calendar") java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_MONTH) else 0))
-            } else {
-                // A tonal rounded square with the kind's Material glyph.
-                h.glyph.visibility = View.GONE
-                h.icon.visibility = View.VISIBLE
-                h.icon.scaleType = ImageView.ScaleType.CENTER_INSIDE
-                h.icon.setImageResource(KIND_ICONS[item.kind] ?: R.drawable.ic_kind_file)
-                val (fill, ink) = when (item.kind) {
-                    "contact", "call" -> pal.tertiaryContainer to pal.onTertiaryContainer
-                    "message", "file" -> pal.secondaryContainer to pal.onSecondaryContainer
-                    "ask" -> pal.primary to pal.onPrimary
-                    else -> pal.primaryContainer to pal.onPrimaryContainer
-                }
-                h.icon.setColorFilter(ink)
-                h.icon.setPadding(dp(10), dp(10), dp(10), dp(10))
-                h.icon.background = round(fill, 14)
             }
             return h.root
         }
@@ -2375,11 +1915,9 @@ class MainActivity : Activity() {
             val cell = (convertView as? LinearLayout) ?: LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER_HORIZONTAL
-                if (pal.classic && !pal.sense) {
-                    // a glass tile with the name on a darker strip along its foot
-                    setPadding(0, dp(10), 0, 0)
-                    background = spiritGlass(9f, ai.nanosearch.launcher.ui.SpiritGlass.Look.CARD, opacity = 0.6f)
-                } else setPadding(dp(2), dp(4), dp(2), dp(4))
+                // a glass tile with the name on a darker strip along its foot
+                setPadding(0, dp(10), 0, 0)
+                background = android.graphics.drawable.ColorDrawable(0x55202428)
                 // pressed: grow a little, as in Android's launchers (a state animator follows the list's own pressed state)
                 stateListAnimator = android.animation.StateListAnimator().apply {
                     fun scaled(v: Float) = ObjectAnimator.ofPropertyValuesHolder(
@@ -2393,9 +1931,9 @@ class MainActivity : Activity() {
                     addView(badgeView(0).also { it.visibility = View.GONE }, FrameLayout.LayoutParams(-2, dp(18), Gravity.TOP or Gravity.END))
                 }, LinearLayout.LayoutParams(dp(54), dp(54)))
                 addView(NText(context).apply {
-                    textSize = 12f; setTextColor(if (pal.classic) 0xFFF1F3F4.toInt() else pal.onSurface); maxLines = if (pal.sense) 2 else 1; gravity = Gravity.CENTER
+                    textSize = 12f; setTextColor(0xFFF1F3F4.toInt()); maxLines = 1; gravity = Gravity.CENTER
                     ellipsize = TextUtils.TruncateAt.END
-                    if (pal.classic && !pal.sense) {
+                    run {
                         // the strip carries the tile's bottom corners itself, so the tile needs no clipping
                         val foot = dp(8).toFloat()
                         background = android.graphics.drawable.LayerDrawable(arrayOf(
@@ -2403,8 +1941,8 @@ class MainActivity : Activity() {
                             android.graphics.drawable.ColorDrawable(0x44FFFFFF),
                         )).apply { setLayerHeight(1, 1); setLayerGravity(1, Gravity.TOP) }
                         setPadding(dp(4), dp(5), dp(4), dp(5))
-                    } else if (!pal.sense) setShadowLayer(0f, 0f, 0f, 0)
-                }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(if (pal.classic && !pal.sense) 8 else 4) })
+                    }
+                }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
             }
             val item = items[position]
             (cell.getChildAt(1) as TextView).text = item.title

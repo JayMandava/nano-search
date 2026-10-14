@@ -13,7 +13,7 @@ object LockClock {
     private const val SERVICE = "ai.nanosearch.launcher.clocks.ClockWallpaperService"
 
     val CLOCKS = listOf("steel" to "Steel Dial", "flip" to "Flip clock")
-    val BACKGROUNDS = ClassicWallpapers.ALL.map { it.id to it.name } + ("black" to "Black")
+    val BACKGROUNDS = SpiritWallpapers.ALL.map { it.id to it.name } + ("black" to "Black")
     val POSITIONS = listOf("top" to "Top", "middle" to "Middle", "low" to "Low")
 
     private fun prefs(c: Context) = c.getSharedPreferences("nano", Context.MODE_PRIVATE)

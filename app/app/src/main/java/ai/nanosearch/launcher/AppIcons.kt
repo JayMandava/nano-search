@@ -33,13 +33,11 @@ object AppIcons {
     fun get(context: Context, cn: ComponentName): Drawable {
         val pm = context.packageManager
         val own = runCatching { pm.getActivityIcon(cn) }.getOrNull() ?: pm.defaultActivityIcon
-        if (!AppSettings.isClassic(context)) return own
         val label = runCatching { pm.getActivityInfo(cn, 0).loadLabel(pm).toString() }.getOrDefault("")
         val kind = kindOf(cn.packageName, label)
         val day = if (kind == "calendar") Calendar.getInstance().get(Calendar.DAY_OF_MONTH) else 0
-        val sense = AppSettings.isSense(context)
-        val key = "${if (sense) "s" else "g"}|${cn.flattenToShortString()}|$kind|$day"
-        return cache.get(key) ?: BitmapDrawable(context.resources, if (sense) senseIcon(own, kind, day) else spiritIcon(own, kind, day)).also { cache.put(key, it) }
+        val key = "g|${cn.flattenToShortString()}|$kind|$day"
+        return cache.get(key) ?: BitmapDrawable(context.resources, spiritIcon(own, kind, day)).also { cache.put(key, it) }
     }
 
     private val KINDS = listOf(
@@ -187,24 +185,11 @@ object AppIcons {
         own.draw(c)
     }
 
-    /**
-     * The Sense look: no tile. The drawn icons stand straight on the wallpaper (the handset in green), and another app's own icon is left as it is,
-     * with a soft shadow under it.
-     */
-    private fun senseIcon(own: Drawable, kind: String?, day: Int): Bitmap = if (kind != null) draw(kind, day, sense = true) else bitmap { c ->
-        val icon = Bitmap.createBitmap(144, 144, Bitmap.Config.ARGB_8888)
-        own.setBounds(0, 0, 144, 144)
-        own.draw(Canvas(icon))
-        val shadow = icon.extractAlpha(paint().apply { maskFilter = BlurMaskFilter(7f, BlurMaskFilter.Blur.NORMAL) }, intArrayOf(0, 0))
-        c.drawBitmap(shadow, 24f, 28f, paint().apply { color = 0x88000000.toInt() })
-        c.drawBitmap(icon, 24f, 20f, Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG))
-    }
-
     // ---------------------------------------------------------------- the icons
 
-    fun draw(kind: String, day: Int = 0, sense: Boolean = false): Bitmap = bitmap { c ->
+    fun draw(kind: String, day: Int = 0): Bitmap = bitmap { c ->
         when (kind) {
-            "phone" -> phone(c, sense); "message" -> message(c); "email" -> email(c); "browser" -> browser(c); "camera" -> camera(c)
+            "phone" -> phone(c); "message" -> message(c); "email" -> email(c); "browser" -> browser(c); "camera" -> camera(c)
             "gallery" -> gallery(c); "music" -> music(c); "clock" -> clock(c); "calendar" -> calendar(c, day); "calculator" -> calculator(c)
             "contacts" -> contacts(c); "files" -> files(c); "settings" -> settings(c); "maps" -> maps(c); "notes" -> notes(c)
             "store" -> store(c); "video" -> video(c); "recorder" -> recorder(c); "weather" -> weather(c); "wallet" -> wallet(c); "tasks" -> tasks(c)
@@ -232,15 +217,15 @@ object AppIcons {
         }
     }
 
-    private fun phone(c: Canvas, sense: Boolean = false) {
+    private fun phone(c: Canvas) {
         val curve = Path().apply { moveTo(46f, 52f); cubicTo(40f, 132f, 100f, 160f, 146f, 146f) }
         val ends = Path().apply { addRoundRect(RectF(30f, 36f, 74f, 78f), 12f, 12f, Path.Direction.CW); addRoundRect(RectF(118f, 118f, 164f, 160f), 12f, 12f, Path.Direction.CW) }
         c.save(); c.translate(0f, 6f)
         c.drawPath(curve, paint().apply { style = Paint.Style.STROKE; strokeWidth = 30f; strokeCap = Paint.Cap.ROUND; color = 0x70000000; maskFilter = BlurMaskFilter(7f, BlurMaskFilter.Blur.NORMAL) })
         c.restore()
-        c.drawPath(curve, paint().apply { style = Paint.Style.STROKE; strokeWidth = 30f; strokeCap = Paint.Cap.ROUND; shader = if (sense) lin(40f, 160f, 0xFFb4f27a.toInt(), 0xFF2a8a1d.toInt()) else lin(40f, 160f, 0xFFf2f3f5.toInt(), 0xFF8e949b.toInt()) })
+        c.drawPath(curve, paint().apply { style = Paint.Style.STROKE; strokeWidth = 30f; strokeCap = Paint.Cap.ROUND; shader = lin(40f, 160f, 0xFFf2f3f5.toInt(), 0xFF8e949b.toInt()) })
         c.drawPath(curve, paint().apply { style = Paint.Style.STROKE; strokeWidth = 8f; strokeCap = Paint.Cap.ROUND; color = 0x99FFFFFF.toInt() })
-        c.drawPath(ends, paint().apply { shader = if (sense) lin(36f, 160f, 0xFFd9f8b8.toInt(), 0xFF2f9a22.toInt()) else lin(36f, 160f, 0xFFdfe2e6.toInt(), 0xFF6f757c.toInt()) })
+        c.drawPath(ends, paint().apply { shader = lin(36f, 160f, 0xFFdfe2e6.toInt(), 0xFF6f757c.toInt()) })
         c.drawPath(ends, paint().apply { style = Paint.Style.STROKE; strokeWidth = 1.5f; color = 0x66FFFFFF })
     }
 

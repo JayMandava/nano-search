@@ -60,6 +60,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -121,9 +122,8 @@ private fun SettingsScreen(onBack: () -> Unit, listState: LazyListState, scroll:
             item { DefaultHomeCard(tick) }
             item { ModelsRow() }
             item { Header("Appearance") }
-            item { StyleCard() }
-            if (AppSettings.isSense(context)) item { WeatherCard() }
             item { AppearanceCard() }
+            item { WeatherCard() }
             item { Header("Screen") }
             item { FullScreenCard() }
             item { Header("Hub and badges") }
@@ -205,7 +205,7 @@ private fun FullScreenCard() {
     }
 }
 
-/** The Hub, the dots on icons and Active Frames. Classic turns them on by default; each is a switch of its own. */
+/** The Hub, the dots on icons and Active Frames. They are on by default; each is a switch of its own. */
 @Composable
 private fun HubCard(tick: Int) {
     val context = LocalContext.current
@@ -213,17 +213,14 @@ private fun HubCard(tick: Int) {
     var dots by remember { mutableStateOf(AppSettings.dots(context)) }
     var frames by remember { mutableStateOf(AppSettings.frames(context)) }
     val allowed = remember(tick) { HubStore.allowed(context) }
-    val sense = AppSettings.isSense(context) // the Hub and Active Frames are Spirit's
     Card(shape = RoundedCornerShape(24.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (!sense) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).padding(end = 16.dp)) {
                     Text("Hub", style = MaterialTheme.typography.bodyLarge)
                     Text("One list for texts, missed calls, events and notifications. Swipe in from the left edge, or tap the Hub button by the search bar.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(checked = hub, onCheckedChange = { hub = it; AppSettings.setHub(context, it); SettingsTheme.bump() })
-            }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).padding(end = 16.dp)) {
@@ -232,7 +229,6 @@ private fun HubCard(tick: Int) {
                 }
                 Switch(checked = dots, onCheckedChange = { dots = it; AppSettings.setDots(context, it) })
             }
-            if (!sense) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).padding(end = 16.dp)) {
                     Text("Active Frames", style = MaterialTheme.typography.bodyLarge)
@@ -240,16 +236,13 @@ private fun HubCard(tick: Int) {
                 }
                 Switch(checked = frames, onCheckedChange = { frames = it; AppSettings.setFrames(context, it) })
             }
-            }
             var sounds by remember { mutableStateOf(AppSettings.hubSounds(context)) }
-            if (!sense) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).padding(end = 16.dp)) {
                     Text("Hub sounds", style = MaterialTheme.typography.bodyLarge)
                     Text("A soft tick when the Hub opens and when you dismiss or clear things. The haptic tick is always on.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(checked = sounds, onCheckedChange = { sounds = it; AppSettings.setHubSounds(context, it) })
-            }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).padding(end = 16.dp)) {
@@ -274,7 +267,8 @@ private fun WeatherCard() {
     var f by remember { mutableStateOf(Weather.fahrenheit(context)) }
     var city by remember { mutableStateOf(Weather.city(context)?.first) }
     var query by remember { mutableStateOf("") }
-    val matches = remember(query) { Gazetteer.search(context, query) }
+    // looking cities up reads a large list on first use: done off the main thread, so typing and scrolling never wait for it
+    val matches by produceState(emptyList<Gazetteer.Match>(), query) { value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { Gazetteer.search(context, query) } }
     Card(shape = RoundedCornerShape(24.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
@@ -315,70 +309,10 @@ private fun WeatherCard() {
     }
 }
 
-/** Modern is the Material 3 Expressive launcher; Old School is the flat, dark one, in two eras: Spirit (blue, glossy drawn icons) and Sense (graphite and green, flip clock). */
-@Composable
-private fun StyleCard() {
-    val context = LocalContext.current
-    var style by remember { mutableStateOf(AppSettings.style(context)) }
-    var era by remember { mutableStateOf(AppSettings.era(context)) }
-    var menu by remember { mutableStateOf(false) }
-    val eras = listOf("spirit" to "Spirit", "sense" to "Sense")
-    Card(shape = RoundedCornerShape(24.dp)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Style", style = MaterialTheme.typography.titleSmall)
-            val options = listOf("modern" to "Modern", "classic" to "Old School")
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                options.forEachIndexed { i, (key, label) ->
-                    SegmentedButton(
-                        selected = style == key,
-                        onClick = { style = key; AppSettings.setStyle(context, key); SettingsTheme.bump() },
-                        shape = SegmentedButtonDefaults.itemShape(i, options.size),
-                    ) { Text(label) }
-                }
-            }
-            if (style == "classic") {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                    Text("Era", style = MaterialTheme.typography.bodyLarge)
-                    Box {
-                        OutlinedButton(onClick = { menu = true }) { Text(eras.first { it.first == era }.second) }
-                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                            eras.forEach { (key, label) ->
-                                DropdownMenuItem(text = { Text(label) }, onClick = {
-                                    menu = false
-                                    if (key != era) { era = key; AppSettings.setEra(context, key); SettingsTheme.bump() }
-                                })
-                            }
-                        }
-                    }
-                }
-                if (era == "sense") {
-                    var haptics by remember { mutableStateOf(AppSettings.ringHaptics(context)) }
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f).padding(end = 16.dp)) {
-                            Text("Ring haptics", style = MaterialTheme.typography.bodyLarge)
-                            Text("A tick as you grab the ring, another as it passes the point where letting go finishes the move, and a thump when an app is dropped on it.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Switch(checked = haptics, onCheckedChange = { haptics = it; AppSettings.setRingHaptics(context, it) })
-                    }
-                }
-            }
-            Text(
-                when {
-                    style != "classic" -> "Material 3 Expressive: rounded shapes and colours from your wallpaper."
-                    era == "sense" -> "Graphite and silver with one green accent: a flip clock with the weather, glossy icons that stand straight on the wallpaper, an arched carbon dock with Phone, Camera and a silver ring you pull up for your apps, and an app drawer with glossy tabs."
-                    else -> "Flat and dark with one blue accent, a steel dial clock, a labelled bar for the dock, and the Hub, notification dots and Active Frames on by default. Each can be switched off below."
-                },
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
 @Composable
 private fun AppearanceCard() {
     val context = LocalContext.current
     var mode by remember { mutableStateOf(AppSettings.themeMode(context)) }
-    var dynamic by remember { mutableStateOf(AppSettings.dynamicColor(context)) }
     Card(shape = RoundedCornerShape(24.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Theme", style = MaterialTheme.typography.titleSmall)
@@ -391,13 +325,6 @@ private fun AppearanceCard() {
                         shape = SegmentedButtonDefaults.itemShape(i, options.size),
                     ) { Text(label) }
                 }
-            }
-            if (!AppSettings.isClassic(context)) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Column(Modifier.weight(1f).padding(end = 16.dp)) {
-                    Text("Colours from wallpaper", style = MaterialTheme.typography.bodyLarge)
-                    Text("Material You. Off uses the Nano Search violet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Switch(checked = dynamic, onCheckedChange = { dynamic = it; AppSettings.setDynamicColor(context, it); SettingsTheme.bump() })
             }
         }
     }
@@ -456,15 +383,18 @@ internal fun FilesRow(tick: Int) {
 private fun DataCard(tick: Int) {
     val context = LocalContext.current
     var refresh by remember { mutableIntStateOf(0) }
-    val counts = remember(tick, refresh) {
-        val index = SearchIndex(context)
-        listOf("app" to "apps", "contact" to "contacts", "message" to "messages", "call" to "calls", "event" to "events", "file" to "files", "photo" to "photos", "phototext" to "photos with text", "setting" to "settings")
-            .map { (kind, label) -> index.count(kind) to label }.filter { it.first > 0 }
+    // counting what is stored opens the search database: done off the main thread, so the card appears at once and scrolling to it never stalls
+    val stored by produceState<Pair<List<Pair<Int, String>>, Long>?>(null, tick, refresh) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val index = SearchIndex(context)
+            val counts = listOf("app" to "apps", "contact" to "contacts", "message" to "messages", "call" to "calls", "event" to "events", "file" to "files", "photo" to "photos", "phototext" to "photos with text", "setting" to "settings")
+                .map { (kind, label) -> index.count(kind) to label }.filter { it.first > 0 }
+            val db = context.getDatabasePath("index.db")
+            counts to listOf(db, java.io.File(db.path + "-wal")).sumOf { if (it.exists()) it.length() else 0L }
+        }
     }
-    val size = remember(tick, refresh) {
-        val db = context.getDatabasePath("index.db")
-        listOf(db, java.io.File(db.path + "-wal")).sumOf { if (it.exists()) it.length() else 0L }
-    }
+    val counts = stored?.first.orEmpty()
+    val size = stored?.second ?: 0L
     Card(shape = RoundedCornerShape(24.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(if (counts.isEmpty()) "Nothing indexed yet." else counts.joinToString(" · ") { "${it.first} ${it.second}" }, style = MaterialTheme.typography.bodyMedium)

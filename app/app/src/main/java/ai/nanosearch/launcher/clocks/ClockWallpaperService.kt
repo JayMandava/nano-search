@@ -1,6 +1,6 @@
 package ai.nanosearch.launcher.clocks
 
-import ai.nanosearch.launcher.ClassicWallpapers
+import ai.nanosearch.launcher.SpiritWallpapers
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -69,7 +69,7 @@ class ClockWallpaperService : WallpaperService() {
             val id = prefs.getString("lockclock_bg", "carbon") ?: "carbon"
             val key = "$id|$w|$h"
             if (bg == null || key != bgKey) {
-                bg = if (id == "black") null else runCatching { ClassicWallpapers.render(id, w, h) }.getOrNull()
+                bg = if (id == "black") null else runCatching { SpiritWallpapers.render(id, w, h) }.getOrNull()
                 bgKey = key
             }
             if (bg != null) c.drawBitmap(bg!!, 0f, 0f, null) else c.drawColor(0xFF000000.toInt())

@@ -12,7 +12,7 @@ import kotlin.random.Random
  * The wallpapers, the same in every style: woven carbon, brushed steel and five more metals (gold, rose gold, copper, bronze and platinum), all drawn here in code
  * at whatever size the screen is. All original artwork.
  */
-object ClassicWallpapers {
+object SpiritWallpapers {
     class Paper(val id: String, val name: String)
 
     val ALL = listOf(
