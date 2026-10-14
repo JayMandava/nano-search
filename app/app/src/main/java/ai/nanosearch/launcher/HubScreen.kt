@@ -97,7 +97,7 @@ class HubScreen(
         val close = NText(activity).apply { text = "✕"; textSize = 18f; setTextColor(pal.onVariant); gravity = Gravity.CENTER; setOnClickListener { dismiss() } }
         val header = LinearLayout(activity).apply {
             gravity = Gravity.CENTER_VERTICAL
-            if (spirit) { background = glass(10f, ai.nanosearch.launcher.ui.SpiritGlass.Look.DOCK); elevation = dp(6).toFloat(); setPadding(dp(16), 0, dp(4), 0) }
+            if (spirit) setPadding(dp(8), 0, dp(4), 0) // just the title: no bar, no close button (Back or a tap beside the panel closes it)
             addView(title, LinearLayout.LayoutParams(-2, -2))
             // the unread count is a small pill beside the title, not part of it
             countBadge = NText(activity).apply {
@@ -106,8 +106,8 @@ class HubScreen(
             }
             addView(countBadge, LinearLayout.LayoutParams(-2, dp(20)).apply { marginStart = dp(10) })
             addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
-            addView(clearButton, LinearLayout.LayoutParams(-2, dp(if (spirit) 56 else 44)))
-            addView(close, LinearLayout.LayoutParams(dp(44), dp(if (spirit) 56 else 44)))
+            addView(clearButton, LinearLayout.LayoutParams(-2, dp(44)))
+            if (!spirit) addView(close, LinearLayout.LayoutParams(dp(44), dp(44)))
         }
 
         val chipRow = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL }
@@ -150,8 +150,8 @@ class HubScreen(
             } else setBackgroundColor(pal.panel or 0xFF000000.toInt())
             isClickable = true
             elevation = dp(16).toFloat()
-            if (spirit) setPadding(dp(8), top + dp(8), dp(8), 0) else setPadding(dp(16), top + dp(8), dp(8), 0)
-            addView(header, LinearLayout.LayoutParams(-1, if (spirit) dp(56) else -2))
+            if (spirit) setPadding(dp(8), top, dp(8), 0) else setPadding(dp(16), top + dp(8), dp(8), 0)
+            addView(header, LinearLayout.LayoutParams(-1, if (spirit) dp(48) else -2))
             addView(chipScroll, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(if (spirit) 12 else 6); bottomMargin = dp(10); if (spirit) marginStart = dp(2) })
             addView(banner, LinearLayout.LayoutParams(-1, dp(38)).apply { bottomMargin = dp(8); marginEnd = dp(if (spirit) 2 else 8); if (spirit) marginStart = dp(2) })
             addView(listView, LinearLayout.LayoutParams(-1, 0, 1f))
