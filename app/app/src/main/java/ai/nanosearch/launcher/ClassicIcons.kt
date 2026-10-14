@@ -38,8 +38,8 @@ object AppIcons {
         val kind = kindOf(cn.packageName, label)
         val day = if (kind == "calendar") Calendar.getInstance().get(Calendar.DAY_OF_MONTH) else 0
         val sense = AppSettings.isSense(context)
-        val key = "${if (sense) "s" else "c"}|${cn.flattenToShortString()}|$kind|$day"
-        return cache.get(key) ?: BitmapDrawable(context.resources, if (sense) senseIcon(own, kind, day) else if (kind != null) draw(kind, day) else tile(own)).also { cache.put(key, it) }
+        val key = "${if (sense) "s" else "g"}|${cn.flattenToShortString()}|$kind|$day"
+        return cache.get(key) ?: BitmapDrawable(context.resources, if (sense) senseIcon(own, kind, day) else spiritIcon(own, kind, day)).also { cache.put(key, it) }
     }
 
     private val KINDS = listOf(
@@ -88,7 +88,93 @@ object AppIcons {
 
     private fun bitmap(block: (Canvas) -> Unit): Bitmap = Bitmap.createBitmap(SIZE, SIZE, Bitmap.Config.ARGB_8888).also { block(Canvas(it)) }
 
-    /** An app without a drawn icon: its own picture on a dark glossy tile, so the grid stays uniform. */
+    // ---------------------------------------------------------------- Spirit: the glossy gem
+
+    /** The colour of the gem each kind of app sits in, chosen so the drawn object on it stands out. */
+    private val GEM_COLOURS = mapOf(
+        "phone" to 0xFF1F9F4D, "message" to 0xFF6B3FBF, "email" to 0xFF2060C0, "browser" to 0xFF3B4048, "camera" to 0xFFAEB4BD, "gallery" to 0xFF1C7FA6,
+        "music" to 0xFF3C3A8F, "clock" to 0xFFE0881A, "calendar" to 0xFF148D99, "calculator" to 0xFF3B4048, "contacts" to 0xFFAEB4BD, "files" to 0xFF3F72A8,
+        "settings" to 0xFF3B4048, "maps" to 0xFF1B8F6A, "notes" to 0xFFD9A81C, "store" to 0xFF2F4F7A, "video" to 0xFF7A2FA0, "recorder" to 0xFFB3262C,
+        "weather" to 0xFF2E8FD8, "wallet" to 0xFF7A4B2A, "tasks" to 0xFF1F9F9A, "ask" to 0xFF1A8FD6,
+    )
+
+    /** Any picture set in a gem: for an app that has no launcher entry of its own to ask. */
+    fun gemOf(context: Context, own: Drawable): Drawable = BitmapDrawable(context.resources, spiritIcon(own, null, 0))
+
+    /** The gem for a kind of thing that is not an app (a missed call, an event): the same look, cached. */
+    fun kindGem(context: Context, kind: String, day: Int = 0): Drawable {
+        val key = "k|$kind|$day"
+        return cache.get(key) ?: BitmapDrawable(context.resources, gem((GEM_COLOURS[kind] ?: 0xFF3B4048).toInt(), draw(kind, day), 0.66f)).also { cache.put(key, it) }
+    }
+
+    /** An app's gem: a drawn object on a coloured one, or another app's own picture on a gem tinted from its colours. */
+    private fun spiritIcon(own: Drawable, kind: String?, day: Int): Bitmap =
+        if (kind != null) gem((GEM_COLOURS[kind] ?: 0xFF3B4048).toInt(), draw(kind, day), 0.66f)
+        else {
+            val emblem = Bitmap.createBitmap(144, 144, Bitmap.Config.ARGB_8888)
+            own.setBounds(0, 0, 144, 144); own.draw(Canvas(emblem))
+            gem(dominant(own), emblem, 0.6f, shadow = true)
+        }
+
+    /** The vivid colour an icon is mostly made of; a plain white, grey or black icon gets graphite. */
+    private fun dominant(own: Drawable): Int {
+        val n = 24
+        val b = Bitmap.createBitmap(n, n, Bitmap.Config.ARGB_8888)
+        own.setBounds(0, 0, n, n); own.draw(Canvas(b))
+        val hsv = FloatArray(3)
+        var r = 0f; var g = 0f; var bl = 0f; var total = 0f; var hc = 0f; var hs = 0f
+        for (y in 0 until n) for (x in 0 until n) {
+            val px = b.getPixel(x, y)
+            if (px ushr 24 < 200) continue
+            android.graphics.Color.colorToHSV(px, hsv)
+            val w = hsv[1] * hsv[2] // vivid pixels count; grey, white and black count for nothing
+            if (w < 0.08f) continue
+            r += android.graphics.Color.red(px) * w; g += android.graphics.Color.green(px) * w; bl += android.graphics.Color.blue(px) * w; total += w
+            val h = Math.toRadians(hsv[0].toDouble()); hc += (w * cos(h)).toFloat(); hs += (w * sin(h)).toFloat()
+        }
+        if (total < 1.2f || Math.hypot(hc.toDouble(), hs.toDouble()) / total < 0.6) return 0xFF3B4048.toInt() // plain, or many colours (a mean of them would be mud): graphite
+        android.graphics.Color.colorToHSV(android.graphics.Color.rgb((r / total).toInt(), (g / total).toInt(), (bl / total).toInt()), hsv)
+        hsv[1] = hsv[1].coerceIn(0.55f, 0.9f); hsv[2] = hsv[2].coerceIn(0.5f, 0.78f)
+        return android.graphics.Color.HSVToColor(hsv)
+    }
+
+    /**
+     * A glossy gem: a rounded tile that is lit from above (light at the top, deep at the bottom), a bevelled rim, light bouncing up from its foot, a curved
+     * gloss over its upper half, and the [emblem] standing on it.
+     */
+    private fun gem(base: Int, emblem: Bitmap, scale: Float, shadow: Boolean = false): Bitmap = bitmap { c ->
+        val l = 14f; val t = 10f; val r = 178f; val b = 174f
+        val tile = rr(l, t, r, b, 42f)
+        val hi = ai.nanosearch.launcher.ui.SpiritGlass.lighten(base, 0.38f); val lo = ai.nanosearch.launcher.ui.SpiritGlass.darken(base, 0.42f)
+        c.shadowOf(tile, dy = 8f, blur = 9f, alpha = 0x90)
+        c.drawPath(tile, paint().apply { shader = LinearGradient(0f, t, 0f, b, intArrayOf(hi, base, lo), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP) })
+        c.save(); c.clipPath(tile)
+        // light bouncing up from the foot
+        c.drawCircle(96f, b + 6f, 96f, paint().apply { shader = RadialGradient(96f, b + 6f, 96f, 0x66FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP) })
+        c.restore()
+        // the emblem
+        val half = 192f * scale / 2f
+        val dest = RectF(96f - half, 92f - half, 96f + half, 92f + half)
+        if (shadow) {
+            val sh = emblem.extractAlpha(paint().apply { maskFilter = BlurMaskFilter(6f, BlurMaskFilter.Blur.NORMAL) }, intArrayOf(0, 0))
+            c.drawBitmap(sh, null, RectF(dest).apply { offset(0f, 5f) }, paint().apply { color = 0xAA000000.toInt() })
+        }
+        c.drawBitmap(emblem, null, dest, Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG))
+        // the curved gloss over the upper half
+        c.save(); c.clipPath(tile)
+        val gloss = Path().apply { addOval(RectF(l - 44f, t - 150f, r + 44f, t + 82f), Path.Direction.CW) }
+        c.drawPath(gloss, paint().apply { shader = lin(t, t + 82f, 0xB4FFFFFF.toInt(), 0x16FFFFFF) })
+        c.drawPath(gloss, paint().apply { style = Paint.Style.STROKE; strokeWidth = 1.6f; color = 0x33FFFFFF })
+        c.restore()
+        // the bevelled rim, bright on the upper left, dark on the lower right, and a keyline round the edge
+        c.drawPath(rr(l + 2f, t + 2f, r - 2f, b - 2f, 40f), paint().apply {
+            style = Paint.Style.STROKE; strokeWidth = 3.6f
+            shader = LinearGradient(l, t, r, b, intArrayOf(0xCCFFFFFF.toInt(), 0x22FFFFFF, 0x00000000, 0x88000000.toInt()), floatArrayOf(0f, 0.35f, 0.6f, 1f), Shader.TileMode.CLAMP)
+        })
+        c.drawPath(tile, paint().apply { style = Paint.Style.STROKE; strokeWidth = 1.6f; color = 0xCC000000.toInt() })
+    }
+
+    /** An app without a drawn icon: its own picture on a dark glossy tile, so the grid stays uniform. (The earlier Spirit look.) */
     private fun tile(own: Drawable): Bitmap = bitmap { c ->
         val t = rr(14f, 14f, 178f, 178f, 34f)
         c.glossy(t, 0xFF3a3d41.toInt(), 0xFF17191b.toInt(), 14f, 178f)
@@ -118,10 +204,29 @@ object AppIcons {
             "gallery" -> gallery(c); "music" -> music(c); "clock" -> clock(c); "calendar" -> calendar(c, day); "calculator" -> calculator(c)
             "contacts" -> contacts(c); "files" -> files(c); "settings" -> settings(c); "maps" -> maps(c); "notes" -> notes(c)
             "store" -> store(c); "video" -> video(c); "recorder" -> recorder(c); "weather" -> weather(c); "wallet" -> wallet(c); "tasks" -> tasks(c)
+            "ask" -> ask(c)
         }
     }
 
     val ALL = listOf("phone", "message", "email", "browser", "camera", "gallery", "music", "clock", "calendar", "calculator", "contacts", "files", "settings", "maps", "notes", "store", "video", "recorder", "weather", "wallet", "tasks")
+
+    /** The "ask" gem's emblem: a large and a small four-pointed spark. */
+    private fun ask(c: Canvas) {
+        fun spark(cx: Float, cy: Float, outer: Float, inner: Float): Path = Path().apply {
+            for (i in 0 until 8) {
+                val a = Math.toRadians(i * 45.0 - 90.0); val r = if (i % 2 == 0) outer else inner
+                val x = cx + (r * cos(a)).toFloat(); val y = cy + (r * sin(a)).toFloat()
+                if (i == 0) moveTo(x, y) else lineTo(x, y)
+            }
+            close()
+        }
+        val big = spark(88f, 100f, 70f, 17f); val small = spark(150f, 50f, 30f, 8f)
+        for (sp in listOf(big, small)) {
+            c.shadowOf(sp, dy = 5f, blur = 6f, alpha = 0x70)
+            c.drawPath(sp, paint().apply { shader = lin(30f, 170f, 0xFFFFFFFF.toInt(), 0xFFBFD9F2.toInt()) })
+            c.drawPath(sp, paint().apply { style = Paint.Style.STROKE; strokeWidth = 1.6f; color = 0x66FFFFFF })
+        }
+    }
 
     private fun phone(c: Canvas, sense: Boolean = false) {
         val curve = Path().apply { moveTo(46f, 52f); cubicTo(40f, 132f, 100f, 160f, 146f, 146f) }

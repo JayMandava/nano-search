@@ -29,8 +29,11 @@ class FramesPage(
     private fun dp(v: Int) = (v * density).toInt()
     private val pm = activity.packageManager
 
-    private val column = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(12), dp(4), dp(12), dp(24)) }
-    val scroll = ScrollView(activity).apply { isVerticalScrollBarEnabled = false; addView(column) }
+    /** Spirit: each frame is a glass card with a header bar, a shadow and a bevelled edge. */
+    private val spirit = pal.classic && !pal.sense
+
+    private val column = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(12), dp(4), dp(12), dp(24)); clipChildren = false; clipToPadding = false }
+    val scroll = ScrollView(activity).apply { isVerticalScrollBarEnabled = false; clipChildren = false; clipToPadding = false; addView(column) }
     val root: View = scroll
 
     private class Frame(val cn: ComponentName, val label: String, val note: HubStore.Note?, val openedAt: Long)
@@ -40,16 +43,16 @@ class FramesPage(
     fun refresh() {
         column.removeAllViews()
         val frames = collect()
-        column.addView(NText(activity).apply { text = "Active Frames"; textSize = 13f; setTextColor(pal.onVariant); setPadding(dp(4), dp(8), 0, dp(10)); letterSpacing = 0.06f; typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) })
+        column.addView(NText(activity).apply { text = "Active Frames"; textSize = 13f; setTextColor(if (spirit) 0xFFFFFFFF.toInt() else pal.onVariant); setPadding(dp(4), dp(8), 0, dp(10)); letterSpacing = 0.06f; typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL); if (spirit) setShadowLayer(6f, 0f, 1f, 0xCC000000.toInt()) })
         if (frames.isEmpty()) {
             column.addView(NText(activity).apply { text = "Apps you open show up here, with what they are saying right now."; textSize = 15f; setTextColor(pal.onVariant); setPadding(dp(4), dp(8), dp(4), 0) })
             return
         }
         for (i in frames.indices step 2) {
-            val row = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL }
+            val row = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL; clipChildren = false }
             for (j in 0..1) {
                 val f = frames.getOrNull(i + j)
-                row.addView(if (f != null) tile(f) else View(activity), LinearLayout.LayoutParams(0, dp(136), 1f).apply { setMargins(dp(4), dp(4), dp(4), dp(4)) })
+                row.addView(if (f != null) (if (spirit) spiritTile(f) else tile(f)) else View(activity), LinearLayout.LayoutParams(0, dp(if (spirit) 168 else 136), 1f).apply { setMargins(dp(4), dp(4), dp(4), dp(if (spirit) 8 else 4)) })
             }
             column.addView(row, LinearLayout.LayoutParams(-1, -2))
         }
@@ -71,6 +74,48 @@ class FramesPage(
         }
         for ((comp, _) in recents) add(ComponentName.unflattenFromString(comp), HubStore.snapshot().firstOrNull { it.pkg == comp.substringBefore('/') })
         return out.take(8)
+    }
+
+    private fun whenOf(f: Frame): String {
+        val whenText = (f.note?.whenMs ?: f.openedAt).takeIf { it > 0 }?.let {
+            if (System.currentTimeMillis() - it < 60_000L) "just now" else DateUtils.getRelativeTimeSpanString(it, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS, DateUtils.FORMAT_ABBREV_RELATIVE).toString()
+        }
+        return if (f.note != null) whenText.orEmpty() else if (whenText != null) "Opened $whenText" else ""
+    }
+
+    /** A glass card: a glossy header with the app's gem, its name and unread count; what the app is saying; and when. */
+    private fun spiritTile(f: Frame): View {
+        val card = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            background = ai.nanosearch.launcher.ui.SpiritGlass(activity, 10f, ai.nanosearch.launcher.ui.SpiritGlass.Look.CARD, pal.primary)
+            clipToOutline = true
+            elevation = dp(5).toFloat()
+            setOnClickListener { launch(f.cn, it) }
+            setOnLongClickListener { menu(f.cn, it); true }
+        }
+        val count = HubStore.countFor(f.cn.packageName)
+        val head = LinearLayout(activity).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            background = ai.nanosearch.launcher.ui.SpiritGlass(activity, 0f, ai.nanosearch.launcher.ui.SpiritGlass.Look.DOCK, pal.primary)
+            setPadding(dp(8), dp(6), dp(10), dp(6))
+            addView(ImageView(activity).apply { setImageDrawable(AppIcons.get(activity, f.cn)) }, LinearLayout.LayoutParams(dp(40), dp(40)))
+            addView(NText(activity).apply { text = f.label; textSize = 14f; setTextColor(pal.onSurface); maxLines = 1; ellipsize = TextUtils.TruncateAt.END; typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) },
+                LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(8) })
+            if (count > 0 && AppSettings.dots(activity)) addView(NText(activity).apply {
+                text = if (count > 9) "9+" else count.toString(); textSize = 10f; setTextColor(0xFFFFFFFF.toInt()); gravity = Gravity.CENTER; typeface = Typeface.DEFAULT_BOLD; minWidth = dp(20); setPadding(dp(5), 0, dp(5), 0)
+                background = ai.nanosearch.launcher.ui.SpiritGlass(activity, 10f, ai.nanosearch.launcher.ui.SpiritGlass.Look.ACCENT, pal.primary)
+            }, LinearLayout.LayoutParams(-2, dp(20)))
+        }
+        card.addView(head, LinearLayout.LayoutParams(-1, dp(52)))
+        val body = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(12), dp(9), dp(12), 0) }
+        val note = f.note
+        if (note != null && (note.title.isNotBlank() || note.body.isNotBlank())) {
+            if (note.title.isNotBlank()) body.addView(NText(activity).apply { text = note.title; textSize = 13.5f; setTextColor(pal.onSurface); maxLines = 1; ellipsize = TextUtils.TruncateAt.END; typeface = Typeface.DEFAULT_BOLD })
+            if (note.body.isNotBlank()) body.addView(NText(activity).apply { text = note.body; textSize = 12.5f; setTextColor(pal.onVariant); maxLines = if (note.title.isNotBlank()) 2 else 3; ellipsize = TextUtils.TruncateAt.END }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(2) })
+        } else body.addView(NText(activity).apply { text = "Nothing new"; textSize = 13f; setTextColor(pal.onVariant) })
+        card.addView(body, LinearLayout.LayoutParams(-1, 0, 1f))
+        card.addView(NText(activity).apply { text = whenOf(f); textSize = 11f; setTextColor(pal.onVariant); setPadding(dp(12), 0, dp(12), dp(9)); gravity = Gravity.END }, LinearLayout.LayoutParams(-1, -2))
+        return card
     }
 
     private fun tile(f: Frame): View {

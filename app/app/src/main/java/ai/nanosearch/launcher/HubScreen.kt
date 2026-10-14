@@ -75,6 +75,11 @@ class HubScreen(
 
     private fun round(color: Int, radius: Int) = GradientDrawable().apply { setColor(color); cornerRadius = dp(pal.radius(radius)).toFloat() }
 
+    /** Spirit gives the Hub glass: a glossy header bar, glass filter pills and card rows. */
+    private val spirit = pal.classic && !pal.sense
+    private fun glass(radiusDp: Float, look: ai.nanosearch.launcher.ui.SpiritGlass.Look = ai.nanosearch.launcher.ui.SpiritGlass.Look.DARK): android.graphics.drawable.Drawable =
+        ai.nanosearch.launcher.ui.SpiritGlass(activity, radiusDp, look, pal.primary)
+
     /** Builds the Hub offscreen. [peeking] true leaves it at the edge for the caller to drag in. */
     private fun build() {
         if (layer != null) return
@@ -92,6 +97,7 @@ class HubScreen(
         val close = NText(activity).apply { text = "✕"; textSize = 18f; setTextColor(pal.onVariant); gravity = Gravity.CENTER; setOnClickListener { dismiss() } }
         val header = LinearLayout(activity).apply {
             gravity = Gravity.CENTER_VERTICAL
+            if (spirit) { background = glass(0f, ai.nanosearch.launcher.ui.SpiritGlass.Look.DOCK); elevation = dp(6).toFloat(); setPadding(dp(16), 0, dp(4), 0) }
             addView(title, LinearLayout.LayoutParams(-2, -2))
             // the unread count is a small pill beside the title, not part of it
             countBadge = NText(activity).apply {
@@ -100,8 +106,8 @@ class HubScreen(
             }
             addView(countBadge, LinearLayout.LayoutParams(-2, dp(20)).apply { marginStart = dp(10) })
             addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
-            addView(clearButton, LinearLayout.LayoutParams(-2, dp(44)))
-            addView(close, LinearLayout.LayoutParams(dp(44), dp(44)))
+            addView(clearButton, LinearLayout.LayoutParams(-2, dp(if (spirit) 56 else 44)))
+            addView(close, LinearLayout.LayoutParams(dp(44), dp(if (spirit) 56 else 44)))
         }
 
         val chipRow = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL }
@@ -123,25 +129,30 @@ class HubScreen(
 
         banner = NText(activity).apply {
             text = "See notifications from your other apps  ›"; textSize = 13f; setTextColor(pal.onPrimaryContainer); gravity = Gravity.CENTER_VERTICAL
-            background = round(pal.primaryContainer, 19); setPadding(dp(14), 0, dp(14), 0); setOnClickListener { openAccess() }
+            if (spirit) { background = glass(7f, ai.nanosearch.launcher.ui.SpiritGlass.Look.ACCENT); setTextColor(0xFFFFFFFF.toInt()) } else background = round(pal.primaryContainer, 19)
+            setPadding(dp(14), 0, dp(14), 0); setOnClickListener { openAccess() }
         }
 
         listView = ListView(activity).apply {
             adapter = rows
-            divider = android.graphics.drawable.ColorDrawable(pal.outline); dividerHeight = dp(1)
-            clipToPadding = false; setPadding(0, 0, 0, bottom + dp(12))
+            if (spirit) { divider = android.graphics.drawable.ColorDrawable(0); dividerHeight = dp(8); clipToPadding = false; setPadding(dp(10), dp(6), dp(10), bottom + dp(12)) }
+            else { divider = android.graphics.drawable.ColorDrawable(pal.outline); dividerHeight = dp(1); clipToPadding = false; setPadding(0, 0, 0, bottom + dp(12)) }
             emptyView = null
         }
 
         val p = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(pal.panel or 0xFF000000.toInt())
+            if (spirit) background = android.graphics.drawable.LayerDrawable(arrayOf(
+                GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0xFF23262A.toInt(), 0xFF111214.toInt())),
+                android.graphics.drawable.ColorDrawable(0x33FFFFFF),
+            )).apply { setLayerWidth(1, dp(1)); setLayerGravity(1, Gravity.END) }
+            else setBackgroundColor(pal.panel or 0xFF000000.toInt())
             isClickable = true
             elevation = dp(16).toFloat()
-            setPadding(dp(16), top + dp(8), dp(8), 0)
-            addView(header, LinearLayout.LayoutParams(-1, -2))
-            addView(chipScroll, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(6); bottomMargin = dp(10) })
-            addView(banner, LinearLayout.LayoutParams(-1, dp(38)).apply { bottomMargin = dp(8); marginEnd = dp(8) })
+            if (spirit) setPadding(0, top, 0, 0) else setPadding(dp(16), top + dp(8), dp(8), 0)
+            addView(header, LinearLayout.LayoutParams(-1, if (spirit) dp(56) else -2))
+            addView(chipScroll, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(if (spirit) 12 else 6); bottomMargin = dp(10); if (spirit) marginStart = dp(10) })
+            addView(banner, LinearLayout.LayoutParams(-1, dp(38)).apply { bottomMargin = dp(8); marginEnd = dp(if (spirit) 10 else 8); if (spirit) marginStart = dp(10) })
             addView(listView, LinearLayout.LayoutParams(-1, 0, 1f))
         }
         val scrim = View(activity).apply { setBackgroundColor(pal.scrim); alpha = 0f; setOnClickListener { dismiss() } }
@@ -213,12 +224,12 @@ class HubScreen(
         appChip?.let { c ->
             val pkg = appFilter
             c.visibility = if (pkg != null) View.VISIBLE else View.GONE
-            if (pkg != null) { c.text = "${appName(pkg)}  ✕"; c.setTextColor(pal.onPrimaryContainer); c.background = round(pal.primaryContainer, 17) }
+            if (pkg != null) { c.text = "${appName(pkg)}  ✕"; c.setTextColor(if (spirit) 0xFFFFFFFF.toInt() else pal.onPrimaryContainer); c.background = if (spirit) glass(7f, ai.nanosearch.launcher.ui.SpiritGlass.Look.ACCENT) else round(pal.primaryContainer, 17) }
         }
         for ((key, chip) in chips) {
             val on = key == filter
-            chip.setTextColor(if (on) pal.onPrimary else pal.onVariant)
-            chip.background = round(if (on) pal.primary else pal.container, 17)
+            chip.setTextColor(if (spirit && on) 0xFFFFFFFF.toInt() else if (on) pal.onPrimary else pal.onVariant)
+            chip.background = if (spirit) glass(7f, if (on) ai.nanosearch.launcher.ui.SpiritGlass.Look.ACCENT else ai.nanosearch.launcher.ui.SpiritGlass.Look.DARK) else round(if (on) pal.primary else pal.container, 17)
         }
     }
 
@@ -266,6 +277,11 @@ class HubScreen(
             if (data.isEmpty()) return convertView ?: NText(activity).apply {
                 text = "All caught up"; textSize = 16f; setTextColor(pal.onVariant); gravity = Gravity.CENTER
                 layoutParams = AbsListViewParams(-1, dp(220))
+                if (spirit) { // an envelope gem above the words
+                    gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL; setPadding(0, dp(48), 0, 0)
+                    setCompoundDrawables(null, AppIcons.kindGem(activity, "email").constantState!!.newDrawable().mutate().apply { setBounds(0, 0, dp(72), dp(72)); alpha = 170 }, null, null)
+                    compoundDrawablePadding = dp(10)
+                }
             }
             val item = data[position]
             val row = (convertView as? LinearLayout) ?: buildRow()
@@ -286,7 +302,11 @@ class HubScreen(
         val body = NText(activity).apply { textSize = 14f; setTextColor(pal.onVariant); maxLines = 2; ellipsize = TextUtils.TruncateAt.END }
         val reply = NText(activity).apply { text = "Reply"; textSize = 13f; setTextColor(pal.primary); setPadding(0, dp(8), dp(20), dp(6)) }
         val dismiss = NText(activity).apply { text = "Dismiss"; textSize = 13f; setTextColor(pal.onVariant); setPadding(0, dp(8), dp(20), dp(6)) }
-        val actions = LinearLayout(activity).apply { addView(reply); addView(dismiss) }
+        if (spirit) for (b in listOf(reply, dismiss)) { b.setPadding(dp(14), dp(6), dp(14), dp(6)); b.background = glass(7f) } // small glass buttons
+        val actions = LinearLayout(activity).apply {
+            if (spirit) { setPadding(0, dp(8), 0, dp(2)); addView(reply, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(8) }); addView(dismiss) }
+            else { addView(reply); addView(dismiss) }
+        }
         val field = NEdit(activity).apply {
             hint = "Reply"; textSize = 15f; setTextColor(pal.onSurface); setHintTextColor(pal.onVariant); maxLines = 4
             background = round(pal.container, 10).also { it.setStroke(dp(1), pal.outline) }
@@ -304,8 +324,8 @@ class HubScreen(
         }
         return LinearLayout(activity).apply {
             gravity = Gravity.TOP
-            setPadding(0, dp(12), 0, dp(10))
-            addView(icon, LinearLayout.LayoutParams(dp(42), dp(42)).apply { marginEnd = dp(12); topMargin = dp(2) })
+            if (spirit) setPadding(dp(12), dp(12), dp(12), dp(10)) else setPadding(0, dp(12), 0, dp(10))
+            addView(icon, LinearLayout.LayoutParams(dp(if (spirit) 46 else 42), dp(if (spirit) 46 else 42)).apply { marginEnd = dp(12); topMargin = dp(2) })
             addView(col, LinearLayout.LayoutParams(0, -2, 1f))
             tag = Parts(icon, title, time, body, actions, reply, dismiss, replyBox, field, send)
         }
@@ -313,6 +333,10 @@ class HubScreen(
 
     private fun bind(row: LinearLayout, item: HubData.Item) {
         val p = row.tag as Parts
+        if (spirit) { // a glass card; an unread one has a blue edge down its left side
+            val card = glass(9f, ai.nanosearch.launcher.ui.SpiritGlass.Look.CARD)
+            row.background = if (item.unread) android.graphics.drawable.LayerDrawable(arrayOf(card, android.graphics.drawable.ColorDrawable(pal.primary))).apply { setLayerWidth(1, dp(3)); setLayerGravity(1, Gravity.START); setLayerInset(1, 0, dp(9), 0, dp(9)) } else card
+        }
         p.title.text = item.title.ifBlank { "(no title)" }
         p.title.typeface = Typeface.create("sans-serif", if (item.unread) Typeface.BOLD else Typeface.NORMAL)
         p.time.text = (if (item.id in HubStore.pinned(activity)) "★ " else "") + whenText(item)
@@ -347,6 +371,15 @@ class HubScreen(
     private fun bindIcon(view: ImageView, item: HubData.Item) {
         view.clearColorFilter(); view.background = null; view.setPadding(0, 0, 0, 0)
         val pkg = item.pkg
+        if (spirit) { // every source is a glossy gem
+            view.setImageDrawable(when {
+                item.kind == "event" -> AppIcons.kindGem(activity, "calendar", Calendar.getInstance().get(Calendar.DAY_OF_MONTH))
+                item.kind == "call" -> AppIcons.kindGem(activity, "phone")
+                pkg != null -> pm.getLaunchIntentForPackage(pkg)?.component?.let { runCatching { AppIcons.get(activity, it) }.getOrNull() } ?: icons.get("g|$pkg") ?: runCatching { AppIcons.gemOf(activity, pm.getApplicationIcon(pkg)) }.getOrNull()?.also { icons.put("g|$pkg", it) } ?: AppIcons.kindGem(activity, "message")
+                else -> AppIcons.kindGem(activity, "message")
+            })
+            return
+        }
         val drawable = pkg?.let { k -> icons.get(k) ?: runCatching { pm.getApplicationIcon(k) }.getOrNull()?.also { icons.put(k, it) } }
         if (drawable != null && item.kind != "event" && item.kind != "call") { view.setImageDrawable(drawable); return }
         view.setImageResource(when (item.kind) { "call" -> R.drawable.ic_kind_call; "event" -> R.drawable.ic_kind_event; else -> R.drawable.ic_kind_message })

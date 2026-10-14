@@ -90,17 +90,20 @@ class Overlays(private val activity: Activity, private val host: FrameLayout, pr
         layer.addView(scrim, FrameLayout.LayoutParams(-1, -1))
         scrim.animate().alpha(1f).setDuration(200).start()
 
+        val spirit = pal.classic && !pal.sense
         val card = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            elevation = dpf(6)
+            elevation = dpf(if (spirit) 10 else 6)
             clipChildren = false
+            if (spirit) { background = SpiritGlass(activity, 10f, SpiritGlass.Look.CARD, pal.primary); clipToOutline = true; setPadding(0, dp(4), 0, dp(4)) } // one glass slab for the whole menu
         }
         val rows = ArrayList<View>()
         groups.forEachIndexed { gi, group ->
             group.forEachIndexed { i, item ->
                 val row = menuRow(item, cornerRadii(i, group.size, 24, 4))
                 rows += row
-                card.addView(row, LinearLayout.LayoutParams(-1, dp(52)).apply { topMargin = if (i == 0 && gi > 0) dp(6) else if (i > 0) dp(2) else 0 })
+                if (spirit && (i > 0 || gi > 0)) card.addView(View(activity).apply { setBackgroundColor(if (i == 0) 0x40FFFFFF else 0x1FFFFFFF) }, LinearLayout.LayoutParams(-1, dp(1)).apply { if (i == 0) { topMargin = dp(3); bottomMargin = dp(3) } })
+                card.addView(row, LinearLayout.LayoutParams(-1, dp(52)).apply { if (!spirit) topMargin = if (i == 0 && gi > 0) dp(6) else if (i > 0) dp(2) else 0 })
             }
         }
         card.measure(View.MeasureSpec.makeMeasureSpec(dp(280), View.MeasureSpec.AT_MOST), View.MeasureSpec.UNSPECIFIED)
@@ -142,14 +145,15 @@ class Overlays(private val activity: Activity, private val host: FrameLayout, pr
     }
 
     private fun menuRow(item: MenuItem, radii: FloatArray): View {
+        val spirit = pal.classic && !pal.sense
         val ink = if (item.destructive) pal.error else pal.onSurface
-        val bg = GradientDrawable().apply { setColor(pal.card); cornerRadii = radii }
+        val bg = GradientDrawable().apply { setColor(if (spirit) Color.TRANSPARENT else pal.card); cornerRadii = if (spirit) FloatArray(8) else radii }
         val mask = GradientDrawable().apply { setColor(Color.WHITE); cornerRadii = radii }
         return LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(16), 0, dp(20), 0)
-            background = RippleDrawable(ColorStateList.valueOf(pal.outline), bg, mask)
+            background = RippleDrawable(ColorStateList.valueOf(if (spirit) 0x663DB8F0 else pal.outline), bg, if (spirit) GradientDrawable().apply { setColor(Color.WHITE) } else mask)
             addView(ImageView(activity).apply { setImageResource(item.icon); setColorFilter(ink) }, LinearLayout.LayoutParams(dp(20), dp(20)))
             addView(NText(activity).apply {
                 text = item.label

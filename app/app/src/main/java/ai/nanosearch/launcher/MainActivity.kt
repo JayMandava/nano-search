@@ -200,7 +200,11 @@ class MainActivity : Activity() {
     private fun senseGlass(radiusDp: Int): Drawable = ai.nanosearch.launcher.ui.SenseGloss(this, radiusDp)
 
     /** The search bar and its buttons: Sense glass, a flat outlined bar in Spirit, a soft rounded one in Modern. */
-    private fun barBg(radiusDp: Int): Drawable = if (pal.sense) senseGlass(9) else round(pal.bar, radiusDp).also { if (pal.classic) it.setStroke(dp(1), pal.outline) }
+    private fun barBg(radiusDp: Int): Drawable = if (pal.sense) senseGlass(9) else if (pal.classic) spiritGlass(7f) else round(pal.bar, radiusDp)
+
+    /** Spirit: glossy glass with a lit upper half, a bright top edge and a dark border; with an elevation it casts a soft shadow. */
+    private fun spiritGlass(radiusDp: Float, look: ai.nanosearch.launcher.ui.SpiritGlass.Look = ai.nanosearch.launcher.ui.SpiritGlass.Look.DARK, accent: Int = pal.primary, opacity: Float = 1f): Drawable =
+        ai.nanosearch.launcher.ui.SpiritGlass(this, radiusDp, look, accent, opacity)
 
     /** A glossy dark band with a bright edge along its top (the tab bar of the Sense drawer). */
     private fun senseDock(): Drawable = android.graphics.drawable.LayerDrawable(arrayOf(
@@ -428,21 +432,21 @@ class MainActivity : Activity() {
         divider = View(this).apply { setBackgroundColor(pal.outline); visibility = View.GONE }
         resultsPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(pal.panel)
+            if (pal.classic && !pal.sense) background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0xFF1E2125.toInt(), 0xFF101113.toInt())) else setBackgroundColor(pal.panel)
             visibility = View.GONE
             isClickable = true // swallow touches so nothing underneath reacts
             addView(card, LinearLayout.LayoutParams(-1, -2).apply { setMargins(dp(12), dp(8), dp(12), 0) })
             addView(divider, LinearLayout.LayoutParams(-1, dp(1)).apply { setMargins(dp(20), dp(12), dp(20), dp(4)) })
             addView(list, LinearLayout.LayoutParams(-1, 0, 1f))
         }
-        if (pal.sense) { // raised glass: the strip and its buttons cast a soft shadow
+        if (pal.classic) { // raised glass: the strip and its buttons cast a soft shadow
             bar.clipChildren = false
             input.elevation = dp(6).toFloat(); mic.elevation = dp(6).toFloat()
             (hubButton?.parent as? View)?.elevation = dp(6).toFloat()
         }
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            if (pal.sense) clipChildren = false
+            if (pal.classic) clipChildren = false
             addView(bar, LinearLayout.LayoutParams(-1, -2).apply { setMargins(dp(16), dp(10), dp(16), dp(6)) })
             addView(resultsPanel, LinearLayout.LayoutParams(-1, 0, 1f))
         }
@@ -522,8 +526,9 @@ class MainActivity : Activity() {
         dockRow = LinearLayout(this@MainActivity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            background = if (pal.sense) ai.nanosearch.launcher.ui.SenseArch(this@MainActivity, dp(60).toFloat()) else if (pal.classic) flatBar(pal.dock, pal.outline) else round(pal.dock, 36)
+            background = if (pal.sense) ai.nanosearch.launcher.ui.SenseArch(this@MainActivity, dp(60).toFloat()) else if (pal.classic) spiritGlass(0f, ai.nanosearch.launcher.ui.SpiritGlass.Look.DOCK) else round(pal.dock, 36)
             if (pal.sense) { clipChildren = false; clipToPadding = false } // the ring stands up out of the panel
+            if (pal.classic && !pal.sense) elevation = dp(10).toFloat() // the dock stands proud of the wallpaper, with a shadow above it
             setPadding(dp(8), dp(if (pal.classic) 8 else 10), dp(8), dp(if (pal.classic) 6 else 10))
         }
         pager = ViewPager(this@MainActivity).apply {
@@ -559,7 +564,7 @@ class MainActivity : Activity() {
         }
         homeContent = LinearLayout(this@MainActivity).apply {
             orientation = LinearLayout.VERTICAL
-            if (pal.sense) clipChildren = false // the ring stands up out of the dock
+            if (pal.classic) clipChildren = false // the ring (Sense) and the dock's shadow (Spirit) reach out of the dock
             addView(pager, LinearLayout.LayoutParams(-1, 0, 1f))
             if (pal.classic && !pal.sense) {
                 pageLabel = NText(this@MainActivity).apply { textSize = 12f; setTextColor(pal.onVariant); gravity = Gravity.CENTER; setShadowLayer(6f, 0f, 1f, 0x99000000.toInt()); letterSpacing = 0.06f }
@@ -1053,7 +1058,8 @@ class MainActivity : Activity() {
         val views = LinkedHashMap<String, TextView>()
         val bar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            background = if (pal.sense) senseDock() else flatBar(pal.dock or 0xFF000000.toInt(), pal.outline)
+            background = if (pal.sense) senseDock() else spiritGlass(0f, ai.nanosearch.launcher.ui.SpiritGlass.Look.DOCK)
+            if (!pal.sense) elevation = dp(8).toFloat()
             for ((key, label, icon) in tabs) {
                 val tab = NText(context).apply {
                     text = label; textSize = 11f; gravity = Gravity.CENTER; compoundDrawablePadding = dp(2); setPadding(0, dp(6), 0, dp(4))
@@ -1072,9 +1078,10 @@ class MainActivity : Activity() {
     private fun styleTabs() {
         for ((key, tab) in tabViews) {
             val on = key == drawerTab
-            tab.setTextColor(if (on) pal.primary else pal.onVariant)
-            tab.compoundDrawablesRelative[1]?.mutate()?.setTint(if (on) pal.primary else pal.onVariant)
-            tab.background = if (on) flatBar(0x00000000, pal.primary).also { (it as android.graphics.drawable.LayerDrawable).setLayerHeight(1, dp(3)) } else null
+            tab.setTextColor(if (on) Color.WHITE else pal.onVariant)
+            tab.compoundDrawablesRelative[1]?.mutate()?.setTint(if (on) Color.WHITE else pal.onVariant)
+            // the chosen tab is a blue gel button set into the bar
+            tab.background = if (on) android.graphics.drawable.InsetDrawable(spiritGlass(6f, ai.nanosearch.launcher.ui.SpiritGlass.Look.ACCENT), dp(10), dp(6), dp(10), dp(6)) else null
         }
     }
 
@@ -2263,6 +2270,13 @@ class MainActivity : Activity() {
                         if (bmp != null) { thumbs.put(item.key, bmp); ui.post { if (h.boundKey == item.key) h.icon.setImageBitmap(bmp) } }
                     }
                 }
+            } else if (pal.classic && !pal.sense) {
+                // Spirit: the same glossy gems as the apps (a contact is the address book, a text is the messaging gem, and so on)
+                h.glyph.visibility = View.GONE
+                h.icon.visibility = View.VISIBLE
+                h.icon.scaleType = ImageView.ScaleType.FIT_CENTER
+                val gemKind = mapOf("contact" to "contacts", "message" to "message", "call" to "phone", "event" to "calendar", "file" to "files", "setting" to "settings", "ask" to "ask")[item.kind] ?: "files"
+                h.icon.setImageDrawable(AppIcons.kindGem(this@MainActivity, gemKind, if (gemKind == "calendar") java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_MONTH) else 0))
             } else {
                 // A tonal rounded square with the kind's Material glyph.
                 h.glyph.visibility = View.GONE
@@ -2341,9 +2355,9 @@ class MainActivity : Activity() {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER_HORIZONTAL
                 if (pal.classic && !pal.sense) {
-                    // a boxed tile with the name on a darker strip along its foot
+                    // a glass tile with the name on a darker strip along its foot
                     setPadding(0, dp(10), 0, 0)
-                    background = GradientDrawable().apply { setColor(0x38000000); cornerRadius = dp(pal.radius(14)).toFloat(); setStroke(dp(1), 0x26FFFFFF) }
+                    background = spiritGlass(9f, ai.nanosearch.launcher.ui.SpiritGlass.Look.CARD, opacity = 0.6f)
                     clipToOutline = true
                 } else setPadding(dp(2), dp(4), dp(2), dp(4))
                 // pressed: grow a little, as in Android's launchers (a state animator follows the list's own pressed state)
@@ -2361,7 +2375,13 @@ class MainActivity : Activity() {
                 addView(NText(context).apply {
                     textSize = 12f; setTextColor(if (pal.classic) 0xFFF1F3F4.toInt() else pal.onSurface); maxLines = if (pal.sense) 2 else 1; gravity = Gravity.CENTER
                     ellipsize = TextUtils.TruncateAt.END
-                    if (pal.classic && !pal.sense) { setBackgroundColor(0x80000000.toInt()); setPadding(dp(4), dp(4), dp(4), dp(4)) } else if (!pal.sense) setShadowLayer(0f, 0f, 0f, 0)
+                    if (pal.classic && !pal.sense) {
+                        background = android.graphics.drawable.LayerDrawable(arrayOf(
+                            GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0xCC2A2E33.toInt(), 0xE60F1113.toInt())),
+                            android.graphics.drawable.ColorDrawable(0x44FFFFFF),
+                        )).apply { setLayerHeight(1, 1); setLayerGravity(1, Gravity.TOP) }
+                        setPadding(dp(4), dp(5), dp(4), dp(5))
+                    } else if (!pal.sense) setShadowLayer(0f, 0f, 0f, 0)
                 }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(if (pal.classic && !pal.sense) 8 else 4) })
             }
             val item = items[position]
