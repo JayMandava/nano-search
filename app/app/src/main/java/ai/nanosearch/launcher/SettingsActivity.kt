@@ -123,7 +123,6 @@ private fun SettingsScreen(onBack: () -> Unit, listState: LazyListState, scroll:
             item { ModelsRow() }
             item { Header("Appearance") }
             item { AppearanceCard() }
-            item { WeatherCard() }
             item { Header("Screen") }
             item { FullScreenCard() }
             item { Header("Hub and badges") }
@@ -254,56 +253,6 @@ private fun HubCard(tick: Int) {
                     )
                 }
                 FilledTonalButton(onClick = { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }) { Text(if (allowed) "Manage" else "Allow") }
-            }
-        }
-    }
-}
-
-/** Weather on the flip clock: off by default; one city, chosen from the offline list. */
-@Composable
-private fun WeatherCard() {
-    val context = LocalContext.current
-    var on by remember { mutableStateOf(Weather.enabled(context)) }
-    var f by remember { mutableStateOf(Weather.fahrenheit(context)) }
-    var city by remember { mutableStateOf(Weather.city(context)?.first) }
-    var query by remember { mutableStateOf("") }
-    // looking cities up reads a large list on first use: done off the main thread, so typing and scrolling never wait for it
-    val matches by produceState(emptyList<Gazetteer.Match>(), query) { value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { Gazetteer.search(context, query) } }
-    Card(shape = RoundedCornerShape(24.dp)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Column(Modifier.weight(1f).padding(end = 16.dp)) {
-                    Text("Weather on the flip clock", style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        "Off by default. When on, the clock asks Open-Meteo for the weather in one city (chosen below, or from your approximate location), at most every 30 minutes, and sends nothing else.",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(checked = on, onCheckedChange = { on = it; Weather.setEnabled(context, it) })
-            }
-            if (on) {
-                var here by remember { mutableStateOf(Weather.useLocation(context)) }
-                val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok -> Weather.setUseLocation(context, ok); here = ok }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f).padding(end = 16.dp)) {
-                        Text("Use my location", style = MaterialTheme.typography.bodyLarge)
-                        Text("Optional. Uses your approximate location, never a precise one, to pick the city. Off: choose a city below.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Switch(checked = here, onCheckedChange = { want ->
-                        if (!want) { Weather.setUseLocation(context, false); here = false }
-                        else if (Weather.locationGranted(context)) { Weather.setUseLocation(context, true); here = true }
-                        else ask.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
-                    })
-                }
-                Text(if (here) "City: ${Weather.spot(context)?.first ?: "waiting for a location"} (from your location)" else if (city != null) "City: $city" else "Choose a city", style = MaterialTheme.typography.bodyMedium)
-                androidx.compose.material3.OutlinedTextField(value = query, onValueChange = { query = it }, label = { Text("Search for a city") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                matches.forEach { m ->
-                    TextButton(onClick = { Weather.setCity(context, m.place.city, m.lat, m.lon); city = m.place.city; query = "" }) { Text(m.place.toString()) }
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                    Text("Fahrenheit", style = MaterialTheme.typography.bodyLarge)
-                    Switch(checked = f, onCheckedChange = { f = it; Weather.setFahrenheit(context, it) })
-                }
             }
         }
     }

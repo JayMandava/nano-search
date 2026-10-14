@@ -566,8 +566,10 @@ class MainActivity : Activity() {
     /** The clock wallpaper's choices, one row each: tap a row to move to its next option, then set it as the wallpaper in Android's own preview. */
     private fun showLockClockSheet() {
         overlays.listSheet("Clock on the lock screen", listOf(
-            MenuItem(R.drawable.ic_menu_clock, "Clock: ${LockClock.nameOf(LockClock.CLOCKS, LockClock.clock(this))}") { LockClock.cycleClock(this); showLockClockSheet() },
-            MenuItem(R.drawable.ic_menu_wallpaper, "Background: ${LockClock.nameOf(LockClock.BACKGROUNDS, LockClock.background(this))}") { LockClock.cycleBackground(this); showLockClockSheet() },
+            MenuItem(R.drawable.ic_menu_wallpaper, "Background: ${LockClock.nameOf(LockClock.backgrounds(this), LockClock.background(this))}") { LockClock.cycleBackground(this); showLockClockSheet() },
+            MenuItem(R.drawable.ic_menu_add, if (LockClock.hasPhoto(this)) "Choose another photo…" else "Choose a photo from your gallery…") {
+                tryStart { startActivityForResult(Intent(Intent.ACTION_GET_CONTENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE), REQ_LOCK_PHOTO) }
+            },
             MenuItem(R.drawable.ic_menu_swap, "Position: ${LockClock.nameOf(LockClock.POSITIONS, LockClock.position(this))}") { LockClock.cyclePosition(this); showLockClockSheet() },
             MenuItem(R.drawable.ic_menu_add, "Set as wallpaper…") { tryStart { LockClock.openPicker(this) } },
         ))
@@ -1150,6 +1152,14 @@ class MainActivity : Activity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (requestCode == REQ_PHOTO) {
             if (resultCode == RESULT_OK) data?.data?.let { wallpaperScreen.startCrop(it) }
+            return
+        }
+        if (requestCode == REQ_LOCK_PHOTO) {
+            val uri = data?.data
+            if (resultCode == RESULT_OK && uri != null) Thread {
+                val ok = LockClock.setPhoto(this, uri)
+                runOnUiThread { if (ok) showLockClockSheet() else Toast.makeText(this, "Couldn't use that picture", Toast.LENGTH_SHORT).show() }
+            }.start()
             return
         }
         if (!HomeWidgets.dispatch(requestCode, resultCode, data)) super.onActivityResult(requestCode, resultCode, data)
@@ -1985,6 +1995,7 @@ class MainActivity : Activity() {
         const val REQ_ACCESS = 2
         const val REQ_MIC = 3
         const val REQ_PHOTO = 43
+        const val REQ_LOCK_PHOTO = 44
         const val OCR_VERSION = 2 // 2: text is also stored without joining punctuation
         var lastHeavyRefresh = 0L
         var lastAccessSignature = -1

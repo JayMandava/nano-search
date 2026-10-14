@@ -75,7 +75,6 @@ object LiveFrames {
                 val next = runCatching { context.getSystemService(AlarmManager::class.java).nextAlarmClock }.getOrNull()
                 Live(big = clock.format(Date()), bigSub = if (next != null) "Next alarm " + DateFormat.format("EEE ", next.triggerTime) + clock.format(Date(next.triggerTime)) else "No alarm set")
             }
-            "weather" -> Weather.cached(context)?.let { w -> Live(big = Weather.format(context, w), bigSub = Weather.spot(context)?.first.orEmpty()) }
             "calendar" -> extras.filter { it.kind == "event" }.take(3).map { e ->
                 (if (android.text.format.DateUtils.isToday(e.whenMs)) clock.format(Date(e.whenMs)) else DateFormat.format("EEE ", e.whenMs).toString() + clock.format(Date(e.whenMs))) + "  " + e.title
             }.takeIf { it.isNotEmpty() }?.let { Live(lines = it) }

@@ -24,7 +24,7 @@ answers questions, and listens when you speak. Small language models run entirel
   the search bar, its buttons, menus, cards and tabs are glossy glass with a lit upper half, a bright top edge and a dark border. Icons are original glossy gems (a handset, an envelope, a camera, a calendar page that shows today's date) cut from three restrained metals;
   an app without a drawn icon keeps its own picture on a graphite gem tinted by its colour. The Hub is a glass list of cards, and Active Frames are live glass cards: now-playing with controls, a notification's picture and lines, your next events, battery and storage, an app's shortcuts.
   Pair it with [Bold Keys](https://github.com/JayMandava/bold-keys), the matching keyboard.
-- **Flip clock and Steel Dial:** two clock widgets drawn by the launcher, also usable as a live wallpaper behind the lock screen. The flip clock can show the weather, which is off by default (see Privacy).
+- **Steel Dial:** a clock widget drawn by the launcher, also usable as a live wallpaper behind the lock screen, over one of the drawn wallpapers, black, or a photo from your gallery.
 - **Translucent drawer in Spirit:** the wallpaper shows through the app drawer, and each app sits in a boxed tile with its name on a darker strip along the foot, in the manner of the boxed-tile launchers of the mid-2010s.
 - **Hub:** one list for texts, missed calls, upcoming events and the notifications of your other apps, with filters, replying in place where an app allows it,
   and dismissing. Swipe in from the left edge or tap the Hub button by the search bar. It uses Android's notification access, which you grant yourself;
@@ -41,8 +41,8 @@ answers questions, and listens when you speak. Small language models run entirel
 
 ## Privacy
 
-Everything is indexed into a private database inside the app. Models run on the CPU. The app has the INTERNET permission for two
-reasons: downloading models when you tap Download, and, only if you switch on the flip clock's weather and choose a city, fetching that city's current weather from Open-Meteo (the city's coordinates are the only thing sent). The weather can optionally use your approximate location (a separate switch and permission, coarse only, rounded to about a kilometre) instead of a chosen city. Notification access, if you allow it for the Hub, only reads notifications on the phone. Downloads are checked against a SHA-256 before they are used, and
+Everything is indexed into a private database inside the app. Models run on the CPU. The app has the INTERNET permission for one
+reason: downloading models when you tap Download. Notification access, if you allow it for the Hub, only reads notifications on the phone. Downloads are checked against a SHA-256 before they are used, and
 "Download on Wi-Fi only" is on by default. Each search source (contacts, messages, calls, calendar, files, photos) can be switched off
 in Settings, and "Clear and rebuild" empties the index.
 
@@ -116,4 +116,4 @@ Nano Search is licensed under the [Apache License 2.0](LICENSE). The models it d
 - Place names come from [GeoNames](https://www.geonames.org), licensed CC BY 4.0.
 - Models are the work of their authors under the licences in the table above.
 
-Spirit uses the Source Sans 3 typeface (SIL Open Font License, copyright Adobe), bundled with its licence. The flip clock uses Play (SIL OFL, Playtype) and the Steel Dial uses Barlow (SIL OFL, The Barlow Project Authors), each bundled with its licence. Weather data comes from [Open-Meteo](https://open-meteo.com) (CC BY 4.0).
+Spirit uses the Source Sans 3 typeface (SIL Open Font License, copyright Adobe), bundled with its licence. The Steel Dial uses Barlow (SIL OFL, The Barlow Project Authors), each bundled with its licence. Weather data comes from [Open-Meteo](https://open-meteo.com) (CC BY 4.0).
