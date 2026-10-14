@@ -544,9 +544,18 @@ class MainActivity : Activity() {
                     page.alpha = 1f - a * 0.65f
                 } else page.alpha = 1f - a * 0.5f
             }
+            val vp = this
             addOnPageChangeListener(object : ViewPager.SimpleOnPageChangeListener() {
                 override fun onPageScrolled(position: Int, positionOffset: Float, positionOffsetPixels: Int) { dots.setPosition(position + positionOffset); slideWallpaper(position + positionOffset) }
-                override fun onPageSelected(position: Int) { updatePageLabel(); if (position < pageOffset) framesPage?.refresh() }
+                override fun onPageSelected(position: Int) { updatePageLabel() }
+                override fun onPageScrollStateChanged(state: Int) {
+                    val moving = state != ViewPager.SCROLL_STATE_IDLE
+                    // while pages slide, each is drawn once into a layer and only moved and faded (no redraw of its contents every frame)
+                    for (i in 0 until vp.childCount) vp.getChildAt(i).setLayerType(if (moving) View.LAYER_TYPE_HARDWARE else View.LAYER_TYPE_NONE, null)
+                    boostFrameRate(moving)
+                    framesPage?.setScrolling(moving)
+                    if (!moving && vp.currentItem < pageOffset) framesPage?.refresh() // arrived: bring the frames up to date, never mid-swipe
+                }
             })
         }
         dots = PageDots(this@MainActivity, Color.WHITE, arc = pal.sense, accent = pal.primary).apply { if (pal.sense) setOnClickListener { leap() } }
@@ -629,6 +638,7 @@ class MainActivity : Activity() {
     private fun openHub() {
         if (hubScreen.isShowing) return
         resetUi()
+        boostFrameRate(true); window.decorView.postDelayed({ boostFrameRate(false) }, 450)
         hubScreen.show()
     }
 
@@ -1327,7 +1337,17 @@ class MainActivity : Activity() {
         homeContent.alpha = 1f - 0.85f * p
     }
 
+    /** Asks for the display's top refresh rate (120 Hz here) while something moves, then lets it settle back so a still screen costs nothing. Android 15 and later. */
+    private val frameRateOff = Runnable { if (Build.VERSION.SDK_INT >= 35) window.decorView.setRequestedFrameRate(View.REQUESTED_FRAME_RATE_CATEGORY_NO_PREFERENCE) }
+    private fun boostFrameRate(on: Boolean, holdMs: Long = 400) {
+        if (Build.VERSION.SDK_INT < 35) return
+        val v = window.decorView
+        v.removeCallbacks(frameRateOff)
+        if (on) v.setRequestedFrameRate(120f) else v.postDelayed(frameRateOff, holdMs)
+    }
+
     private fun animateDrawer(to: Float, durationMs: Long, end: () -> Unit) {
+        boostFrameRate(true); window.decorView.postDelayed({ boostFrameRate(false) }, durationMs)
         ObjectAnimator.ofFloat(drawer, View.TRANSLATION_Y, drawer.translationY, to).apply {
             duration = durationMs
             interpolator = DecelerateInterpolator(1.7f)
@@ -2359,7 +2379,6 @@ class MainActivity : Activity() {
                     // a glass tile with the name on a darker strip along its foot
                     setPadding(0, dp(10), 0, 0)
                     background = spiritGlass(9f, ai.nanosearch.launcher.ui.SpiritGlass.Look.CARD, opacity = 0.6f)
-                    clipToOutline = true
                 } else setPadding(dp(2), dp(4), dp(2), dp(4))
                 // pressed: grow a little, as in Android's launchers (a state animator follows the list's own pressed state)
                 stateListAnimator = android.animation.StateListAnimator().apply {
@@ -2377,8 +2396,10 @@ class MainActivity : Activity() {
                     textSize = 12f; setTextColor(if (pal.classic) 0xFFF1F3F4.toInt() else pal.onSurface); maxLines = if (pal.sense) 2 else 1; gravity = Gravity.CENTER
                     ellipsize = TextUtils.TruncateAt.END
                     if (pal.classic && !pal.sense) {
+                        // the strip carries the tile's bottom corners itself, so the tile needs no clipping
+                        val foot = dp(8).toFloat()
                         background = android.graphics.drawable.LayerDrawable(arrayOf(
-                            GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0xCC2A2E33.toInt(), 0xE60F1113.toInt())),
+                            GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0xCC2A2E33.toInt(), 0xE60F1113.toInt())).apply { cornerRadii = floatArrayOf(0f, 0f, 0f, 0f, foot, foot, foot, foot) },
                             android.graphics.drawable.ColorDrawable(0x44FFFFFF),
                         )).apply { setLayerHeight(1, 1); setLayerGravity(1, Gravity.TOP) }
                         setPadding(dp(4), dp(5), dp(4), dp(5))

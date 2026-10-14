@@ -40,22 +40,38 @@ class FramesPage(
 
     private fun round(color: Int, radius: Int) = GradientDrawable().apply { setColor(color); cornerRadius = dp(pal.radius(radius)).toFloat() }
 
+    private var drawnSig: String? = null
+    private var scrolling = false
+    private var pendingDraw = false
+
+    /** Told while the pages are sliding: nothing is rebuilt then (a rebuild in the middle of a swipe is what made it stutter), and what is waiting is done when it stops. */
+    fun setScrolling(on: Boolean) {
+        scrolling = on
+        if (!on && pendingDraw) { pendingDraw = false; draw() }
+    }
+
+    /** Brings the frames up to date. The pictures are only rebuilt when something on them changed. */
     fun refresh() {
-        if (spirit && !loading) {
-            loading = true
-            Thread {
-                val m = runCatching { LiveFrames.media(activity) }.getOrDefault(emptyList())
-                val e = runCatching { HubData.load(activity) }.getOrDefault(emptyList())
-                val map = HashMap<String, LiveFrames.Live>()
-                for (f in runCatching { collect(m) }.getOrDefault(emptyList())) runCatching { LiveFrames.live(activity, f.cn.packageName, f.label, e) }.getOrNull()?.let { map[f.cn.packageName] = it }
-                val sig = map.entries.sortedBy { it.key }.joinToString(";") { it.key + it.value.signature }
-                activity.runOnUiThread {
-                    loading = false
-                    if (m.map { it.title + it.playing } != media.map { it.title + it.playing } || sig != liveSig) { media = m; extras = e; liveByPkg = map; liveSig = sig; draw() }
+        if (!spirit) { if (scrolling) pendingDraw = true else draw(); return }
+        if (drawnSig == null) { drawnSig = ""; draw() } // something on screen straight away; the real content follows
+        if (loading) return
+        loading = true
+        Thread {
+            val m = runCatching { LiveFrames.media(activity) }.getOrDefault(emptyList())
+            val e = runCatching { HubData.load(activity) }.getOrDefault(emptyList())
+            val frames = runCatching { collect(m) }.getOrDefault(emptyList())
+            val map = HashMap<String, LiveFrames.Live>()
+            for (f in frames) runCatching { LiveFrames.live(activity, f.cn.packageName, f.label, e) }.getOrNull()?.let { map[f.cn.packageName] = it }
+            val sig = frames.joinToString(";") { f -> "${f.cn.packageName}|${f.note?.title}|${f.note?.body}|${whenOf(f)}|${map[f.cn.packageName]?.signature}" } +
+                "#" + m.joinToString(";") { it.pkg + it.title + it.playing }
+            activity.runOnUiThread {
+                loading = false
+                if (sig != drawnSig) {
+                    media = m; extras = e; liveByPkg = map; drawnSig = sig
+                    if (scrolling) pendingDraw = true else draw()
                 }
-            }.start()
-        }
-        draw()
+            }
+        }.start()
     }
 
     private fun draw() {
