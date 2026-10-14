@@ -1004,8 +1004,8 @@ class MainActivity : Activity() {
         drawerEmpty = NText(this@MainActivity).apply { textSize = 15f; setTextColor(pal.onVariant); gravity = Gravity.CENTER; visibility = View.GONE }
         addView(drawerEmpty, FrameLayout.LayoutParams(-1, -2, Gravity.CENTER))
         if (pal.classic && !pal.sense) {
-            grid.setPadding(dp(8), dp(8), dp(8), dp(24) + dp(56))
-            addView(buildTabBar(), FrameLayout.LayoutParams(-1, dp(56), Gravity.BOTTOM))
+            grid.setPadding(dp(8), dp(8), dp(8), dp(24) + dp(66))
+            addView(buildTabBar(), FrameLayout.LayoutParams(-1, dp(66), Gravity.BOTTOM))
         }
         if (pal.sense) {
             // Sense's drawer: a charcoal page under a title bar, the grid, and three glossy tabs along the bottom
@@ -1081,7 +1081,7 @@ class MainActivity : Activity() {
             tab.setTextColor(if (on) Color.WHITE else pal.onVariant)
             tab.compoundDrawablesRelative[1]?.mutate()?.setTint(if (on) Color.WHITE else pal.onVariant)
             // the chosen tab is a blue gel button set into the bar
-            tab.background = if (on) android.graphics.drawable.InsetDrawable(spiritGlass(6f, ai.nanosearch.launcher.ui.SpiritGlass.Look.ACCENT), dp(10), dp(6), dp(10), dp(6)) else null
+            tab.background = if (on) android.graphics.drawable.InsetDrawable(spiritGlass(8f, ai.nanosearch.launcher.ui.SpiritGlass.Look.ACCENT), dp(14), dp(8), dp(14), dp(12)) else null
         }
     }
 

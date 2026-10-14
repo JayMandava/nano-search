@@ -82,6 +82,7 @@ object LiveFrames {
             "phone" -> extras.filter { it.kind == "call" }.take(3).map { "Missed: ${it.title}" }.takeIf { it.isNotEmpty() }?.let { Live(lines = it) }
             "message" -> extras.filter { it.kind == "message" && it.pkg == pkg }.take(3).map { "${it.title}: ${it.body}" }.takeIf { it.isNotEmpty() }?.let { Live(lines = it) }
             "camera", "gallery" -> photos(context, 3).takeIf { it.isNotEmpty() }?.let { Live(photos = it) }
+            "files" -> recentFiles(context).takeIf { it.isNotEmpty() }?.let { Live(lines = it) }
             "settings" -> {
                 val b = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
                 val pct = b?.let { it.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) * 100 / it.getIntExtra(BatteryManager.EXTRA_SCALE, 100).coerceAtLeast(1) } ?: -1
@@ -94,10 +95,32 @@ object LiveFrames {
             else -> null
         }
         if (live != null && !live.isEmpty) return live
+        // what the app has running in the shade (a VPN's state, a download, Tor's status)
+        val running = ongoing(pkg)
+        if (running.isNotEmpty()) return Live(lines = running)
         // anything else: the shortcuts the app publishes (what the app can do, one tap away)
         val sc = shortcuts(context, pkg)
         return if (sc.isNotEmpty()) Live(shortcuts = sc) else null
     }
+
+    /** The newest files this app is allowed to see (photos, videos, audio, whatever the granted permissions cover), by name. */
+    private fun recentFiles(context: Context): List<String> = runCatching {
+        val out = ArrayList<String>()
+        context.contentResolver.query(MediaStore.Files.getContentUri("external"), arrayOf(MediaStore.Files.FileColumns.DISPLAY_NAME), "${MediaStore.Files.FileColumns.MEDIA_TYPE} != 0", null,
+            "${MediaStore.Files.FileColumns.DATE_ADDED} DESC LIMIT 3")?.use { c -> while (c.moveToNext()) c.getString(0)?.let { out.add(it) } }
+        out
+    }.getOrDefault(emptyList())
+
+    /** What an app shows in the notification shade while it runs (not a message to read): its title and text, newest first. */
+    private fun ongoing(pkg: String): List<String> = runCatching {
+        val out = ArrayList<String>()
+        for (sbn in HubStore.service?.activeNotifications.orEmpty().filter { it.packageName == pkg && it.notification.flags and android.app.Notification.FLAG_GROUP_SUMMARY == 0 }.sortedByDescending { it.postTime }.take(2)) {
+            val x = sbn.notification.extras
+            x.getCharSequence(android.app.Notification.EXTRA_TITLE)?.toString()?.takeIf { it.isNotBlank() }?.let { out.add(it) }
+            x.getCharSequence(android.app.Notification.EXTRA_TEXT)?.toString()?.takeIf { it.isNotBlank() }?.let { out.add(it) }
+        }
+        out.take(3)
+    }.getOrDefault(emptyList())
 
     private fun photos(context: Context, n: Int): List<Bitmap> {
         if (!has(context, Manifest.permission.READ_MEDIA_IMAGES)) return emptyList()

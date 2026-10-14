@@ -74,7 +74,9 @@ class FramesPage(
                 if (mediaFor(first) != null) row.addView(spiritTile(first, wide = true), LinearLayout.LayoutParams(0, -1, 1f).apply { setMargins(dp(4), dp(4), dp(4), dp(8)) })
                 else {
                     row.addView(spiritTile(first), LinearLayout.LayoutParams(0, -1, 1f).apply { setMargins(dp(4), dp(4), dp(4), dp(8)) })
-                    val nextIdx = queue.indexOfFirst { mediaFor(it) == null }
+                    // pair a frame with one of the same kind (full cards with full cards, compact ones with compact ones), so a row never has a tall card beside an empty one
+                    val rich = hasContent(first)
+                    val nextIdx = queue.indexOfFirst { mediaFor(it) == null && hasContent(it) == rich }.takeIf { it >= 0 } ?: queue.indexOfFirst { mediaFor(it) == null }
                     if (nextIdx >= 0) row.addView(spiritTile(queue.removeAt(nextIdx)), LinearLayout.LayoutParams(0, -1, 1f).apply { setMargins(dp(4), dp(4), dp(4), dp(8)) })
                     else row.addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
                 }
@@ -124,6 +126,9 @@ class FramesPage(
     private var loading = false
     private var liveSig = ""
 
+    /** Whether a frame has anything to show beyond its header: a notification, live content or music. */
+    private fun hasContent(f: Frame) = mediaFor(f) != null || liveByPkg[f.cn.packageName] != null || (f.note != null && (f.note.title.isNotBlank() || f.note.body.isNotBlank()))
+
     private fun mediaFor(f: Frame) = media.firstOrNull { it.pkg == f.cn.packageName }
 
     private var liveByPkg: Map<String, LiveFrames.Live> = emptyMap()
@@ -171,6 +176,7 @@ class FramesPage(
         val m = mediaFor(f)
         val note = f.note
         val live = liveByPkg[f.cn.packageName]
+        var quiet = false
         when {
             m != null -> { // now playing: the cover, the track and the transport buttons
                 val row = LinearLayout(activity).apply { gravity = Gravity.CENTER_VERTICAL }
@@ -216,12 +222,11 @@ class FramesPage(
                     setOnClickListener { sc.open() }
                 }, LinearLayout.LayoutParams(-1, dp(32)).apply { bottomMargin = dp(4) })
             }
-            else -> { // nothing the app lets us read: its gem, standing in for the frame's picture
-                body.gravity = Gravity.CENTER
-                body.addView(ImageView(activity).apply { setImageDrawable(AppIcons.get(activity, f.cn)); alpha = 0.85f }, LinearLayout.LayoutParams(dp(60), dp(60)))
+            else -> { // nothing the app lets us read: a compact card (its header and when you last opened it) rather than an empty window
+                card.minimumHeight = 0; quiet = true
             }
         }
-        card.addView(body, LinearLayout.LayoutParams(-1, 0, 1f))
+        if (!quiet) card.addView(body, LinearLayout.LayoutParams(-1, 0, 1f))
         card.addView(NText(activity).apply { text = if (m != null) (if (m.playing) "Playing" else "Paused") else whenOf(f); textSize = 11f; setTextColor(pal.onVariant); setPadding(dp(12), dp(4), dp(12), dp(9)); gravity = Gravity.END }, LinearLayout.LayoutParams(-1, -2))
         return card
     }
