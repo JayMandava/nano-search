@@ -41,6 +41,18 @@ class FramesPage(
     private fun round(color: Int, radius: Int) = GradientDrawable().apply { setColor(color); cornerRadius = dp(pal.radius(radius)).toFloat() }
 
     fun refresh() {
+        if (spirit && !loading) {
+            loading = true
+            Thread {
+                val m = runCatching { LiveFrames.media(activity) }.getOrDefault(emptyList())
+                val e = runCatching { HubData.load(activity) }.getOrDefault(emptyList())
+                activity.runOnUiThread { loading = false; if (m.map { it.title + it.playing } != media.map { it.title + it.playing } || e.size != extras.size) { media = m; extras = e; draw() } }
+            }.start()
+        }
+        draw()
+    }
+
+    private fun draw() {
         column.removeAllViews()
         val frames = collect()
         column.addView(NText(activity).apply { text = "Active Frames"; textSize = 13f; setTextColor(if (spirit) 0xFFFFFFFF.toInt() else pal.onVariant); setPadding(dp(4), dp(8), 0, dp(10)); letterSpacing = 0.06f; typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL); if (spirit) setShadowLayer(6f, 0f, 1f, 0xCC000000.toInt()) })
@@ -48,11 +60,27 @@ class FramesPage(
             column.addView(NText(activity).apply { text = "Apps you open show up here, with what they are saying right now."; textSize = 15f; setTextColor(pal.onVariant); setPadding(dp(4), dp(8), dp(4), 0) })
             return
         }
+        if (spirit) { // a frame playing music takes a full row; the rest sit two to a row
+            val queue = ArrayList(frames)
+            while (queue.isNotEmpty()) {
+                val first = queue.removeAt(0)
+                val row = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL; clipChildren = false }
+                if (mediaFor(first) != null) row.addView(spiritTile(first, wide = true), LinearLayout.LayoutParams(0, -1, 1f).apply { setMargins(dp(4), dp(4), dp(4), dp(8)) })
+                else {
+                    row.addView(spiritTile(first), LinearLayout.LayoutParams(0, -1, 1f).apply { setMargins(dp(4), dp(4), dp(4), dp(8)) })
+                    val nextIdx = queue.indexOfFirst { mediaFor(it) == null }
+                    if (nextIdx >= 0) row.addView(spiritTile(queue.removeAt(nextIdx)), LinearLayout.LayoutParams(0, -1, 1f).apply { setMargins(dp(4), dp(4), dp(4), dp(8)) })
+                    else row.addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
+                }
+                column.addView(row, LinearLayout.LayoutParams(-1, -2))
+            }
+            return
+        }
         for (i in frames.indices step 2) {
             val row = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL; clipChildren = false }
             for (j in 0..1) {
                 val f = frames.getOrNull(i + j)
-                row.addView(if (f != null) (if (spirit) spiritTile(f) else tile(f)) else View(activity), LinearLayout.LayoutParams(0, dp(if (spirit) 168 else 136), 1f).apply { setMargins(dp(4), dp(4), dp(4), dp(if (spirit) 8 else 4)) })
+                row.addView(if (f != null) tile(f) else View(activity), LinearLayout.LayoutParams(0, dp(136), 1f).apply { setMargins(dp(4), dp(4), dp(4), dp(4)) })
             }
             column.addView(row, LinearLayout.LayoutParams(-1, -2))
         }
@@ -69,6 +97,7 @@ class FramesPage(
             val label = runCatching { pm.getActivityInfo(cn, 0).loadLabel(pm).toString() }.getOrNull() ?: return
             out.add(Frame(cn, label, note, openedAt[cn.packageName] ?: 0L))
         }
+        if (spirit) for (m in media) add(pm.getLaunchIntentForPackage(m.pkg)?.component, null) // whatever is playing leads
         if (AppSettings.dots(activity) || AppSettings.hub(activity)) {
             for (n in HubStore.snapshot()) add(pm.getLaunchIntentForPackage(n.pkg)?.component, n)
         }
@@ -83,20 +112,50 @@ class FramesPage(
         return if (f.note != null) whenText.orEmpty() else if (whenText != null) "Opened $whenText" else ""
     }
 
-    /** A glass card: a glossy header with the app's gem, its name and unread count; what the app is saying; and when. */
-    private fun spiritTile(f: Frame): View {
+    /** The live things worth showing for an app with no notification: its next events, its missed calls, or its latest texts. Loaded off the main thread. */
+    private var extras: List<HubData.Item> = emptyList()
+    private var media: List<LiveFrames.Media> = emptyList()
+    private var loading = false
+
+    private fun mediaFor(f: Frame) = media.firstOrNull { it.pkg == f.cn.packageName }
+
+    /** What a frame can say beyond its notification: a few lines of real content from the app's own data. */
+    private fun liveLines(f: Frame): List<String> {
+        val kind = AppIcons.kindOf(f.cn.packageName, f.label)
+        val clock = android.text.format.DateFormat.getTimeFormat(activity)
+        return when (kind) {
+            "calendar" -> extras.filter { it.kind == "event" }.take(3).map { e ->
+                val day = DateUtils.formatDateTime(activity, e.whenMs, DateUtils.FORMAT_SHOW_WEEKDAY or DateUtils.FORMAT_ABBREV_WEEKDAY)
+                val sameDay = DateUtils.isToday(e.whenMs)
+                (if (sameDay) clock.format(java.util.Date(e.whenMs)) else "$day ${clock.format(java.util.Date(e.whenMs))}") + "  " + e.title
+            }
+            "phone" -> extras.filter { it.kind == "call" }.take(3).map { "Missed: ${it.title}" }
+            "message" -> extras.filter { it.kind == "message" && it.pkg == f.cn.packageName }.take(3).map { "${it.title}: ${it.body}" }
+            else -> emptyList()
+        }
+    }
+
+    private fun glassButton(label: String, onClick: () -> Unit) = NText(activity).apply {
+        text = label; textSize = 13f; setTextColor(0xFFFFFFFF.toInt()); gravity = Gravity.CENTER
+        background = ai.nanosearch.launcher.ui.SpiritGlass(activity, 9f, ai.nanosearch.launcher.ui.SpiritGlass.Look.DARK, pal.primary)
+        setOnClickListener { onClick(); postDelayed({ refresh() }, 350) }
+    }
+
+    /** A glass card: a glossy header with the app's gem, its name and unread count, then what the app is doing, and when. */
+    private fun spiritTile(f: Frame, wide: Boolean = false): View {
         val card = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            background = ai.nanosearch.launcher.ui.SpiritGlass(activity, 10f, ai.nanosearch.launcher.ui.SpiritGlass.Look.CARD, pal.primary)
+            background = ai.nanosearch.launcher.ui.SpiritGlass(activity, 11f, ai.nanosearch.launcher.ui.SpiritGlass.Look.CARD, pal.primary)
             clipToOutline = true
             elevation = dp(5).toFloat()
+            minimumHeight = dp(150)
             setOnClickListener { launch(f.cn, it) }
             setOnLongClickListener { menu(f.cn, it); true }
         }
         val count = HubStore.countFor(f.cn.packageName)
         val head = LinearLayout(activity).apply {
             gravity = Gravity.CENTER_VERTICAL
-            background = ai.nanosearch.launcher.ui.SpiritGlass(activity, 0f, ai.nanosearch.launcher.ui.SpiritGlass.Look.DOCK, pal.primary)
+            background = ai.nanosearch.launcher.ui.SpiritGlass(activity, 11f, ai.nanosearch.launcher.ui.SpiritGlass.Look.DOCK, pal.primary, topOnly = true)
             setPadding(dp(8), dp(6), dp(10), dp(6))
             addView(ImageView(activity).apply { setImageDrawable(AppIcons.get(activity, f.cn)) }, LinearLayout.LayoutParams(dp(40), dp(40)))
             addView(NText(activity).apply { text = f.label; textSize = 14f; setTextColor(pal.onSurface); maxLines = 1; ellipsize = TextUtils.TruncateAt.END; typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) },
@@ -108,13 +167,46 @@ class FramesPage(
         }
         card.addView(head, LinearLayout.LayoutParams(-1, dp(52)))
         val body = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(12), dp(9), dp(12), 0) }
+        fun text(t: String, size: Float, color: Int, lines: Int, bold: Boolean = false) = NText(activity).apply {
+            this.text = t; textSize = size; setTextColor(color); maxLines = lines; ellipsize = TextUtils.TruncateAt.END; if (bold) typeface = Typeface.DEFAULT_BOLD
+        }
+        fun picture(b: android.graphics.Bitmap, h: Int) = ImageView(activity).apply {
+            setImageBitmap(b); scaleType = ImageView.ScaleType.CENTER_CROP; clipToOutline = true
+            outlineProvider = object : android.view.ViewOutlineProvider() { override fun getOutline(v: View, o: android.graphics.Outline) = o.setRoundRect(0, 0, v.width, v.height, dp(7).toFloat()) }
+        }.let { img -> LinearLayout(activity).apply { addView(img, LinearLayout.LayoutParams(-1, dp(h))) } }
+
+        val m = mediaFor(f)
         val note = f.note
-        if (note != null && (note.title.isNotBlank() || note.body.isNotBlank())) {
-            if (note.title.isNotBlank()) body.addView(NText(activity).apply { text = note.title; textSize = 13.5f; setTextColor(pal.onSurface); maxLines = 1; ellipsize = TextUtils.TruncateAt.END; typeface = Typeface.DEFAULT_BOLD })
-            if (note.body.isNotBlank()) body.addView(NText(activity).apply { text = note.body; textSize = 12.5f; setTextColor(pal.onVariant); maxLines = if (note.title.isNotBlank()) 2 else 3; ellipsize = TextUtils.TruncateAt.END }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(2) })
-        } else body.addView(NText(activity).apply { text = "Nothing new"; textSize = 13f; setTextColor(pal.onVariant) })
+        val lines = liveLines(f)
+        when {
+            m != null -> { // now playing: the cover, the track and the transport buttons
+                val row = LinearLayout(activity).apply { gravity = Gravity.CENTER_VERTICAL }
+                if (m.art != null) row.addView(ImageView(activity).apply {
+                    setImageBitmap(m.art); scaleType = ImageView.ScaleType.CENTER_CROP; clipToOutline = true
+                    outlineProvider = object : android.view.ViewOutlineProvider() { override fun getOutline(v: View, o: android.graphics.Outline) = o.setRoundRect(0, 0, v.width, v.height, dp(8).toFloat()) }
+                }, LinearLayout.LayoutParams(dp(84), dp(84)).apply { marginEnd = dp(12) })
+                val col = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
+                col.addView(text(m.title, 15f, pal.onSurface, 2, bold = true))
+                if (m.artist.isNotBlank()) col.addView(text(m.artist, 13f, pal.onVariant, 1), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(2) })
+                val controls = LinearLayout(activity).apply { gravity = Gravity.CENTER_VERTICAL }
+                controls.addView(glassButton("◀◀") { m.previous() }, LinearLayout.LayoutParams(0, dp(36), 1f))
+                controls.addView(glassButton(if (m.playing) "❚❚" else "▶") { m.toggle() }, LinearLayout.LayoutParams(0, dp(36), 1.3f).apply { marginStart = dp(6); marginEnd = dp(6) })
+                controls.addView(glassButton("▶▶") { m.next() }, LinearLayout.LayoutParams(0, dp(36), 1f))
+                col.addView(controls, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+                row.addView(col, LinearLayout.LayoutParams(0, -2, 1f))
+                body.addView(row)
+            }
+            note != null && (note.title.isNotBlank() || note.body.isNotBlank()) -> {
+                if (note.picture != null) body.addView(picture(note.picture, if (wide) 110 else 70), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
+                if (note.title.isNotBlank()) body.addView(text(note.title, 13.5f, pal.onSurface, 1, bold = true))
+                val shown = if (note.lines.size > 1) note.lines.takeLast(3) else listOf(note.body).filter { it.isNotBlank() }
+                for (l in shown) body.addView(text(l, 12.5f, pal.onVariant, if (shown.size == 1 && note.picture == null) 3 else 1), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(2) })
+            }
+            lines.isNotEmpty() -> for (l in lines) body.addView(text(l, 13f, pal.onSurface, 1), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(3) })
+            else -> body.addView(text("Nothing new", 13f, pal.onVariant, 1))
+        }
         card.addView(body, LinearLayout.LayoutParams(-1, 0, 1f))
-        card.addView(NText(activity).apply { text = whenOf(f); textSize = 11f; setTextColor(pal.onVariant); setPadding(dp(12), 0, dp(12), dp(9)); gravity = Gravity.END }, LinearLayout.LayoutParams(-1, -2))
+        card.addView(NText(activity).apply { text = if (m != null) (if (m.playing) "Playing" else "Paused") else whenOf(f); textSize = 11f; setTextColor(pal.onVariant); setPadding(dp(12), dp(4), dp(12), dp(9)); gravity = Gravity.END }, LinearLayout.LayoutParams(-1, -2))
         return card
     }
 

@@ -20,6 +20,8 @@ object HubStore {
     class Note(
         val key: String, val pkg: String, val title: String, val body: String, val whenMs: Long, val kind: String,
         val contentIntent: PendingIntent?, val reply: Notification.Action?, val clearable: Boolean,
+        /** A picture the notification carries (a photo, or the sender's picture), kept small, and the extra lines of a list or chat. Used by Active Frames. */
+        val picture: android.graphics.Bitmap? = null, val lines: List<String> = emptyList(),
     )
 
     private val notes = LinkedHashMap<String, Note>()
@@ -120,7 +122,17 @@ object HubStore {
             else -> "app"
         }
         val reply = n.actions?.firstOrNull { a -> a.remoteInputs?.any { it.allowFreeFormInput } == true }
-        return Note(sbn.key, sbn.packageName, title, body, sbn.postTime, kind, n.contentIntent, reply, sbn.isClearable)
+        @Suppress("DEPRECATION")
+        val picture = (x.getParcelable<android.graphics.Bitmap>(Notification.EXTRA_PICTURE) ?: x.getParcelable<android.graphics.Bitmap>(Notification.EXTRA_LARGE_ICON))?.let { LiveFrames.shrink(it, 360) }
+        val lines = ArrayList<String>()
+        x.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)?.takeLast(4)?.forEach { lines.add(it.toString()) }
+        @Suppress("DEPRECATION")
+        x.getParcelableArray(Notification.EXTRA_MESSAGES)?.takeLast(3)?.forEach { m ->
+            val b = m as? android.os.Bundle
+            val text = b?.getCharSequence("text")?.toString().orEmpty()
+            if (text.isNotBlank()) lines.add(text)
+        }
+        return Note(sbn.key, sbn.packageName, title, body, sbn.postTime, kind, n.contentIntent, reply, sbn.isClearable, picture, lines)
     }
 }
 

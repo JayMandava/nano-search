@@ -200,11 +200,11 @@ class MainActivity : Activity() {
     private fun senseGlass(radiusDp: Int): Drawable = ai.nanosearch.launcher.ui.SenseGloss(this, radiusDp)
 
     /** The search bar and its buttons: Sense glass, a flat outlined bar in Spirit, a soft rounded one in Modern. */
-    private fun barBg(radiusDp: Int): Drawable = if (pal.sense) senseGlass(9) else if (pal.classic) spiritGlass(7f) else round(pal.bar, radiusDp)
+    private fun barBg(radiusDp: Int): Drawable = if (pal.sense) senseGlass(9) else if (pal.classic) spiritGlass(9f) else round(pal.bar, radiusDp)
 
     /** Spirit: glossy glass with a lit upper half, a bright top edge and a dark border; with an elevation it casts a soft shadow. */
-    private fun spiritGlass(radiusDp: Float, look: ai.nanosearch.launcher.ui.SpiritGlass.Look = ai.nanosearch.launcher.ui.SpiritGlass.Look.DARK, accent: Int = pal.primary, opacity: Float = 1f): Drawable =
-        ai.nanosearch.launcher.ui.SpiritGlass(this, radiusDp, look, accent, opacity)
+    private fun spiritGlass(radiusDp: Float, look: ai.nanosearch.launcher.ui.SpiritGlass.Look = ai.nanosearch.launcher.ui.SpiritGlass.Look.DARK, accent: Int = pal.primary, opacity: Float = 1f, topOnly: Boolean = false): Drawable =
+        ai.nanosearch.launcher.ui.SpiritGlass(this, radiusDp, look, accent, opacity, topOnly)
 
     /** A glossy dark band with a bright edge along its top (the tab bar of the Sense drawer). */
     private fun senseDock(): Drawable = android.graphics.drawable.LayerDrawable(arrayOf(
@@ -526,7 +526,7 @@ class MainActivity : Activity() {
         dockRow = LinearLayout(this@MainActivity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            background = if (pal.sense) ai.nanosearch.launcher.ui.SenseArch(this@MainActivity, dp(60).toFloat()) else if (pal.classic) spiritGlass(0f, ai.nanosearch.launcher.ui.SpiritGlass.Look.DOCK) else round(pal.dock, 36)
+            background = if (pal.sense) ai.nanosearch.launcher.ui.SenseArch(this@MainActivity, dp(60).toFloat()) else if (pal.classic) spiritGlass(12f, ai.nanosearch.launcher.ui.SpiritGlass.Look.DOCK, topOnly = true) else round(pal.dock, 36)
             if (pal.sense) { clipChildren = false; clipToPadding = false } // the ring stands up out of the panel
             if (pal.classic && !pal.sense) elevation = dp(10).toFloat() // the dock stands proud of the wallpaper, with a shadow above it
             setPadding(dp(8), dp(if (pal.classic) 8 else 10), dp(8), dp(if (pal.classic) 6 else 10))
@@ -1058,8 +1058,8 @@ class MainActivity : Activity() {
         val views = LinkedHashMap<String, TextView>()
         val bar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            background = if (pal.sense) senseDock() else spiritGlass(0f, ai.nanosearch.launcher.ui.SpiritGlass.Look.DOCK)
-            if (!pal.sense) elevation = dp(8).toFloat()
+            background = if (pal.sense) senseDock() else spiritGlass(10f, ai.nanosearch.launcher.ui.SpiritGlass.Look.DOCK, topOnly = true)
+            if (!pal.sense) { elevation = dp(8).toFloat(); clipToOutline = true }
             for ((key, label, icon) in tabs) {
                 val tab = NText(context).apply {
                     text = label; textSize = 11f; gravity = Gravity.CENTER; compoundDrawablePadding = dp(2); setPadding(0, dp(6), 0, dp(4))

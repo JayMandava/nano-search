@@ -90,12 +90,16 @@ object AppIcons {
 
     // ---------------------------------------------------------------- Spirit: the glossy gem
 
-    /** The colour of the gem each kind of app sits in, chosen so the drawn object on it stands out. */
-    private val GEM_COLOURS = mapOf(
-        "phone" to 0xFF1F9F4D, "message" to 0xFF6B3FBF, "email" to 0xFF2060C0, "browser" to 0xFF3B4048, "camera" to 0xFFAEB4BD, "gallery" to 0xFF1C7FA6,
-        "music" to 0xFF3C3A8F, "clock" to 0xFFE0881A, "calendar" to 0xFF148D99, "calculator" to 0xFF3B4048, "contacts" to 0xFFAEB4BD, "files" to 0xFF3F72A8,
-        "settings" to 0xFF3B4048, "maps" to 0xFF1B8F6A, "notes" to 0xFFD9A81C, "store" to 0xFF2F4F7A, "video" to 0xFF7A2FA0, "recorder" to 0xFFB3262C,
-        "weather" to 0xFF2E8FD8, "wallet" to 0xFF7A4B2A, "tasks" to 0xFF1F9F9A, "ask" to 0xFF1A8FD6,
+    /**
+     * The metal each gem is cut from. Restrained, as on the original: three neutrals (gunmetal blue for communication, graphite for media, steel for tools),
+     * with the colour left to the drawn object on top.
+     */
+    private const val GUNMETAL = 0xFF3E4C5E; private const val GRAPHITE = 0xFF3D4147; private const val STEEL = 0xFF7C838C
+    private val GEM_COLOURS: Map<String, Long> = mapOf(
+        "phone" to GUNMETAL, "message" to GUNMETAL, "email" to GUNMETAL, "contacts" to GUNMETAL, "browser" to GUNMETAL, "ask" to 0xFF2F6A9C,
+        "music" to GRAPHITE, "video" to GRAPHITE, "gallery" to GRAPHITE, "camera" to GRAPHITE, "recorder" to GRAPHITE, "maps" to GRAPHITE,
+        "clock" to STEEL, "calendar" to STEEL, "calculator" to STEEL, "files" to STEEL, "settings" to STEEL, "notes" to STEEL, "tasks" to STEEL,
+        "wallet" to STEEL, "weather" to STEEL, "store" to STEEL,
     )
 
     /** Any picture set in a gem: for an app that has no launcher entry of its own to ask. */
@@ -134,7 +138,7 @@ object AppIcons {
         }
         if (total < 1.2f || Math.hypot(hc.toDouble(), hs.toDouble()) / total < 0.6) return 0xFF3B4048.toInt() // plain, or many colours (a mean of them would be mud): graphite
         android.graphics.Color.colorToHSV(android.graphics.Color.rgb((r / total).toInt(), (g / total).toInt(), (bl / total).toInt()), hsv)
-        hsv[1] = hsv[1].coerceIn(0.55f, 0.9f); hsv[2] = hsv[2].coerceIn(0.5f, 0.78f)
+        hsv[1] = (hsv[1] * 0.4f).coerceIn(0.16f, 0.36f); hsv[2] = hsv[2].coerceIn(0.36f, 0.5f) // a tint of the app's colour in graphite, never a loud tile
         return android.graphics.Color.HSVToColor(hsv)
     }
 
@@ -145,12 +149,12 @@ object AppIcons {
     private fun gem(base: Int, emblem: Bitmap, scale: Float, shadow: Boolean = false): Bitmap = bitmap { c ->
         val l = 14f; val t = 10f; val r = 178f; val b = 174f
         val tile = rr(l, t, r, b, 42f)
-        val hi = ai.nanosearch.launcher.ui.SpiritGlass.lighten(base, 0.38f); val lo = ai.nanosearch.launcher.ui.SpiritGlass.darken(base, 0.42f)
+        val hi = ai.nanosearch.launcher.ui.SpiritGlass.lighten(base, 0.30f); val lo = ai.nanosearch.launcher.ui.SpiritGlass.darken(base, 0.5f)
         c.shadowOf(tile, dy = 8f, blur = 9f, alpha = 0x90)
         c.drawPath(tile, paint().apply { shader = LinearGradient(0f, t, 0f, b, intArrayOf(hi, base, lo), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP) })
         c.save(); c.clipPath(tile)
         // light bouncing up from the foot
-        c.drawCircle(96f, b + 6f, 96f, paint().apply { shader = RadialGradient(96f, b + 6f, 96f, 0x66FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP) })
+        c.drawCircle(96f, b + 6f, 96f, paint().apply { shader = RadialGradient(96f, b + 6f, 96f, 0x44FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP) })
         c.restore()
         // the emblem
         val half = 192f * scale / 2f

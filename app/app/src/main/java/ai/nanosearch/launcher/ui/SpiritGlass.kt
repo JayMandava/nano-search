@@ -18,7 +18,7 @@ import android.graphics.drawable.Drawable
  * top, a dark border all round and a soft shadow underneath when the view has an elevation. [Look] picks the glass: dark for bars and buttons,
  * a flatter one for cards, and a coloured one for whatever is selected.
  */
-class SpiritGlass(context: Context, radiusDp: Float, private val look: Look = Look.DARK, private val accent: Int = 0xFF1AA0E0.toInt(), private val opacity: Float = 1f) : Drawable() {
+class SpiritGlass(context: Context, radiusDp: Float, private val look: Look = Look.DARK, private val accent: Int = 0xFF1AA0E0.toInt(), private val opacity: Float = 1f, private val topOnly: Boolean = false) : Drawable() {
     enum class Look { DARK, DOCK, CARD, ACCENT }
 
     private val d = context.resources.displayMetrics.density
@@ -43,7 +43,7 @@ class SpiritGlass(context: Context, radiusDp: Float, private val look: Look = Lo
     }
 
     override fun onBoundsChange(b: Rect) {
-        rect.set(b); clip.reset(); clip.addRoundRect(rect, r, r, Path.Direction.CW)
+        rect.set(b); clip.reset(); clip.addRoundRect(rect, radii(0f), Path.Direction.CW)
         // the top half and the bottom half are separate gradients, so the lit half ends in a crisp edge
         fill.shader = LinearGradient(0f, b.top.toFloat(), 0f, b.bottom.toFloat(), intArrayOf(topA, topB, botA, botB), floatArrayOf(0f, 0.499f, 0.5f, 1f), Shader.TileMode.CLAMP)
         line.shader = LinearGradient(b.left.toFloat(), 0f, b.right.toFloat(), 0f, intArrayOf(0x00FFFFFF, highlight, highlight, 0x00FFFFFF), floatArrayOf(0f, 0.12f, 0.88f, 1f), Shader.TileMode.CLAMP)
@@ -60,15 +60,21 @@ class SpiritGlass(context: Context, radiusDp: Float, private val look: Look = Lo
         c.restore()
         stroke.strokeWidth = 1f * d; stroke.color = rim; stroke.alpha = ((rim ushr 24) * opacity).toInt()
         val i1 = 1.5f * d
-        c.drawRoundRect(rect.left + i1, rect.top + i1, rect.right - i1, rect.bottom - i1, (r - i1).coerceAtLeast(0f), (r - i1).coerceAtLeast(0f), stroke)
+        c.drawPath(Path().apply { addRoundRect(RectF(rect.left + i1, rect.top + i1, rect.right - i1, rect.bottom - i1), radii(i1), Path.Direction.CW) }, stroke)
         stroke.strokeWidth = 1.2f * d; stroke.color = border; stroke.alpha = ((border ushr 24) * opacity.coerceAtLeast(0.7f)).toInt()
         val i0 = stroke.strokeWidth / 2
         if (look == Look.DOCK && r == 0f) { // a bar that runs edge to edge: a border along its top and bottom only
             c.drawLine(rect.left, rect.top + i0, rect.right, rect.top + i0, stroke); c.drawLine(rect.left, rect.bottom - i0, rect.right, rect.bottom - i0, stroke)
-        } else c.drawRoundRect(rect.left + i0, rect.top + i0, rect.right - i0, rect.bottom - i0, (r - i0).coerceAtLeast(0f), (r - i0).coerceAtLeast(0f), stroke)
+        } else c.drawPath(Path().apply { addRoundRect(RectF(rect.left + i0, rect.top + i0, rect.right - i0, rect.bottom - i0), radii(i0), Path.Direction.CW) }, stroke)
     }
 
-    override fun getOutline(outline: Outline) { outline.setRoundRect(bounds, r); outline.alpha = 0.9f }
+    /** Corner radii for a path inset by [inset]: all four corners, or only the top two for a bar that rises from the bottom of the screen. */
+    private fun radii(inset: Float): FloatArray {
+        val v = (r - inset).coerceAtLeast(0f)
+        return if (topOnly) floatArrayOf(v, v, v, v, 0f, 0f, 0f, 0f) else floatArrayOf(v, v, v, v, v, v, v, v)
+    }
+
+    override fun getOutline(outline: Outline) { if (topOnly) outline.setConvexPath(clip) else outline.setRoundRect(bounds, r); outline.alpha = 0.9f }
     override fun setAlpha(alpha: Int) = Unit
     override fun setColorFilter(cf: ColorFilter?) = Unit
     @Deprecated("Drawable API") override fun getOpacity() = PixelFormat.TRANSLUCENT
