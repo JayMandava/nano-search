@@ -77,12 +77,12 @@ object HubStore {
     fun dismissAll() { service?.cancelAllNotifications() }
 
     internal fun reset(context: Context, all: Array<StatusBarNotification>?) {
-        synchronized(notes) { notes.clear(); all?.forEach { build(context, it)?.let { n -> notes[n.key] = n } } }
+        synchronized(notes) { notes.clear(); all?.forEach { runCatching { build(context, it) }.getOrNull()?.let { n -> notes[n.key] = n } } }
         changed()
     }
 
     internal fun post(context: Context, sbn: StatusBarNotification) {
-        val n = build(context, sbn)
+        val n = runCatching { build(context, sbn) }.getOrNull() // a notification that cannot be read is skipped, never fatal
         synchronized(notes) { if (n != null) notes[n.key] = n else notes.remove(sbn.key) }
         changed()
     }
@@ -95,6 +95,26 @@ object HubStore {
     }
 
     internal fun remove(key: String) { synchronized(notes) { notes.remove(key) }; changed() }
+
+    /**
+     * The picture a notification carries, whatever form it is in: an app may attach a Bitmap or, on newer Android, an Icon, and asking for the wrong one throws
+     * (that crashed the launcher in a loop: it was asked again at every reconnect). One that cannot be read is simply no picture.
+     */
+    @Suppress("DEPRECATION")
+    private fun pictureOf(context: Context, x: android.os.Bundle): android.graphics.Bitmap? {
+        for (key in listOf(Notification.EXTRA_PICTURE, Notification.EXTRA_PICTURE_ICON, Notification.EXTRA_LARGE_ICON)) {
+            val bmp = when (val v = runCatching { x.get(key) }.getOrNull()) {
+                is android.graphics.Bitmap -> v
+                is android.graphics.drawable.Icon -> runCatching { v.loadDrawable(context)?.let { d ->
+                    val w = d.intrinsicWidth.coerceAtLeast(1); val h = d.intrinsicHeight.coerceAtLeast(1)
+                    android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888).also { b -> d.setBounds(0, 0, w, h); d.draw(android.graphics.Canvas(b)) }
+                } }.getOrNull()
+                else -> null
+            }
+            if (bmp != null) return runCatching { LiveFrames.shrink(bmp, 360) }.getOrNull()
+        }
+        return null
+    }
 
     private fun build(context: Context, sbn: StatusBarNotification): Note? {
         val n = sbn.notification
@@ -122,8 +142,7 @@ object HubStore {
             else -> "app"
         }
         val reply = n.actions?.firstOrNull { a -> a.remoteInputs?.any { it.allowFreeFormInput } == true }
-        @Suppress("DEPRECATION")
-        val picture = (x.getParcelable<android.graphics.Bitmap>(Notification.EXTRA_PICTURE) ?: x.getParcelable<android.graphics.Bitmap>(Notification.EXTRA_LARGE_ICON))?.let { LiveFrames.shrink(it, 360) }
+        val picture = pictureOf(context, x)
         val lines = ArrayList<String>()
         x.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)?.takeLast(4)?.forEach { lines.add(it.toString()) }
         @Suppress("DEPRECATION")
