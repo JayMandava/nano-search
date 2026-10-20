@@ -37,6 +37,8 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,6 +50,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** Choose which apps stay out of the app drawer and search. They are still installed and still work; this only hides them from view. */
 class HiddenAppsActivity : ComponentActivity() {
@@ -88,7 +92,15 @@ private fun HiddenAppsScreen(onBack: () -> Unit) {
     val rows = remember { appRows(context) }
     var hidden by remember { mutableStateOf(AppSettings.hiddenApps(context)) }
     var filter by remember { mutableStateOf("") }
-    val shown = rows.filter { filter.isBlank() || it.label.contains(filter.trim(), ignoreCase = true) }
+    val shown = remember(filter) { rows.filter { filter.isBlank() || it.label.contains(filter.trim(), ignoreCase = true) } }
+    // The icons are made once, off the main thread, in list order (so the first rows are ready first), and kept here for as long as the screen is open. Making one while its row
+    // scrolled into view, and again each time the row came back, held the main thread long enough to make the list stutter.
+    val icons = remember { mutableStateMapOf<String, androidx.compose.ui.graphics.ImageBitmap>() }
+    LaunchedEffect(rows) {
+        withContext(Dispatchers.Default) {
+            for (row in rows) iconOf(context, row)?.let { icons[row.pkg] = it }
+        }
+    }
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
@@ -117,7 +129,7 @@ private fun HiddenAppsScreen(onBack: () -> Unit) {
                 ListItem(
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     leadingContent = {
-                        val icon = remember(row.pkg) { iconOf(context, row) }
+                        val icon = icons[row.pkg]
                         Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) { if (icon != null) Image(icon, contentDescription = null, Modifier.size(40.dp)) }
                     },
                     headlineContent = { Text(row.label) },
