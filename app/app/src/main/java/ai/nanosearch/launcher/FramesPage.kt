@@ -114,10 +114,11 @@ class FramesPage(
     private fun collect(playing: List<LiveFrames.Media> = media): List<Frame> {
         val out = ArrayList<Frame>()
         val seen = HashSet<String>()
+        val hidden = AppSettings.hiddenApps(activity)
         val recents = AppUsage.recents(activity)
         val openedAt = recents.associate { it.first.substringBefore('/') to it.second }
         fun add(cn: ComponentName?, note: HubStore.Note?) {
-            if (cn == null || cn.packageName == activity.packageName || !seen.add(cn.packageName)) return
+            if (cn == null || cn.packageName == activity.packageName || cn.packageName in hidden || !seen.add(cn.packageName)) return
             val label = runCatching { pm.getActivityInfo(cn, 0).loadLabel(pm).toString() }.getOrNull() ?: return
             out.add(Frame(cn, label, note, openedAt[cn.packageName] ?: 0L))
         }

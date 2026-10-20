@@ -21,6 +21,15 @@ object AppSettings {
     fun sourceEnabled(c: Context, kind: String) = prefs(c).getBoolean("source_$kind", true)
     fun setSourceEnabled(c: Context, kind: String, on: Boolean) = prefs(c).edit().putBoolean("source_$kind", on).apply()
 
+    /** Apps the user chose to hide (package names): kept out of the drawer, search, recents, favourites, Frames and the dock picker, until shown again in Settings. */
+    fun hiddenApps(c: Context): Set<String> = prefs(c).getString("hiddenApps", "")!!.split(';').filter { it.isNotBlank() }.toSet()
+    fun setAppHidden(c: Context, pkg: String, hidden: Boolean) {
+        val now = hiddenApps(c)
+        prefs(c).edit().putString("hiddenApps", (if (hidden) now + pkg else now - pkg).sorted().joinToString(";")).apply()
+    }
+    /** Changes whenever the hidden set does, so the launcher can tell on return that its lists need building again. */
+    fun hiddenKey(c: Context): String = prefs(c).getString("hiddenApps", "") ?: ""
+
     /** The installed icon pack in use (its package name), or "" for this launcher's own icons. */
     fun iconPack(c: Context): String = prefs(c).getString("iconPack", "") ?: ""
     fun setIconPack(c: Context, pkg: String) { prefs(c).edit().putString("iconPack", pkg).apply(); IconPacks.reset() }

@@ -11,7 +11,6 @@ import android.provider.AlarmClock
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
-import java.util.Calendar
 import kotlin.math.abs
 import kotlin.math.min
 
@@ -22,16 +21,20 @@ import kotlin.math.min
 class SteelDialView(context: Context) : View(context) {
     private val art = DialArt(context)
     private var face: Bitmap? = null
+    private var still: Bitmap? = null // the face with the hour and minute hands on it, redrawn once a second
+    private var stillAt = -1L // which whole second `still` shows
     private var side = 0
     private var hour = 0; private var minute = 0; private var second = 0
+    private var zone = java.util.TimeZone.getDefault()
 
-    private fun readTime() {
-        val cal = Calendar.getInstance()
-        hour = cal.get(Calendar.HOUR_OF_DAY); minute = cal.get(Calendar.MINUTE); second = cal.get(Calendar.SECOND)
+    /** The time of day from the clock and the zone, by arithmetic: a Calendar built on every frame was a large part of the cost of drawing this. */
+    private fun readTime(now: Long = System.currentTimeMillis()) {
+        val s = ((now + zone.getOffset(now)) / 1000 % 86400).toInt().let { if (it < 0) it + 86400 else it }
+        hour = s / 3600; minute = s / 60 % 60; second = s % 60
     }
 
     private val clockChanged = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) { readTime(); invalidate() }
+        override fun onReceive(context: Context, intent: Intent) { zone = java.util.TimeZone.getDefault(); stillAt = -1L; readTime(); invalidate() }
     }
     private var receiving = false
 
@@ -45,6 +48,7 @@ class SteelDialView(context: Context) : View(context) {
             context.registerReceiver(clockChanged, f, Context.RECEIVER_NOT_EXPORTED)
             receiving = true
         }
+        zone = java.util.TimeZone.getDefault(); stillAt = -1L
         readTime(); invalidate()
     }
 
@@ -61,20 +65,30 @@ class SteelDialView(context: Context) : View(context) {
         if (isVisible && isAttachedToWindow) { readTime(); invalidate() }
     }
 
-    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) { side = min(w, h); face = null }
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) { side = min(w, h); face = null; still = null; stillAt = -1L }
 
     override fun onDraw(canvas: Canvas) {
         if (side <= 0) return
         val now = System.currentTimeMillis()
-        readTime()
+        readTime(now)
         if (face == null) {
             face = Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888).also { art.drawFace(Canvas(it), side) }
+        }
+        // The face and the slow hands are one picture, made again only when the second changes; each frame then draws that picture and the seconds hand.
+        val sec = now / 1000
+        if (still == null || stillAt != sec) {
+            val bmp = still ?: Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888).also { still = it }
+            val c = Canvas(bmp)
+            bmp.eraseColor(0)
+            c.drawBitmap(face!!, 0f, 0f, null)
+            art.drawHourMinute(c, side, hour, minute, second.toFloat())
+            stillAt = sec
         }
         // whole pixels, so the dial is never resampled and stays sharp
         val dx = ((width - side) / 2).toFloat(); val dy = ((height - side) / 2).toFloat()
         canvas.save(); canvas.translate(dx, dy)
-        canvas.drawBitmap(face!!, 0f, 0f, null)
-        art.drawHands(canvas, side, hour, minute, second + (now % 1000) / 1000f)
+        canvas.drawBitmap(still!!, 0f, 0f, null)
+        art.drawSecondsAndPivot(canvas, side, second + (now % 1000) / 1000f)
         canvas.restore()
         if (visible) postInvalidateOnAnimation() // the next frame, so the seconds hand sweeps
     }

@@ -616,7 +616,15 @@ class MainActivity : Activity() {
     private var lastDockSignature = ""
     private fun dockSignature(): String {
         val saved = dockSaved()
-        return (0 until dockSlots).joinToString(",") { slot -> dotCount(dockEntry(slot, saved[slot])?.component?.packageName).toString() }
+        return (0 until dockSlots).joinToString(",") { slot -> dotCount(dockComponent(slot, saved[slot])?.packageName).toString() }
+    }
+
+    /** The app a dock slot opens, found without drawing its icon: the badge dots only need the package. (Building a whole entry here drew four icons on every return to home.) */
+    private fun dockComponent(slot: Int, saved: String): ComponentName? {
+        val custom = ComponentName.unflattenFromString(saved)
+        if (custom != null && runCatching { packageManager.getActivityInfo(custom, 0) }.isSuccess) return custom
+        val ri = packageManager.resolveActivity(defaultDock[slot], PackageManager.MATCH_DEFAULT_ONLY) ?: return null
+        return ri.activityInfo?.let { ComponentName(it.packageName, it.name) }
     }
 
     private val notificationsChanged: () -> Unit = {
@@ -999,6 +1007,11 @@ class MainActivity : Activity() {
             MenuItem(R.drawable.ic_menu_apps, "Add to dock") {
                 overlays.listSheet("Add ${item.title} to the dock", List(dockSlots) { slot -> MenuItem(R.drawable.ic_menu_add, "Dock slot ${slot + 1}") { setDock(slot, item.key) } })
             },
+            MenuItem(R.drawable.ic_menu_remove, "Hide") {
+                AppSettings.setAppHidden(this, pkg, true)
+                refreshIndex(heavy = false)
+                Toast.makeText(this, "${item.title} hidden. Show it again in Settings, Hidden apps.", Toast.LENGTH_LONG).show()
+            },
             MenuItem(R.drawable.ic_menu_delete, "Uninstall", destructive = true) { runCatching { startActivity(Intent(Intent.ACTION_DELETE, Uri.parse("package:$pkg"))) } },
         )))
     }
@@ -1023,9 +1036,30 @@ class MainActivity : Activity() {
         apps.clearIcons()
     }
 
+    private var pkgSeq = -1 // the package manager's change counter at the last look
+    private var iconDay = -1 // the day of the year icons were last drawn on: calendar icons show the date
+    private var lastHiddenKey: String? = null
+    private var listStale = true // the app lists need building again (set by a return that finds a change)
+
+    /**
+     * Whether anything that changes the apps or their icons happened since the launcher last looked: an app installed, updated or removed, or a new day.
+     * Most returns to home change nothing, and then nothing is thrown away or redrawn, which is what keeps coming back to home smooth.
+     */
+    private fun appsChangedWhileAway(): Boolean {
+        val first = pkgSeq < 0
+        val ch = runCatching { packageManager.getChangedPackages(maxOf(pkgSeq, 0)) }.getOrNull()
+        if (ch != null) pkgSeq = ch.sequenceNumber else if (first) pkgSeq = 0
+        val day = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_YEAR)
+        val hidden = AppSettings.hiddenKey(this)
+        val iconsStale = first || ch != null || day != iconDay
+        listStale = iconsStale || hidden != lastHiddenKey
+        iconDay = day; lastHiddenKey = hidden
+        return iconsStale
+    }
+
     override fun onStart() {
         super.onStart()
-        refreshIcons()
+        if (appsChangedWhileAway()) refreshIcons()
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_PACKAGE_ADDED)
             addAction(Intent.ACTION_PACKAGE_REMOVED)
@@ -1092,8 +1126,8 @@ class MainActivity : Activity() {
         if (voiceFile != models.whisper || (voice is VoiceInput && models.whisper.exists())) { voice.release(); voice = buildVoice() }
         // First run: the setup tour asks for permissions itself, with reasons.
         if (SetupActivity.needed(this)) startActivity(Intent(this, SetupActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) else requestAccessOnce()
-        refreshIndex(heavy = false)
-        search()
+        refreshIndex(heavy = false, appsChanged = listStale)
+        if (listStale || drawerTab == "recent") search() // the recents tab changes every time an app is opened; the others only when apps change
         updateBanner()
         startEmbedding()
         CpuTuner.maybeRun(this)
@@ -1624,13 +1658,15 @@ class MainActivity : Activity() {
 
     // ---------------------------------------------------------------- indexing and permissions
 
-    private fun refreshIndex(heavy: Boolean) {
+    private fun refreshIndex(heavy: Boolean, appsChanged: Boolean = true) {
         indexer.execute {
-            index.replaceKind("app", Indexers.apps(this))
-            if (index.count("setting") == 0) index.replaceKind("setting", Indexers.settings())
+            var changed = appsChanged
+            if (appsChanged || index.count("app") == 0) { index.replaceKind("app", Indexers.apps(this)); changed = true }
+            if (index.count("setting") == 0) { index.replaceKind("setting", Indexers.settings()); changed = true }
             val now = System.currentTimeMillis()
             val force = prefs.getBoolean("reindex", false).also { if (it) prefs.edit().remove("reindex").apply() }
             if (heavy || force || now - lastHeavyRefresh > HEAVY_REFRESH_MS || accessSignature() != lastAccessSignature) {
+                changed = true
                 lastHeavyRefresh = now
                 lastAccessSignature = accessSignature()
                 // One failing collector must never take the app down or wipe what was indexed before.
@@ -1658,7 +1694,8 @@ class MainActivity : Activity() {
                 }
                 if (AppSettings.sourceEnabled(this, "photo")) startEmbedding()
             }
-            ui.post { search() }
+            // the lists are built again only if something they show was re-read: apps, or (with a query typed) the other results
+            if (changed) ui.post { if (appsChanged || input.text.isNotBlank()) search() }
         }
     }
 
@@ -1689,8 +1726,12 @@ class MainActivity : Activity() {
         !Environment.isExternalStorageManager()
 
     private fun updateBanner() {
-        banner.visibility = if (missingAccess()) View.VISIBLE else View.GONE
-        (grid.layoutParams as FrameLayout.LayoutParams).topMargin = if (banner.visibility == View.VISIBLE) dp(48) else 0
+        val vis = if (missingAccess()) View.VISIBLE else View.GONE
+        val margin = if (vis == View.VISIBLE) dp(48) else 0
+        val lp = grid.layoutParams as FrameLayout.LayoutParams
+        if (banner.visibility == vis && lp.topMargin == margin) return // nothing changed: do not ask the whole grid to lay itself out again
+        banner.visibility = vis
+        lp.topMargin = margin
         grid.requestLayout()
     }
 

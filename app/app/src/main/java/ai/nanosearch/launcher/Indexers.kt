@@ -41,9 +41,11 @@ object Indexers {
 
     private fun Context.granted(permission: String) = checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
 
-    fun apps(context: Context): List<Item> {
+    /** Every launcher app the user has not hidden; [includeHidden] gives them all (the Hidden apps screen lists every one). */
+    fun apps(context: Context, includeHidden: Boolean = false): List<Item> {
         val launch = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-        return context.packageManager.queryIntentActivities(launch, 0).map {
+        val hidden = if (includeHidden) emptySet() else AppSettings.hiddenApps(context)
+        return context.packageManager.queryIntentActivities(launch, 0).filter { it.activityInfo.packageName !in hidden }.map {
             Item("app", it.loadLabel(context.packageManager).toString(),
                 ComponentName(it.activityInfo.packageName, it.activityInfo.name).flattenToString())
         }

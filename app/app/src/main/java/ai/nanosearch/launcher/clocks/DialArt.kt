@@ -189,15 +189,27 @@ class DialArt(context: Context) {
     }
 
     /** The three hands and the pivot. [second] is fractional, so the seconds hand sweeps. */
+    /** All the hands, as on the finished dial. */
     fun drawHands(c: Canvas, size: Int, hour: Int, minute: Int, second: Float) {
+        drawHourMinute(c, size, hour, minute, second)
+        drawSecondsAndPivot(c, size, second)
+    }
+
+    /** The hour and minute hands: they barely move from one second to the next, so the clock view draws them once a second into a picture instead of on every frame. */
+    fun drawHourMinute(c: Canvas, size: Int, hour: Int, minute: Int, second: Float) {
         val cx = size / 2f; val cy = size / 2f
         val r = caseRadius(size)
         val mDeg = (minute + second / 60f) * 6f
         val hDeg = ((hour % 12) + (minute + second / 60f) / 60f) * 30f
-        val sDeg = second * 6f
-
         drawHand(c, cx, cy, hDeg, r * 0.56f, r * 0.08f, r * 0.037f, r * 0.02f, r * 0.26f, r)
         drawHand(c, cx, cy, mDeg, r * 0.78f, r * 0.09f, r * 0.031f, r * 0.019f, r * 0.22f, r)
+    }
+
+    /** The seconds hand and the pivot over it: cheap lines and discs, so they can be drawn every frame and the hand sweeps smoothly. */
+    fun drawSecondsAndPivot(c: Canvas, size: Int, second: Float) {
+        val cx = size / 2f; val cy = size / 2f
+        val r = caseRadius(size)
+        val sDeg = second * 6f
 
         // seconds: a thin white hand with a red tip and a short tail
         p.reset(); p.isAntiAlias = true; p.style = Paint.Style.STROKE; p.strokeCap = Paint.Cap.BUTT
@@ -215,7 +227,6 @@ class DialArt(context: Context) {
         p.color = 0xFF2b2c2f.toInt(); c.drawCircle(cx, cy, r * 0.011f, p)
     }
 
-    /** A still picture of the whole clock, for the widget picker. */
     fun picture(size: Int, hour: Int, minute: Int, second: Float): Bitmap =
         Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).also { val c = Canvas(it); drawFace(c, size); drawHands(c, size, hour, minute, second) }
 }

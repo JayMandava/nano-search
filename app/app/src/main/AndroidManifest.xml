@@ -91,6 +91,14 @@
             android:theme="@style/Theme.Settings" />
 
         <activity
+            android:name=".HiddenAppsActivity"
+            android:taskAffinity="ai.nanosearch.launcher.settings"
+            android:exported="false"
+            android:label="Hidden apps"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.Settings" />
+
+        <activity
             android:name=".SettingsActivity"
             android:taskAffinity="ai.nanosearch.launcher.settings"
             android:exported="false"

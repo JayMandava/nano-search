@@ -124,6 +124,7 @@ private fun SettingsScreen(onBack: () -> Unit, listState: LazyListState, scroll:
         ) {
             item { DefaultHomeCard(tick) }
             item { ModelsRow() }
+            item { HiddenAppsRow(tick) }
             item { Header("Appearance") }
             item { AppearanceCard() }
             item { Header("Screen") }
@@ -138,6 +139,19 @@ private fun SettingsScreen(onBack: () -> Unit, listState: LazyListState, scroll:
             item { SetupRow() }
             item { AdvancedRow() }
         }
+    }
+}
+
+@Composable
+private fun HiddenAppsRow(tick: Int) {
+    val context = LocalContext.current
+    val count = remember(tick) { AppSettings.hiddenApps(context).size } // re-read when coming back from the screen
+    Card(shape = RoundedCornerShape(24.dp), onClick = { context.startActivity(Intent(context, HiddenAppsActivity::class.java)) }) {
+        ListItem(
+            colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
+            headlineContent = { Text("Hidden apps") },
+            supportingContent = { Text(if (count == 0) "Keep apps out of the drawer and search. None hidden." else if (count == 1) "1 app hidden from the drawer and search." else "$count apps hidden from the drawer and search.") },
+        )
     }
 }
 
