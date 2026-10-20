@@ -67,11 +67,18 @@ private fun appRows(c: Context): List<AppRow> =
         .filter { it.pkg != c.packageName }
         .sortedBy { it.label.lowercase() }
 
+/**
+ * The icon for a row. [AppIcons.get] hands out one shared drawable per app, the same object the drawer and the dock are showing, so it must only be read:
+ * setting its size to draw it here made those icons shrink. A scaled copy of its picture is made instead.
+ */
 private fun iconOf(c: Context, row: AppRow): androidx.compose.ui.graphics.ImageBitmap? = runCatching {
     val d = AppIcons.get(c, row.component)
     val size = (40 * c.resources.displayMetrics.density).toInt().coerceAtLeast(1)
-    val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-    d.setBounds(0, 0, size, size); d.draw(Canvas(bmp))
+    val picture = (d as? android.graphics.drawable.BitmapDrawable)?.bitmap
+    val bmp = if (picture != null) Bitmap.createScaledBitmap(picture, size, size, true) else {
+        val copy = (d.constantState?.newDrawable()?.mutate() ?: return@runCatching null)
+        Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).also { copy.setBounds(0, 0, size, size); copy.draw(Canvas(it)) }
+    }
     bmp.asImageBitmap()
 }.getOrNull()
 
