@@ -496,13 +496,29 @@ class HubScreen(
         }
     }
 
+    /**
+     * Options for sending another app's PendingIntent from here. Since Android 14 the system, by default, counts an app's PendingIntent as the app that
+     * made it, which is in the background, and blocks the activity it starts (nothing happens, and no error comes back). This screen is in front and the
+     * user just tapped, so it says so: the intent may start with this launcher's right to open things.
+     */
+    private fun sendOptions(): Bundle = android.app.ActivityOptions.makeBasic().apply {
+        if (android.os.Build.VERSION.SDK_INT >= 34) setPendingIntentBackgroundActivityStartMode(android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED)
+    }.toBundle()
+
+    private fun launchApp(pkg: String) = pm.getLaunchIntentForPackage(pkg)?.let { activity.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } ?: throw IllegalStateException("no launcher activity for $pkg")
+
+    /** A tap on an item opens it: a notification opens exactly what the app meant (the conversation, the mail), and if that cannot be sent the app itself opens. */
     private fun open(item: HubData.Item) {
         val note = item.note
         val ok = runCatching {
             when {
-                note?.contentIntent != null -> { note.contentIntent.send(); if (note.clearable) HubStore.dismiss(note.key) }
+                note?.contentIntent != null -> {
+                    val sent = runCatching { note.contentIntent.send(activity, 0, null, null, null, null, sendOptions()) }.isSuccess
+                    if (!sent) launchApp(note.pkg) // the app's own intent was cancelled or refused: still take the user to the app
+                    if (note.clearable) HubStore.dismiss(note.key)
+                }
                 item.open != null -> activity.startActivity(item.open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                item.pkg != null -> pm.getLaunchIntentForPackage(item.pkg)?.let { activity.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                item.pkg != null -> launchApp(item.pkg)
             }
         }.isSuccess
         if (ok) dismiss() else Toast.makeText(activity, "Couldn't open that", Toast.LENGTH_SHORT).show()
@@ -515,7 +531,7 @@ class HubScreen(
         val free = inputs.firstOrNull { it.allowFreeFormInput } ?: return
         val result = Intent()
         RemoteInput.addResultsToIntent(inputs, result, Bundle().apply { putCharSequence(free.resultKey, text) })
-        val sent = runCatching { action.actionIntent.send(activity, 0, result) }.isSuccess
+        val sent = runCatching { action.actionIntent.send(activity, 0, result, null, null, null, sendOptions()) }.isSuccess
         Toast.makeText(activity, if (sent) "Sent" else "Couldn't send that", Toast.LENGTH_SHORT).show()
         if (sent) { drafts.remove(item.id); replying = null; hideKeyboard(layer ?: return); refreshList() }
     }

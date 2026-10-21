@@ -52,6 +52,8 @@ Numbers below were measured on a mid-range 2023 phone (8 GB RAM, CPU only). Othe
 - **Typeface.** Spirit uses Source Sans 3, a variable font, through `NText` and `NEdit` (a TextView and an EditText that map any requested weight onto the font's weight axis) and a Compose typography for Settings.
 - **Full screen.** `WindowInsetsController` hides the system bars with swipe-to-reveal; the layout takes the display cutout as an inset so the search bar clears a camera hole when the status bar is gone.
 
+A tap on a notification in the Hub sends the notification's own PendingIntent, so it opens exactly what the app meant (the conversation, the mail). Since Android 14 the system counts a PendingIntent as coming from the app that made it, which is in the background, and blocks the activity it starts without any error (the log says `Background activity launch blocked ... BAL_BLOCK`); the Hub was closing and nothing opened. It now sends with `ActivityOptions.setPendingIntentBackgroundActivityStartMode(MODE_BACKGROUND_ACTIVITY_START_ALLOWED)`, which says that the launcher, in front with the user's tap, may start it (`HubScreen.sendOptions`, also used for in-place replies). If the intent is cancelled the app's own launch intent is used instead. Texts, missed calls and events open their own intents directly.
+
 ## Search
 
 1. **Instant path (no model).** One SQLite FTS4 index holds every kind of item (Android's SQLite has no FTS5). Queries match titles first, then
