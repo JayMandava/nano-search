@@ -14,8 +14,8 @@ android {
         applicationId = "ai.nanosearch.launcher"
         minSdk = 33
         targetSdk = 35
-        versionCode = 8
-        versionName = "0.5.2"
+        versionCode = 9
+        versionName = "0.6.0"
 
         ndk {
             abiFilters += "arm64-v8a"
