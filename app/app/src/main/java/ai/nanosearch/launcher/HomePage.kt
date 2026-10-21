@@ -13,6 +13,7 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.widget.FrameLayout
 import android.widget.GridLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -40,7 +41,7 @@ class HomePage(
     private val key = "shortcuts_$id"
 
     val root = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
-    private val widgetBox = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(8), dp(16), dp(8)) }
+    private val widgetBox = WidgetCanvas(activity).apply { setPadding(0, dp(8), 0, dp(8)) } // free placement: each widget sits where it was put
     private val grid = GridLayout(activity).apply { columnCount = COLUMNS; setPadding(dp(8), dp(4), dp(8), dp(8)) }
     val widgets = HomeWidgets(activity, widgetHost, widgetBox, id, overlays, pal)
 

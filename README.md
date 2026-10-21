@@ -38,6 +38,7 @@ answers questions, and listens when you speak. Small language models run entirel
 - **Full screen:** an optional mode that hides the status bar and navigation bar; a swipe from the top or bottom edge brings them back for a moment.
 - **Type to search:** with a hardware keyboard, start typing anywhere on home and the keys go to the search bar.
 - **Icon packs:** any installed icon pack (the format other launchers use) can dress the app icons, chosen in Settings under Appearance; apps a pack does not cover keep the built-in icons.
+- **Widgets anywhere:** press and hold a widget and choose Move or resize, then drag it wherever you like on the page (the page scrolls along when you take it to the top or bottom edge) or pull the corner to resize it; a faint grid and guide lines appear, and the widget snaps to the grid and lines up with the page's margins, its centre and the other widgets' edges. Resizing never moves a widget. Pages nobody has changed look as they always did.
 - **Hidden apps:** keep any app out of the drawer, search, recents, favourites and Frames: press and hold an app and choose Hide, or switch apps on and off in Settings, Hidden apps. A hidden app stays installed and keeps working.
 - **Settings:** Material 3 Expressive components in Spirit's colours, light, dark or system, and an adaptive icon.
 
