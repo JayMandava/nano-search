@@ -123,3 +123,29 @@ airplane-mode, security, pairing, or permission-grant settings were changed.
 
 Only whitelisted navigation/status UI labels were retained. Screenshots were
 cropped to the confirmed Settings card; no adjacent message content was saved.
+
+## Release 0.6.2 validation — 2026-10-25
+
+Version name/code: `0.6.2` / `11`. Both debug and release unit-test variants
+passed all 14 tests. `:app:assembleRelease` completed successfully, including
+native compilation, R8 shrinking, resource shrinking, and production signing.
+The final-version lint run reproduced the same five base errors, 254 warnings,
+and one hint; no checks were suppressed.
+
+The published 0.6.1 APK was downloaded and independently checked: SHA-256
+`80f4aa9d81f7c26d1c55251001d2fbaf1b8f3da4a563db346eefaadb72cbda1e`.
+Its signing certificate matches the new release APK's production certificate:
+`1F:08:D7:D9:AA:07:3E:5D:7C:4F:2C:9F:D8:CA:CA:76:1F:C4:2F:10:8C:05:E7:A5:AC:88:EA:9D:BC:53:32:CE`.
+
+The release APK verifies with APK Signature Scheme v2. Its package remains
+`ai.nanosearch.launcher`, minimum SDK 33, target SDK 35, and native architecture
+`arm64-v8a`; it is not debuggable. The built manifest includes
+`ACCESS_WIFI_STATE`, with no Wi-Fi-change, nearby Wi-Fi, or location permission
+added. The release worktree has no optional personal source overlay; its APK's
+font assets are only the two fonts already tracked in the public repository.
+
+Release APK SHA-256:
+`deddc529402b1dc7869a9a100ce2e1436157440b11d3327788fbadc34a628c57`.
+The APK ZIP was checked to contain identical APK bytes. The production release
+APK was not installed on the test phone; the device validation above used the
+debug variant. Real radio-toggle/transition scenarios remain unrun.
