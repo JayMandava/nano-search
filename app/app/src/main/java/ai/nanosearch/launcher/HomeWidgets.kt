@@ -195,11 +195,22 @@ class HomeWidgets(
                     background = GradientDrawable().apply { setColor(pal.container); cornerRadius = dp(pal.radius(16)).toFloat() }
                     setPadding(dp(6), dp(6), dp(6), dp(6))
                 }, LinearLayout.LayoutParams(dp(88), dp(64)))
-                row.addView(NText(activity).apply {
-                    text = info?.loadLabel(activity.packageManager) ?: (entry as BuiltinWidget).label
-                    textSize = 16f
-                    setTextColor(pal.onSurface)
+                val builtin = entry as? BuiltinWidget
+                row.addView(LinearLayout(activity).apply {
+                    orientation = LinearLayout.VERTICAL
                     setPadding(dp(16), 0, 0, 0)
+                    addView(NText(activity).apply {
+                        text = info?.loadLabel(activity.packageManager) ?: builtin?.label
+                        textSize = 16f
+                        setTextColor(pal.onSurface)
+                    }, LinearLayout.LayoutParams(-1, -2))
+                    builtin?.credit?.let { attribution ->
+                        addView(NText(activity).apply {
+                            text = attribution
+                            textSize = 12f
+                            setTextColor(pal.onVariant)
+                        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
+                    }
                 }, LinearLayout.LayoutParams(0, -2, 1f))
                 return row
             }

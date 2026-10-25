@@ -1,9 +1,12 @@
 # build output
 build/
 .gradle/
+.kotlin/
 .cxx/
 *.iml
 local.properties
+# Optional personal widgets/fonts are local debug overlays, never public source or release assets.
+app/app/src/personal/
 *.apk
 # model weights are large and some are not redistributable; see models/README.md
 models/*

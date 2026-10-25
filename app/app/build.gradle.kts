@@ -14,8 +14,9 @@ android {
         applicationId = "ai.nanosearch.launcher"
         minSdk = 33
         targetSdk = 35
-        versionCode = 11
-        versionName = "0.6.2"
+        versionCode = 12
+        versionName = "0.7.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
             abiFilters += "arm64-v8a"
@@ -78,7 +79,8 @@ android {
 
     // Private, local-only built-in widgets live in src/personal (git ignores it). They are compiled into the debug and minified test builds only,
     // never into release, so nothing in it can reach a published APK. The launcher finds them by name at run time (see BuiltinWidgets.kt).
-    if (file("src/personal").exists()) {
+    val includePersonalOverlay = providers.gradleProperty("includePersonalOverlay").map(String::toBoolean).getOrElse(true)
+    if (includePersonalOverlay && file("src/personal").exists()) {
         listOf("debug", "minified").forEach { name ->
             sourceSets.getByName(name) {
                 java.srcDir("src/personal/java")
@@ -130,6 +132,9 @@ tasks.named("preBuild") { dependsOn(buildGpuLib) }
 
 dependencies {
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:rules:1.6.1")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
     implementation(platform("androidx.compose:compose-bom:2025.09.00"))
     implementation("androidx.compose.material3:material3:1.5.0-alpha04")
     implementation("androidx.compose.ui:ui")

@@ -11,6 +11,8 @@ import android.view.View
 interface BuiltinWidget {
     val id: String
     val label: String
+    /** Optional concise attribution shown only in selection UI. */
+    val credit: String? get() = null
     val defaultHeightDp: Int
     fun create(context: Context): View
     /** A picture for the widget picker, or null. */

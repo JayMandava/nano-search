@@ -6,15 +6,16 @@ import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.view.View
 
-/** The launcher's own clock widget: the steel-cased analogue dial. */
+/** Every registered clock is offered without changing existing saved built-in widget IDs. */
 object ClockWidgets {
-    val all: List<BuiltinWidget> = listOf(SteelDial)
-
-    private object SteelDial : BuiltinWidget {
-        override val id = "steeldial"
-        override val label = "Steel Dial"
-        override val defaultHeightDp = 300
-        override fun create(context: Context): View = SteelDialView(context)
-        override fun preview(context: Context): Drawable = BitmapDrawable(context.resources, DialArt(context).picture(360, 10, 9, 38f))
+    val all: List<BuiltinWidget> = ClockFaces.all.map { definition ->
+        object : BuiltinWidget {
+            override val id = definition.id
+            override val label = definition.label
+            override val credit = definition.credit
+            override val defaultHeightDp = definition.defaultHeightDp
+            override fun create(context: Context): View = ClockFaceView(context, id)
+            override fun preview(context: Context): Drawable = BitmapDrawable(context.resources, ClockFaces.preview(context, id))
+        }
     }
 }

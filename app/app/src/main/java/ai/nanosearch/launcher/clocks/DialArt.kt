@@ -191,8 +191,9 @@ class DialArt(context: Context) {
     /** The three hands and the pivot. [second] is fractional, so the seconds hand sweeps. */
     /** All the hands, as on the finished dial. */
     fun drawHands(c: Canvas, size: Int, hour: Int, minute: Int, second: Float) {
+        drawSeconds(c, size, second)
         drawHourMinute(c, size, hour, minute, second)
-        drawSecondsAndPivot(c, size, second)
+        drawPivot(c, size)
     }
 
     /** The hour and minute hands: they barely move from one second to the next, so the clock view draws them once a second into a picture instead of on every frame. */
@@ -207,6 +208,12 @@ class DialArt(context: Context) {
 
     /** The seconds hand and the pivot over it: cheap lines and discs, so they can be drawn every frame and the hand sweeps smoothly. */
     fun drawSecondsAndPivot(c: Canvas, size: Int, second: Float) {
+        drawSeconds(c, size, second)
+        drawPivot(c, size)
+    }
+
+    /** Draw before hour/minute layers so a crossing seconds hand stays underneath them. */
+    fun drawSeconds(c: Canvas, size: Int, second: Float) {
         val cx = size / 2f; val cy = size / 2f
         val r = caseRadius(size)
         val sDeg = second * 6f
@@ -220,6 +227,12 @@ class DialArt(context: Context) {
         p.strokeWidth = r * 0.02f; p.color = 0xFFd8212b.toInt(); c.drawLine(0f, -r * 0.645f, 0f, -r * 0.825f, p)
         c.restore()
 
+    }
+
+    /** Shared top pivot, independent from the seconds layer. */
+    fun drawPivot(c: Canvas, size: Int) {
+        val cx = size / 2f; val cy = size / 2f
+        val r = caseRadius(size)
         // the pivot: a white disc in a dark ring, with a dark dot
         p.style = Paint.Style.FILL
         p.color = 0xFF111214.toInt(); c.drawCircle(cx, cy, r * 0.06f, p)

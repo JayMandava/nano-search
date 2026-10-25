@@ -573,14 +573,41 @@ class MainActivity : Activity() {
 
     /** The clock wallpaper's choices, one row each: tap a row to move to its next option, then set it as the wallpaper in Android's own preview. */
     private fun showLockClockSheet() {
-        overlays.listSheet("Clock on the lock screen", listOf(
+        val selected = ai.nanosearch.launcher.clocks.ClockFaces.find(LockClock.face(this))
+        val items = listOf(
+            MenuItem(R.drawable.ic_menu_clock, "Face: ${selected.label}") { LockClock.cycleFace(this); showLockClockSheet() },
             MenuItem(R.drawable.ic_menu_wallpaper, "Background: ${LockClock.nameOf(LockClock.backgrounds(this), LockClock.background(this))}") { LockClock.cycleBackground(this); showLockClockSheet() },
             MenuItem(R.drawable.ic_menu_add, if (LockClock.hasPhoto(this)) "Choose another photo…" else "Choose a photo from your gallery…") {
                 tryStart { startActivityForResult(Intent(Intent.ACTION_GET_CONTENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE), REQ_LOCK_PHOTO) }
             },
             MenuItem(R.drawable.ic_menu_swap, "Position: ${LockClock.nameOf(LockClock.POSITIONS, LockClock.position(this))}") { LockClock.cyclePosition(this); showLockClockSheet() },
+            MenuItem(R.drawable.ic_menu_clock, "Reduced motion: ${if (LockClock.reducedMotion(this)) "On" else "Off"}") { LockClock.setReducedMotion(this, !LockClock.reducedMotion(this)); showLockClockSheet() },
             MenuItem(R.drawable.ic_menu_add, "Set as wallpaper…") { tryStart { LockClock.openPicker(this) } },
-        ))
+        )
+        val adapter = object : BaseAdapter() {
+            override fun getCount() = items.size
+            override fun getItem(position: Int) = items[position]
+            override fun getItemId(position: Int) = position.toLong()
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val item = items[position]
+                return LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    minimumHeight = dp(56)
+                    setPadding(dp(24), dp(10), dp(24), dp(10))
+                    addView(ImageView(this@MainActivity).apply { setImageResource(item.icon); imageTintList = android.content.res.ColorStateList.valueOf(pal.primary); importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }, LinearLayout.LayoutParams(dp(24), dp(24)))
+                    addView(LinearLayout(this@MainActivity).apply {
+                        orientation = LinearLayout.VERTICAL
+                        setPadding(dp(16), 0, 0, 0)
+                        addView(NText(this@MainActivity).apply { text = item.label; textSize = 16f; setTextColor(pal.onSurface) }, LinearLayout.LayoutParams(-1, -2))
+                        if (position == 0) selected.credit?.let { attribution ->
+                            addView(NText(this@MainActivity).apply { text = attribution; textSize = 12f; setTextColor(pal.onVariant) }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
+                        }
+                    }, LinearLayout.LayoutParams(0, -2, 1f))
+                }
+            }
+        }
+        overlays.adapterSheet("Clock on the lock screen", adapter) { items[it].action() }
     }
 
     // ---- the Hub and notification dots

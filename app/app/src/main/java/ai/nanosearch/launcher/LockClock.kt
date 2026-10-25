@@ -1,5 +1,6 @@
 package ai.nanosearch.launcher
 
+import ai.nanosearch.launcher.clocks.ClockFaces
 import android.app.WallpaperManager
 import android.content.ComponentName
 import android.content.Context
@@ -35,6 +36,17 @@ object LockClock {
 
     fun background(c: Context) = prefs(c).getString("lockclock_bg", "carbon")?.takeIf { k -> backgrounds(c).any { it.first == k } } ?: "carbon"
     fun position(c: Context) = prefs(c).getString("lockclock_pos", "middle") ?: "middle"
+
+    /** Face selection is independent of existing background, position and photo preferences. */
+    fun face(c: Context): String = ClockFaces.find(prefs(c).getString("lockclock_face", ClockFaces.STEEL_ID)).id
+    fun setFace(c: Context, id: String) = prefs(c).edit().putString("lockclock_face", ClockFaces.find(id).id).apply()
+    fun cycleFace(c: Context) {
+        val faces = ClockFaces.all
+        val index = faces.indexOfFirst { it.id == face(c) }
+        setFace(c, faces[(index + 1) % faces.size].id)
+    }
+    fun reducedMotion(c: Context): Boolean = prefs(c).getBoolean("clocks_reduced_motion", false)
+    fun setReducedMotion(c: Context, reduced: Boolean) = prefs(c).edit().putBoolean("clocks_reduced_motion", reduced).apply()
 
     private fun next(options: List<Pair<String, String>>, current: String) = options[(options.indexOfFirst { it.first == current } + 1) % options.size].first
     fun cycleBackground(c: Context) = prefs(c).edit().putString("lockclock_bg", next(backgrounds(c), background(c))).apply()
