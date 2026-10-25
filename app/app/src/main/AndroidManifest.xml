@@ -3,6 +3,8 @@
 
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
+    <!-- Read the Wi-Fi radio state for the Settings Active Frame; never changes networking. -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <!-- Only takes effect when installed as a privileged app; harmless otherwise. Lets widgets be added without the consent dialog. -->
     <uses-permission android:name="android.permission.BIND_APPWIDGET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />

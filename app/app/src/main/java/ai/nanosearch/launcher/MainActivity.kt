@@ -26,6 +26,7 @@ import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -158,6 +159,13 @@ class MainActivity : Activity() {
             refreshIcons()
             refreshIndex(heavy = false)
             rebuildDock()
+        }
+    }
+    // Re-read the service instead of trusting broadcast extras. This also catches Quick Settings
+    // changes while home is still visible, when onStart/onResume need not run again.
+    private val wifiStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == WifiManager.WIFI_STATE_CHANGED_ACTION) framesPage?.refresh()
         }
     }
     private val parseRunnable = Runnable { parseCurrent() }
@@ -1067,6 +1075,7 @@ class MainActivity : Activity() {
             addDataScheme("package")
         }
         registerReceiver(packageReceiver, filter)
+        registerReceiver(wifiStateReceiver, IntentFilter(WifiManager.WIFI_STATE_CHANGED_ACTION), Context.RECEIVER_EXPORTED)
         widgetHost.startListening()
         HubStore.listen(notificationsChanged)
         notificationsChanged()
@@ -1079,6 +1088,7 @@ class MainActivity : Activity() {
 
     override fun onStop() {
         unregisterReceiver(packageReceiver)
+        unregisterReceiver(wifiStateReceiver)
         HubStore.unlisten(notificationsChanged)
         overlays.dismissAll()
         runCatching { widgetHost.stopListening() }
@@ -1122,6 +1132,7 @@ class MainActivity : Activity() {
         applyFullScreen()
         // The theme may have been changed in Settings: repaint everything with the new colours.
         if (builtThemeKey != themeKey) { recreate(); return }
+        framesPage?.refresh()
         // The user may have chosen, downloaded or removed a voice model in Settings.
         if (voiceFile != models.whisper || (voice is VoiceInput && models.whisper.exists())) { voice.release(); voice = buildVoice() }
         // First run: the setup tour asks for permissions itself, with reasons.

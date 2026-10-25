@@ -80,6 +80,8 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 On first launch a short setup tour asks what the app may read, offers the recommended models and helps you make it the default home app.
 
+For the Settings Active Frame's Wi-Fi fix, [Wi-Fi frame validation](docs/wifi-frame-validation.md) gives the full build/test command, APK permission check, and separate device smoke checklist.
+
 ## Models
 
 Settings > Models has one choice per job. Files live in the app's private storage; nothing is bundled in this repository.

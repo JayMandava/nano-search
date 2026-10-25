@@ -87,9 +87,9 @@ object LiveFrames {
                 val pct = b?.let { it.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) * 100 / it.getIntExtra(BatteryManager.EXTRA_SCALE, 100).coerceAtLeast(1) } ?: -1
                 val charging = b?.getIntExtra(BatteryManager.EXTRA_STATUS, 0).let { it == BatteryManager.BATTERY_STATUS_CHARGING || it == BatteryManager.BATTERY_STATUS_FULL }
                 val free = StatFs(Environment.getDataDirectory().path).availableBytes / 1_000_000_000.0
-                val wifi = runCatching { context.applicationContext.getSystemService(WifiManager::class.java).isWifiEnabled }.getOrDefault(false)
+                val wifi = WifiState.label { context.applicationContext.getSystemService(WifiManager::class.java)?.wifiState }
                 Live(big = if (pct >= 0) "$pct%" else null, bigSub = if (charging) "Charging" else "Battery",
-                    lines = listOf("%.0f GB free".format(free), if (wifi) "Wi-Fi on" else "Wi-Fi off"))
+                    lines = listOf("%.0f GB free".format(free), wifi))
             }
             else -> null
         }

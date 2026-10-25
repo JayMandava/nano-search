@@ -41,21 +41,18 @@ class FramesPage(
     private fun round(color: Int, radius: Int) = GradientDrawable().apply { setColor(color); cornerRadius = dp(pal.radius(radius)).toFloat() }
 
     private var drawnSig: String? = null
-    private var scrolling = false
-    private var pendingDraw = false
+    private val refreshState = FrameRefreshState()
 
     /** Told while the pages are sliding: nothing is rebuilt then (a rebuild in the middle of a swipe is what made it stutter), and what is waiting is done when it stops. */
     fun setScrolling(on: Boolean) {
-        scrolling = on
-        if (!on && pendingDraw) { pendingDraw = false; draw() }
+        if (refreshState.setScrolling(on)) draw()
     }
 
     /** Brings the frames up to date. The pictures are only rebuilt when something on them changed. */
     fun refresh() {
-        if (!spirit) { if (scrolling) pendingDraw = true else draw(); return }
-        if (drawnSig == null) { drawnSig = ""; draw() } // something on screen straight away; the real content follows
-        if (loading) return
-        loading = true
+        if (!spirit) { if (refreshState.requestDraw()) draw(); return }
+        if (drawnSig == null) { drawnSig = ""; if (refreshState.requestDraw()) draw() } // real content follows
+        if (!refreshState.beginRefresh()) return
         Thread {
             val m = runCatching { LiveFrames.media(activity) }.getOrDefault(emptyList())
             val e = runCatching { HubData.load(activity) }.getOrDefault(emptyList())
@@ -65,11 +62,14 @@ class FramesPage(
             val sig = frames.joinToString(";") { f -> "${f.cn.packageName}|${f.note?.title}|${f.note?.body}|${whenOf(f)}|${map[f.cn.packageName]?.signature}" } +
                 "#" + m.joinToString(";") { it.pkg + it.title + it.playing }
             activity.runOnUiThread {
-                loading = false
+                val again = refreshState.finishRefresh()
+                if (activity.isDestroyed) return@runOnUiThread
                 if (sig != drawnSig) {
                     media = m; extras = e; liveByPkg = map; drawnSig = sig
-                    if (scrolling) pendingDraw = true else draw()
+                    if (refreshState.requestDraw()) draw()
                 }
+                // A Wi-Fi change may arrive after this worker read the old state. Do not lose it.
+                if (again) refresh()
             }
         }.start()
     }
@@ -140,7 +140,6 @@ class FramesPage(
     /** The live things worth showing for an app with no notification: its next events, its missed calls, or its latest texts. Loaded off the main thread. */
     private var extras: List<HubData.Item> = emptyList()
     private var media: List<LiveFrames.Media> = emptyList()
-    private var loading = false
     private var liveSig = ""
 
     /** Whether a frame has anything to show beyond its header: a notification, live content or music. */
