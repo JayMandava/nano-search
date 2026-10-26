@@ -17,6 +17,9 @@ android {
         versionCode = 14
         versionName = "0.8.0-dev"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        manifestPlaceholders["nanoAppLabel"] = "Nano Search"
+        manifestPlaceholders["nanoHomeCategory"] = "android.intent.category.HOME"
+        manifestPlaceholders["nanoWallpaperEnabled"] = "true"
 
         ndk {
             abiFilters += "arm64-v8a"
@@ -60,6 +63,16 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Opt-in cloud-built physical QA: never replace the installed production package,
+            // become a Home candidate, or expose a selectable QA wallpaper provider.
+            if (providers.gradleProperty("clockQaBuild").map(String::toBoolean).getOrElse(false)) {
+                applicationIdSuffix = ".clockqa"
+                manifestPlaceholders["nanoAppLabel"] = "Nano Clock QA"
+                manifestPlaceholders["nanoHomeCategory"] = "ai.nanosearch.launcher.category.QA_ONLY"
+                manifestPlaceholders["nanoWallpaperEnabled"] = "false"
+            }
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true

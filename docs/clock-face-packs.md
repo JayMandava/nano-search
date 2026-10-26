@@ -73,3 +73,11 @@ On a disposable Android 13+ target, install the matching debug app/test APK pair
 The `minified` build type is debuggable, so it is **not** equivalent to true release/R8. Validate `release` separately. Without the private signing configuration a local release build is debug-signed and must never be presented as the production-signed update. Existing baseline lint findings are recorded separately; do not add blanket suppressions merely to force green.
 
 Run final tests on the exact candidate revision and record suite counts, APK hashes/certificate, sample hash, lint delta and runtime evidence before publishing. Builds, tests, runtime probes and release publication are separate gates; this document is not a claim that pending gates passed.
+
+## Isolated physical QA (cloud-built)
+
+When physical testing is separately authorized, build on the cloud with `-PclockQaBuild=true -PincludePersonalOverlay=false` and `:app:assembleDebug :app:assembleDebugAndroidTest`. This opt-in affects only debug: app ID `ai.nanosearch.launcher.clockqa`, label **Nano Clock QA**, test ID `ai.nanosearch.launcher.clockqa.test`. It removes Home-role eligibility and disables only the QA app's own wallpaper service. Normal debug/release identities and defaults are unchanged. The debug document-provider authority is derived from the actual application ID.
+
+Verify APK package IDs, runner target, label, disabled QA wallpaper service, absence of HOME category, hashes and cloud debug certificate before installation. Install side-by-side; never replace/uninstall/force-stop the production launcher or change its Home/wallpaper defaults. No local compile, private overlay or signing-key access is needed. Run instrumentation against the QA test package, without the emulator-only `testScreenOff` argument; that one case is intentionally skipped on a physical phone. Rendering/preferences tests use disposable QA fixtures, and Java timezone changes are process-local and restored. A system Clock app may open for the Clock-intent test, but no alarm or default is created.
+
+This QA APK uses a different certificate from the existing production app and is **not an update or a production release**. Any future production signing requires the separately authorized existing-key route; keys must not be copied to the cloud.

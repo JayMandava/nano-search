@@ -31,12 +31,12 @@
         <intent><action android:name="android.speech.RecognitionService" /></intent>
     </queries>
 
-    <!-- Used only by the model downloader, and only when the user taps Download. -->
+    <!-- Used only for explicitly requested model or curated clock-face downloads. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:allowBackup="false"
-        android:label="Nano Search"
+        android:label="${nanoAppLabel}"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:theme="@style/Theme.Home">
@@ -51,7 +51,7 @@
             android:clearTaskOnLaunch="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.HOME" />
+                <category android:name="${nanoHomeCategory}" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
@@ -117,6 +117,7 @@
         <!-- The clocks as a live wallpaper, so they can sit behind the lock screen. -->
         <service
             android:name=".clocks.ClockWallpaperService"
+            android:enabled="${nanoWallpaperEnabled}"
             android:exported="true"
             android:label="Nano Clock"
             android:permission="android.permission.BIND_WALLPAPER">
