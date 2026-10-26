@@ -45,6 +45,7 @@ class CarbonDialArt {
     private val silver = Color.rgb(168, 175, 177)
     private val gearPath = gearShape()
     private val motionClip = inner()
+    private val bridgeArt = CarbonBridgeArt()
     private val gearColors = intArrayOf(0xff292e30.toInt(),0xff343a3b.toInt(),0xff292f32.toInt(),0xff393e3f.toInt(),0xff575b58.toInt())
     private val gearArt = arrayOfNulls<Bitmap>(5)
     private val hubFinish = SweepGradient(0f,0f,intArrayOf(0xff707b7c.toInt(),0xffe2e7de.toInt(),0xff555f61.toInt(),0xffc0c9c4.toInt(),0xff707b7c.toInt()),null)
@@ -272,20 +273,9 @@ class CarbonDialArt {
     private fun upper(c: Canvas) {
         val save = c.save()
         c.clipPath(inner())
-        // A continuous, variable-width openwork frame surrounds the counter rings.
-        // Angled shoulders, broad feet and recessed windows replace the former rod bridges.
-        plate(c,floatArrayOf(424f,182f, 441f,183f, 410f,343f, 469f,399f, 532f,401f, 590f,335f, 586f,185f, 605f,187f, 617f,343f, 552f,427f, 471f,436f, 386f,355f),emptyArray())
-        plate(c,floatArrayOf(432f,300f, 464f,279f, 526f,279f, 566f,309f, 568f,351f, 549f,367f, 528f,353f, 475f,353f, 443f,373f, 418f,349f),
-            arrayOf(floatArrayOf(467f,311f,516f,311f,534f,329f,475f,329f)),false)
-        plate(c,floatArrayOf(267f,533f, 344f,537f, 414f,593f, 437f,653f, 433f,813f, 408f,821f, 408f,666f, 389f,618f, 333f,563f, 263f,556f),emptyArray())
-        plate(c,floatArrayOf(735f,530f, 738f,552f, 670f,564f, 611f,622f, 591f,673f, 590f,811f, 566f,815f, 564f,660f, 589f,601f, 657f,541f),emptyArray())
-        plate(c,floatArrayOf(307f,309f, 329f,313f, 324f,367f, 417f,400f, 510f,481f, 616f,519f, 704f,514f, 707f,539f, 604f,545f, 496f,505f, 404f,425f, 300f,384f),emptyArray())
-        plate(c,floatArrayOf(288f,804f, 320f,743f, 378f,700f, 428f,568f, 480f,491f, 550f,402f, 693f,344f, 704f,364f, 567f,422f, 504f,507f, 452f,582f, 400f,716f, 338f,759f, 311f,817f),emptyArray())
-        // Dark secondary lattice masks the big wheels, so the teeth appear through openings.
-        lattice(c,675f,267f,1f)
-        lattice(c,301f,657f,.93f)
-        lattice(c,690f,677f,.79f)
-        for ((x,y) in arrayOf(417f to 327f, 592f to 321f, 355f to 572f, 649f to 572f, 417f to 781f, 587f to 784f)) screw(c,x,y,9f)
+        // Original connected framework, fixed above the animated train and below counters/hands.
+        bridgeArt.draw(c)
+        CarbonBridgeGeometry.bosses.forEach { screw(c, it.x, it.y, it.screwRadius) }
         for ((x,y) in arrayOf(275f to 621f, 737f to 586f, 594f to 234f)) {
             oval(c,x-7,y-9,x+7,y+9,0xff381347.toInt())
             ovalStroke(c,x-7,y-9,x+7,y+9,1.7f,0xffa062a8.toInt())
@@ -459,19 +449,6 @@ class CarbonDialArt {
             val j=(i+2)%outline.size
             if(outline[j]>=outline[i])line(c,outline[i],outline[i+1]-.6f,outline[j],outline[j+1]-.6f,.65f,if(bright)0xffc7d0c8.toInt() else 0xff66736f.toInt())
         }
-    }
-
-    private fun lattice(c:Canvas,x:Float,y:Float,scale:Float) {
-        val s=c.save();c.translate(x,y);c.scale(scale,scale);c.rotate(-13f)
-        for(i in 0..4) {
-            val px=-37f+i*17f
-            plate(c,floatArrayOf(px,-62f,px+5,-63f,px+12,56f,px+7,59f),emptyArray(),false)
-        }
-        for(i in 0..4) {
-            val py=-45f+i*22
-            plate(c,floatArrayOf(-43f,py,42f,py-10,44f,py-4,-42f,py+7),emptyArray(),false)
-        }
-        c.restoreToCount(s)
     }
 
     private fun gearShape():Path = Path().apply {
