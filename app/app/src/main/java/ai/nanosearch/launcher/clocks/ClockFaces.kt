@@ -24,21 +24,32 @@ data class ClockFaceDefinition(
 object ClockFaces {
     const val STEEL_ID = "steeldial"
     const val CARBON_ID = "carbon01"
-    val all: List<ClockFaceDefinition> = listOf(
+    private val builtIns: List<ClockFaceDefinition> = listOf(
         ClockFaceDefinition(STEEL_ID, "Steel Dial", 300),
         ClockFaceDefinition(CARBON_ID, "Carbon 01", 300, "Inspired by RM 65-01 McLaren W1"),
     )
+    val all: List<ClockFaceDefinition> get() = builtIns + ClockFaceRegistry.definitions()
+    private val packId = Regex("pack-(import|curated)-[a-f0-9]{32}")
+    fun isPackId(id: String?): Boolean = id != null && packId.matches(id)
+    fun normalizeSelection(id: String?): String = id?.takeIf { it == STEEL_ID || it == CARBON_ID || isPackId(it) } ?: STEEL_ID
+    fun labelFor(id: String?): String = all.firstOrNull { it.id == id }?.label
+        ?: if (isPackId(id)) "Unavailable face — Steel Dial" else builtIns.first().label
 
-    fun find(id: String?): ClockFaceDefinition = all.firstOrNull { it.id == id } ?: all.first()
-    fun renderer(context: Context, id: String?): ClockFaceRenderer = when (find(id).id) {
-        CARBON_ID -> CarbonClockFaceRenderer()
-        else -> SteelClockFaceRenderer(context)
+    fun find(id: String?): ClockFaceDefinition = all.firstOrNull { it.id == id } ?: builtIns.first()
+    fun renderer(context: Context, id: String?): ClockFaceRenderer {
+        ClockFaceRegistry.ensure(context)
+        if (isPackId(id)) ClockFaceRegistry.installed(context, requireNotNull(id))?.let { return DataClockFaceRenderer(context.applicationContext, it) }
+        return when (id) {
+            CARBON_ID -> CarbonClockFaceRenderer()
+            else -> SteelClockFaceRenderer(context)
+        }
     }
 
     fun preview(context: Context, id: String?, size: Int = 360, epochMillis: Long = System.currentTimeMillis()): Bitmap {
         val side = size.coerceIn(32, 1536)
         val renderer = renderer(context, id)
         return try {
+            if (renderer is DataClockFaceRenderer) renderer.awaitAssets()
             Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888).also {
                 renderer.draw(Canvas(it), RectF(0f, 0f, side.toFloat(), side.toFloat()), epochMillis, false)
             }

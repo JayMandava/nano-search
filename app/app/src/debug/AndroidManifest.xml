@@ -1,5 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
+        <provider
+            android:name="ai.nanosearch.launcher.ClockFaceBlockingProvider"
+            android:authorities="${applicationId}.clockfaces.test"
+            android:exported="false"
+            android:grantUriPermissions="false" />
         <activity android:name="ai.nanosearch.launcher.clocks.ClockTestHostActivity" android:exported="false" android:theme="@android:style/Theme.Material.NoActionBar" />
     </application>
 </manifest>

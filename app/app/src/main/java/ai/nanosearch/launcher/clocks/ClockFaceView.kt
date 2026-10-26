@@ -16,18 +16,19 @@ import java.util.Date
 
 /** Native Nano clock view: the wallpaper uses the same renderer factory and motion policy. */
 open class ClockFaceView @JvmOverloads constructor(context: Context, faceId: String = ClockFaces.STEEL_ID) : View(context) {
-    var faceId: String = ClockFaces.find(faceId).id
+    var faceId: String = ClockFaces.normalizeSelection(faceId)
         set(value) {
-            val normalized = ClockFaces.find(value).id
-            if (field == normalized) return
+            val normalized = ClockFaces.normalizeSelection(value)
+            if (field == normalized) { refreshRenderer(); return }
             field = normalized
-            renderer.release()
-            renderer = ClockFaces.renderer(context, normalized)
+            refreshRenderer()
             lastDescription = Long.MIN_VALUE
             invalidate()
         }
     protected var renderer = ClockFaces.renderer(context, this.faceId)
         private set
+    private var rendererIdentity = ClockFaceRegistry.identity(context, this.faceId)
+    private var registrySubscription: AutoCloseable? = null
     private val bounds = RectF()
     private val visibleRect = Rect()
     private var aggregateVisible = false
@@ -77,6 +78,10 @@ open class ClockFaceView @JvmOverloads constructor(context: Context, faceId: Str
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        registrySubscription = ClockFaceRegistry.observe(context) {
+            refreshRenderer(); lastDescription = Long.MIN_VALUE; invalidate()
+        }
+        refreshRenderer()
         if (!receiving) {
             context.registerReceiver(clockChanged, IntentFilter().apply {
                 addAction(Intent.ACTION_TIME_CHANGED); addAction(Intent.ACTION_TIMEZONE_CHANGED)
@@ -93,6 +98,7 @@ open class ClockFaceView @JvmOverloads constructor(context: Context, faceId: Str
     }
 
     override fun onDetachedFromWindow() {
+        registrySubscription?.close(); registrySubscription = null
         cancelFrame()
         viewTreeObserver.removeOnScrollChangedListener(scrollChanged)
         motionPolicy.detach()
@@ -117,6 +123,7 @@ open class ClockFaceView @JvmOverloads constructor(context: Context, faceId: Str
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) { bounds.set(0f, 0f, w.toFloat(), h.toFloat()) }
 
     override fun onDraw(canvas: Canvas) {
+        refreshRenderer()
         val now = System.currentTimeMillis()
         drawFace(canvas, bounds, now, motionPolicy.smooth)
         val wholeSecond = Math.floorDiv(now, 1000L)
@@ -139,7 +146,17 @@ open class ClockFaceView @JvmOverloads constructor(context: Context, faceId: Str
     protected open fun onScreenInteractiveChanged(interactive: Boolean) = Unit
 
     protected open fun accessibilityDescription(epochMillis: Long): String =
-        "${ClockFaces.find(faceId).label}, ${formatter.format(Date(epochMillis))}"
+        "${ClockFaces.labelFor(faceId)}, ${formatter.format(Date(epochMillis))}"
+
+    private fun refreshRenderer() {
+        val identity = ClockFaceRegistry.identity(context, faceId)
+        if (identity == rendererIdentity) return
+        renderer.release()
+        renderer = ClockFaces.renderer(context, faceId)
+        rendererIdentity = identity
+        lastDescription = Long.MIN_VALUE
+        invalidate()
+    }
 
     private fun cancelFrame() { removeCallbacks(tick); isFrameScheduled = false }
 }

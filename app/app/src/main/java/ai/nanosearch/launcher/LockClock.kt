@@ -38,8 +38,11 @@ object LockClock {
     fun position(c: Context) = prefs(c).getString("lockclock_pos", "middle") ?: "middle"
 
     /** Face selection is independent of existing background, position and photo preferences. */
-    fun face(c: Context): String = ClockFaces.find(prefs(c).getString("lockclock_face", ClockFaces.STEEL_ID)).id
-    fun setFace(c: Context, id: String) = prefs(c).edit().putString("lockclock_face", ClockFaces.find(id).id).apply()
+    fun face(c: Context): String {
+        ai.nanosearch.launcher.clocks.ClockFaceRegistry.ensure(c)
+        return ClockFaces.normalizeSelection(prefs(c).getString("lockclock_face", ClockFaces.STEEL_ID))
+    }
+    fun setFace(c: Context, id: String) = ai.nanosearch.launcher.clocks.PackClockApply.applyLock(c, ClockFaces.normalizeSelection(id))
     fun cycleFace(c: Context) {
         val faces = ClockFaces.all
         val index = faces.indexOfFirst { it.id == face(c) }

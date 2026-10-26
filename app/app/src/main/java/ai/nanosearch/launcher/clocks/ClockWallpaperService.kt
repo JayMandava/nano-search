@@ -33,6 +33,8 @@ class ClockWallpaperService : WallpaperService() {
         private val dialBounds = RectF()
         private val power = getSystemService(PowerManager::class.java)
         private var faceRenderer: ClockFaceRenderer? = null
+        private var rendererIdentity = ""
+        private var registrySubscription: AutoCloseable? = null
         private var w = 0
         private var h = 0
         private var visible = false
@@ -58,6 +60,7 @@ class ClockWallpaperService : WallpaperService() {
 
         override fun onCreate(holder: SurfaceHolder) {
             super.onCreate(holder)
+            registrySubscription = ClockFaceRegistry.observe(this@ClockWallpaperService) { requestFrame() }
             prefs.registerOnSharedPreferenceChangeListener(preferenceChanged)
             observingPreferences = true
         }
@@ -106,6 +109,7 @@ class ClockWallpaperService : WallpaperService() {
         }
 
         override fun onDestroy() {
+            registrySubscription?.close(); registrySubscription = null
             destroyed = true; visible = false
             handler.removeCallbacks(frame)
             stopObservers()
@@ -156,9 +160,11 @@ class ClockWallpaperService : WallpaperService() {
             if (id == "photo") c.drawColor(0x40000000) // Preserve the existing readability veil.
 
             val faceId = LockClock.face(this@ClockWallpaperService)
-            if (faceRenderer?.id != faceId) {
+            val identity = ClockFaceRegistry.identity(this@ClockWallpaperService, faceId)
+            if (faceRenderer == null || rendererIdentity != identity) {
                 faceRenderer?.release()
                 faceRenderer = ClockFaces.renderer(this@ClockWallpaperService, faceId)
+                rendererIdentity = identity
             }
             val cy = h * when (prefs.getString("lockclock_pos", "middle")) { "top" -> 0.28f; "low" -> 0.72f; else -> 0.5f }
             val side = (min(w, h) * 0.82f).toInt()

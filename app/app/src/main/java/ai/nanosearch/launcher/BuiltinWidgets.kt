@@ -23,9 +23,8 @@ interface BuiltinWidget {
 
 object BuiltinWidgets {
     /** The launcher's own clocks, then any extras from the optional personal source set (a local build only). */
-    val all: List<BuiltinWidget> by lazy {
-        ai.nanosearch.launcher.clocks.ClockWidgets.all + extras()
-    }
+    private val personalExtras: List<BuiltinWidget> by lazy { extras() }
+    val all: List<BuiltinWidget> get() = ai.nanosearch.launcher.clocks.ClockWidgets.all + personalExtras
 
     private fun extras(): List<BuiltinWidget> =
         runCatching {
@@ -35,4 +34,5 @@ object BuiltinWidgets {
         }.getOrDefault(emptyList())
 
     fun find(id: String) = all.firstOrNull { it.id == id }
+        ?: if (ai.nanosearch.launcher.clocks.ClockFaces.isPackId(id)) ai.nanosearch.launcher.clocks.ClockWidgets.forFace(id) else null
 }

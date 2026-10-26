@@ -64,6 +64,28 @@ class HomeWidgets(
 
     private val ids: List<Int> get() = items.mapNotNull { it.toIntOrNull() }
 
+    private val restoreChangedFaces = Runnable { if (box.isAttachedToWindow) restore() }
+    private val faceBindingsChanged = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == null || key == idsKey || items.any { key == ai.nanosearch.launcher.clocks.PackClockApply.bindingKey(it) }) {
+            box.removeCallbacks(restoreChangedFaces)
+            box.post(restoreChangedFaces)
+        }
+    }
+    init {
+        box.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(v: View) {
+                prefs.registerOnSharedPreferenceChangeListener(faceBindingsChanged)
+                // Other activities may have changed a binding while this page was detached.
+                box.removeCallbacks(restoreChangedFaces)
+                box.post(restoreChangedFaces)
+            }
+            override fun onViewDetachedFromWindow(v: View) {
+                prefs.unregisterOnSharedPreferenceChangeListener(faceBindingsChanged)
+                box.removeCallbacks(restoreChangedFaces)
+            }
+        })
+    }
+
     val count get() = items.size
 
     /** Saved size in dp as (width, height); width 0 means full width. */
@@ -123,7 +145,7 @@ class HomeWidgets(
 
     /** Removes every widget on this page for good (the page is being deleted). */
     fun removeAll() {
-        items.forEach { token -> token.toIntOrNull()?.let { host.deleteAppWidgetId(it) }; prefs.edit().remove("wsize_$token").remove("wpos_$token").apply() }
+        items.forEach { token -> token.toIntOrNull()?.let { host.deleteAppWidgetId(it) }; prefs.edit().remove("wsize_$token").remove("wpos_$token").remove(ai.nanosearch.launcher.clocks.PackClockApply.bindingKey(token)).apply() }
         items = emptyList()
         box.removeAllViews(); frames.clear(); fitPadding()
     }
@@ -168,18 +190,37 @@ class HomeWidgets(
     }
 
     fun pick() {
+        ai.nanosearch.launcher.clocks.ClockFaceRegistry.ensure(activity)
         val providers = manager.installedProviders.sortedBy { it.loadLabel(activity.packageManager).toString().lowercase() }
-        val builtins = BuiltinWidgets.all
-        val entries: List<Any> = builtins + providers
+        var entries: List<Any> = BuiltinWidgets.all + providers
         if (entries.isEmpty()) {
             Toast.makeText(activity, "This phone has no widgets installed", Toast.LENGTH_SHORT).show()
             return
         }
         val adapter = object : BaseAdapter() {
+            private var observedParent: View? = null
+            private var registryLink: AutoCloseable? = null
+            private fun observePicker(parent: ViewGroup) {
+                if (observedParent === parent) return
+                observedParent = parent
+                fun subscribe() {
+                    registryLink?.close()
+                    registryLink = ai.nanosearch.launcher.clocks.ClockFaceRegistry.observe(activity) {
+                        entries = BuiltinWidgets.all + providers
+                        notifyDataSetChanged()
+                    }
+                }
+                if (parent.isAttachedToWindow) subscribe()
+                parent.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+                    override fun onViewAttachedToWindow(v: View) = subscribe()
+                    override fun onViewDetachedFromWindow(v: View) { registryLink?.close(); registryLink = null }
+                })
+            }
             override fun getCount() = entries.size
             override fun getItem(position: Int) = entries[position]
             override fun getItemId(position: Int) = position.toLong()
             override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                observePicker(parent)
                 val entry = entries[position]
                 val info = entry as? AppWidgetProviderInfo
                 val row = LinearLayout(activity).apply {
@@ -497,12 +538,15 @@ class HomeWidgets(
         box.removeView(view); frames.remove(view); restack(); fitPadding()
         token.toIntOrNull()?.let { host.deleteAppWidgetId(it) }
         items = items - token
-        prefs.edit().remove("wsize_$token").remove("wpos_$token").apply()
+        prefs.edit().remove("wsize_$token").remove("wpos_$token")
+            .remove(ai.nanosearch.launcher.clocks.PackClockApply.bindingKey(token)).apply()
     }
 
     /** A widget the launcher draws itself: no provider, no binding, no host view; it is an ordinary View in the page. */
     private fun showBuiltin(token: String) {
-        val b = BuiltinWidgets.find(token.split(':').getOrNull(1) ?: return) ?: return
+        val b = if (ai.nanosearch.launcher.clocks.PackClockApply.isClockToken(token))
+            ai.nanosearch.launcher.clocks.ClockWidgets.forFace(ai.nanosearch.launcher.clocks.PackClockApply.faceForToken(activity, token))
+        else BuiltinWidgets.find(token.split(':').getOrNull(1) ?: return) ?: return
         val view = b.create(activity, token)
         val saved = savedSize(token)
         val heightPx = saved?.second?.takeIf { it > 0 }?.let { dp(it) } ?: dp(b.defaultHeightDp)

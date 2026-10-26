@@ -24,6 +24,7 @@ answers questions, and listens when you speak. Small language models run entirel
   the search bar, its buttons, menus, cards and tabs are glossy glass with a lit upper half, a bright top edge and a dark border. Icons are original glossy gems (a handset, an envelope, a camera, a calendar page that shows today's date) cut from three restrained metals, and well-known apps (browsers, chat, mail, social, streaming, office, cloud, payments, shopping, rides, VPNs, password managers, AI assistants, games) each get a drawing of their own, in a colour that suggests them;
   an app without a drawn icon keeps its own picture on a graphite gem tinted by its colour. The Hub is a glass list of cards, and Active Frames are live glass cards: now-playing with controls, a notification's picture and lines, your next events, battery and storage, an app's shortcuts.
   Pair it with [Bold Keys](https://github.com/JayMandava/bold-keys), the matching keyboard.
+- **Clock Faces:** built-in Steel and Carbon faces, plus private data-only analog face packs imported through Android's document picker. Apply a face to one exact Home clock or independently to Lock Clock. See [pack format and validation](docs/clock-face-packs.md) for limits, provenance and the current catalog status.
 - **Steel Dial:** a clock widget drawn by the launcher, also usable as a live wallpaper behind the lock screen, over one of the drawn wallpapers, black, or a photo from your gallery.
 - **Translucent drawer in Spirit:** the wallpaper shows through the app drawer, and each app sits in a boxed tile with its name on a darker strip along the foot, in the manner of the boxed-tile launchers of the mid-2010s.
 - **Hub:** one list for texts, missed calls, upcoming events and the notifications of your other apps, with filters, replying in place where an app allows it,
@@ -44,9 +45,8 @@ answers questions, and listens when you speak. Small language models run entirel
 
 ## Privacy
 
-Everything is indexed into a private database inside the app. Models run on the CPU. The app has the INTERNET permission for one
-reason: downloading models when you tap Download. Notification access, if you allow it for the Hub, only reads notifications on the phone. Downloads are checked against a SHA-256 before they are used, and
-"Download on Wi-Fi only" is on by default. Each search source (contacts, messages, calls, calendar, files, photos) can be switched off
+Everything is indexed into a private database inside the app. Models run on the CPU. The app uses the INTERNET permission for downloads you explicitly start: models and curated clock-face packs when entries are available in the compiled catalog. Imported clock packs never run code or access the network. Notification access, if you allow it for the Hub, only reads notifications on the phone. Downloads are checked against a SHA-256 before they are used, and
+Model downloads have "Download on Wi-Fi only" on by default. Each search source (contacts, messages, calls, calendar, files, photos) can be switched off
 in Settings, and "Clear and rebuild" empties the index.
 
 Some custom Android builds switch off network access for apps that were installed before they declared the INTERNET permission. If a download

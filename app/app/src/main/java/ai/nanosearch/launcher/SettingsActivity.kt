@@ -127,6 +127,7 @@ private fun SettingsScreen(onBack: () -> Unit, listState: LazyListState, scroll:
             item { HiddenAppsRow(tick) }
             item { Header("Appearance") }
             item { AppearanceCard() }
+            item { ClockFacesRow() }
             item { Header("Screen") }
             item { FullScreenCard() }
             item { Header("Hub and badges") }
@@ -139,6 +140,18 @@ private fun SettingsScreen(onBack: () -> Unit, listState: LazyListState, scroll:
             item { SetupRow() }
             item { AdvancedRow() }
         }
+    }
+}
+
+@Composable
+private fun ClockFacesRow() {
+    val context = LocalContext.current
+    Card(shape = RoundedCornerShape(24.dp), onClick = { context.startActivity(Intent(context, ClockFacesActivity::class.java)) }) {
+        ListItem(
+            colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
+            headlineContent = { Text("Clock Faces") },
+            supportingContent = { Text("Built-in and imported faces for Home and Lock Clock.") },
+        )
     }
 }
 

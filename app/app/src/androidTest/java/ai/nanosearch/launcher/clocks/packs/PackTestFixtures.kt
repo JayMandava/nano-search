@@ -8,7 +8,7 @@ import java.util.zip.Deflater
 /** Byte-level fixtures deliberately independent of the production ZIP parser. */
 internal object PackTestFixtures {
     // Original authoring fixture: no supplied artwork, font, brand, or external dependency.
-    val manifest = """{"schemaVersion":1,"template":"analog-v1","id":"test-original","version":1,"name":"Original test dial","palette":{"background":"#101820","rim":"#506070","ticks":"#e8edf0"},"hour":{"shape":"sword","length":240,"width":24,"color":"#ffffff"},"minute":{"shape":"baton","length":390,"width":14,"color":"#ffffff"},"second":{"shape":"baton","length":410,"width":4,"color":"#ff7700"},"pivot":{"radius":20,"color":"#dddddd"}}"""
+    val manifest = """{"format":"nano.clock-face-pack","schemaVersion":1,"packId":"test-original","packVersion":1,"name":"Original test dial","author":"Nano test fixtures","license":"CC0-1.0","minAppVersionCode":14,"requires":["analog-v1"],"template":"analog-v1","dial":{"backgroundColor":"#FF101820","ticks":"minute","tickColor":"#FFE8EDF0","numerals":"quarters","numeralColor":"#FFE8EDF0","font":"system-sans"},"hands":{"hour":{"shape":"needle","color":"#FFFFFFFF","length":0.24,"width":0.024,"tail":0.02},"minute":{"shape":"bar","color":"#FFFFFFFF","length":0.39,"width":0.014,"tail":0.03}},"assets":[]}"""
     fun manifestWith(extra: String): String = manifest.dropLast(1) + "," + extra + "}"
     data class Entry(
         val name: String,

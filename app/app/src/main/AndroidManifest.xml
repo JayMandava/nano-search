@@ -85,6 +85,13 @@
             android:theme="@style/Theme.Settings" />
 
         <activity
+            android:name=".ClockFacesActivity"
+            android:taskAffinity="ai.nanosearch.launcher.settings"
+            android:exported="false"
+            android:label="Clock Faces"
+            android:theme="@style/Theme.Settings" />
+
+        <activity
             android:name=".ModelsActivity"
             android:taskAffinity="ai.nanosearch.launcher.settings"
             android:exported="false"
