@@ -8,9 +8,9 @@ Collection previews are static, rendered off the UI thread. Only a selected deta
 
 ## Availability and provenance
 
-The production catalog currently contains **no published entries**. There is no placeholder download URL or claim that a hosted gallery has shipped. A reviewed pack must be published first; only then can its exact immutable first-party URL, byte count, pack identity/version and SHA-256 be added to `FacePackCatalog`.
+The production catalog contains **Orbit Blue (demo)**, an original, unbranded CC0 example—not a commercial-watch reproduction or an additional built-in face. Its real published archive is pinned to commit `19072b6ed38b944142b1aaf7b4f1f3d87a00a3a6`, 14,303 bytes, SHA-256 `f12204deb3d998843c77048be0f7e5803307246d49bba047aa017e8ac1e0363f`. It was fetched and byte-verified before the compiled catalog was activated. Carbon and Steel remain built in.
 
-`app/app/src/androidTest/assets/clock-packs/orbit-blue.zip` is an original, unbranded CC0 fixture with a reproducible generator in `tools/clock-packs`. It is test-only, not packaged in the app or listed in the production catalog. Local-server download tests inject a test catalog/transport without weakening production URL validation.
+`app/app/src/androidTest/assets/clock-packs/orbit-blue.zip` is an original, unbranded CC0 fixture with a reproducible generator in `tools/clock-packs`. The same exact archive is now the published demo; the ZIP is not bundled into the app and is downloaded only on explicit request. Local-server download tests inject a test catalog/transport without weakening production URL validation.
 
 No private font, personal overlay, signing key, downloaded model or reference photograph is required for this feature. The public source assets are checked against the exact reviewed public-baseline hash allowlist, not only filename keywords.
 

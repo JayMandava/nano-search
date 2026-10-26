@@ -42,11 +42,24 @@ class FacePackDownloaderTest {
     private fun reject(reason: FacePackFailure, action: () -> Unit) {
         try { action(); fail("Expected rejection: $reason") } catch (e: FacePackOperationException) { assertEquals(e.message, reason, e.reason) }
     }
-    @Test fun frozenCatalogIsInitiallyEmptyAndRejectsUnlistedEntryBeforeIo() {
-        assertTrue(FacePackCatalog.entries.isEmpty())
+    @Test fun frozenCatalogRejectsUnlistedEntryBeforeIo() {
         val transport = Transport { error("No connection allowed") }
         reject(FacePackFailure.UNSUPPORTED_SOURCE) { FacePackDownloader(transport = transport).download(entry(), File(root, "new.zip")) }
         assertTrue(transport.requests.isEmpty()); assertTrue(root.listFiles()!!.isEmpty())
+    }
+    @Test fun compiledDemoPinsThePublishedImmutableArchiveAndDeclaredIdentity() {
+        val demo = FacePackCatalog.entries.single()
+        assertEquals("Orbit Blue (demo)", demo.name)
+        assertEquals("raw.githubusercontent.com", FacePackUrlPolicy.validate(demo.url, true).host)
+        assertTrue(demo.url.contains("/19072b6ed38b944142b1aaf7b4f1f3d87a00a3a6/"))
+        val archive = File("src/androidTest/assets/clock-packs/orbit-blue.zip")
+        assertEquals(demo.bytes, archive.length())
+        assertEquals(demo.sha256, hash(archive.readBytes()))
+        val admitted = FacePackArchive.validateAndExtract(archive, File(root, "admitted-demo"), 15)
+        assertEquals(demo.packId, admitted.spec.packId)
+        assertEquals(demo.version, admitted.spec.packVersion)
+        assertEquals("CC0-1.0", admitted.spec.license)
+        assertEquals(demo.sha256, admitted.digest)
     }
     @Test fun exactFirstPartyInitialRoutesAreAllowed() {
         assertEquals("github.com", FacePackUrlPolicy.validate(url, true).host)

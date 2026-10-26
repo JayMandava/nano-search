@@ -12,9 +12,16 @@ data class FacePackCatalogEntry(
 )
 
 object FacePackCatalog {
-    // Deliberately empty until original packs have been reviewed and actually published.
-    // Import remains available. Never substitute placeholder URLs or silently trust a remote JSON feed.
-    val entries: List<FacePackCatalogEntry> = emptyList()
+    // Original CC0 demo, published and byte-verified before activation; no commercial-watch claims.
+    // A remote feed or mutable branch can never extend this compiled trust list.
+    val entries: List<FacePackCatalogEntry> = listOf(
+        FacePackCatalogEntry(
+            id = "orbit-blue-v1", packId = "orbit-blue", version = 1, name = "Orbit Blue (demo)",
+            url = "https://raw.githubusercontent.com/JayMandava/nano-search/19072b6ed38b944142b1aaf7b4f1f3d87a00a3a6/clock-packs/orbit-blue-v1.zip",
+            bytes = 14_303,
+            sha256 = "f12204deb3d998843c77048be0f7e5803307246d49bba047aa017e8ac1e0363f",
+        ),
+    )
 }
 
 enum class FacePackStage { COPYING, DOWNLOADING, CHECKING, INSTALLING }

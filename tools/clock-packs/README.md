@@ -27,7 +27,7 @@ Pinned fixture identity:
 - SHA-256 `f12204deb3d998843c77048be0f7e5803307246d49bba047aa017e8ac1e0363f`
 - `minAppVersionCode: 14`, requires `analog-v1` and `png-v1`
 
-## Test usage, not a fake production catalog
+## Test usage and published demo
 
 The generated ZIP is an Android **test** asset; obtain it with the instrumentation
 context's assets, not the target application's assets. Supply its bytes to a
@@ -45,8 +45,10 @@ read-only recovery validation.
 For manual testing, this ZIP can be selected via the import UI after copying it
 into an emulator/device's Downloads folder. Copying it is not evidence that an
 import, render, Home selection, or independent Lock selection passed: run and
-record those checks separately. This fixture is not a published downloadable
-catalog entry, and a local test server is not a public delivery service.
+record those checks separately. This exact fixture was published as **Orbit Blue (demo)** at commit
+`19072b6ed38b944142b1aaf7b4f1f3d87a00a3a6` and is now pinned in the production
+catalog. Local tests remain separate from that real public download; they do not
+claim that a local server is a public delivery service.
 
 ## Security profile notes
 

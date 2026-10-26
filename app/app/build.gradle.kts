@@ -14,8 +14,8 @@ android {
         applicationId = "ai.nanosearch.launcher"
         minSdk = 33
         targetSdk = 35
-        versionCode = 14
-        versionName = "0.8.0-dev"
+        versionCode = 15
+        versionName = "0.8.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["nanoAppLabel"] = "Nano Search"
         manifestPlaceholders["nanoHomeCategory"] = "android.intent.category.HOME"
@@ -45,12 +45,15 @@ android {
         }
     }
 
-    // Release signing: a keystore.properties file (storeFile, storePassword, keyAlias, keyPassword) kept outside the repository, found through
-    // the NANO_KEYSTORE_PROPERTIES environment variable or ~/.nano-search-keystore/keystore.properties. Without one, release builds are signed
-    // with the debug key so that anyone can still build them.
+    // Explicit cloud handoff: -PunsignedRelease=true emits an unsigned release and does not
+    // resolve, probe or read private signing configuration. See docs/cloud-release-signing.md.
+    // With the flag absent/false, preserve the normal external release key or debug-key fallback.
+    val unsignedRelease = providers.gradleProperty("unsignedRelease").map(String::toBooleanStrict).getOrElse(false)
     val keystoreProps = Properties()
-    val keystoreFile = (System.getenv("NANO_KEYSTORE_PROPERTIES") ?: "${System.getProperty("user.home")}/.nano-search-keystore/keystore.properties").let { file(it) }
-    if (keystoreFile.exists()) keystoreFile.inputStream().use { stream -> keystoreProps.load(stream) }
+    if (!unsignedRelease) {
+        val keystoreFile = (System.getenv("NANO_KEYSTORE_PROPERTIES") ?: "${System.getProperty("user.home")}/.nano-search-keystore/keystore.properties").let { file(it) }
+        if (keystoreFile.exists()) keystoreFile.inputStream().use { stream -> keystoreProps.load(stream) }
+    }
     signingConfigs {
         if (keystoreProps.containsKey("storeFile")) {
             create("release") {
@@ -77,7 +80,11 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+            signingConfig = if (unsignedRelease) {
+                null
+            } else {
+                signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+            }
         }
         // The release build (shrunk, optimised) signed with the debug key, so it can be installed over a debug install to test the shrinking.
         create("minified") {
