@@ -34,6 +34,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -97,7 +99,9 @@ private fun ClockFacesScreen(model: ClockFacesModel, finish: () -> Unit) {
         TopAppBar(title = { Text(pack?.spec?.name ?: builtin?.label ?: "Clock Faces") },
             navigationIcon = { IconButton(onClick = back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } })
     }) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
+        val detailSideLimit = clockDetailPreviewMaxSide(maxHeight)
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             model.operation?.let { operation -> item(key = "operation") { OperationCard(operation, model::cancelOperation) } }
             model.notice?.let { notice -> item(key = "notice") { Card { Column(Modifier.padding(16.dp)) {
                 Text(notice)
@@ -148,7 +152,7 @@ private fun ClockFacesScreen(model: ClockFacesModel, finish: () -> Unit) {
                 }
             } else if (pack != null || builtin != null) {
                 val name = pack?.spec?.name ?: requireNotNull(builtin).label
-                item { DetailFacePreview(model, selected, name, state.generation) }
+                item { DetailFacePreview(model, selected, name, state.generation, detailSideLimit) }
                 item { Text(if (pack != null) "Installed · ${sourceLabel(pack.source)}" else "Built-in · Included with Nano", style = MaterialTheme.typography.titleMedium) }
                 if (pack != null) {
                     item { Text("Version ${pack.spec.packVersion} · ${byteCount(pack.payloadBytes)} installed payload") }
@@ -182,6 +186,7 @@ private fun ClockFacesScreen(model: ClockFacesModel, finish: () -> Unit) {
                 item { Text("This face is no longer available. Existing selections safely fall back to Steel Dial.") }
                 item { Button(onClick = { model.selectedId = null }) { Text("Back to collection") } }
             }
+        }
         }
     }
     if (backConfirmation && model.operation != null) AlertDialog(onDismissRequest = { backConfirmation = false }, title = { Text("Operation in progress") },
@@ -227,7 +232,7 @@ private fun FaceCard(model: ClockFacesModel, id: String, name: String, source: S
 
 /** The only animated preview is the visible detail. No View is retained after pause or leaving it. */
 @Composable
-private fun DetailFacePreview(model: ClockFacesModel, id: String, name: String, generation: Long) {
+private fun DetailFacePreview(model: ClockFacesModel, id: String, name: String, generation: Long, maxPreviewSide: Dp) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var resumed by remember(lifecycle) { mutableStateOf(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) }
@@ -244,13 +249,15 @@ private fun DetailFacePreview(model: ClockFacesModel, id: String, name: String, 
     LaunchedEffect(resumed, motionAllowed) { if (!resumed || !motionAllowed) live = false }
     val showingLive = live && resumed && motionAllowed
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (showingLive) AndroidView(
-            factory = { DetailClockPreview(it, id, name) },
-            modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp).aspectRatio(1f),
-            onReset = null,
-            onRelease = { it.visibility = View.GONE },
-            update = { it.faceId = id },
-        ) else FacePreview(model, id, name, generation, detail = true)
+        if (showingLive) ClockFacePreviewFrame(maxPreviewSide) {
+            AndroidView(
+                factory = { DetailClockPreview(it, id, name) },
+                modifier = Modifier.matchParentSize(),
+                onReset = null,
+                onRelease = { it.visibility = View.GONE },
+                update = { it.faceId = id },
+            )
+        } else FacePreview(model, id, name, generation, detail = true, maxPreviewSide = maxPreviewSide)
         Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Live local-time preview", Modifier.weight(1f))
             Switch(checked = showingLive, onCheckedChange = { live = it }, enabled = resumed && motionAllowed, modifier = Modifier.semantics { contentDescription = "Live local-time preview" })
@@ -258,6 +265,23 @@ private fun DetailFacePreview(model: ClockFacesModel, id: String, name: String, 
         Text(if (showingLive) "Live preview only; your Home and Lock Clock choices are unchanged."
             else "Static preview at 10:10, using the same renderer as Home and Lock Clock.", style = MaterialTheme.typography.bodySmall)
         if (!motionAllowed || !resumed) Text("Live preview stays off when motion is reduced, battery saver is on, system animations are disabled, or this screen is paused.", style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+/** Leave space for controls in short windows; the remaining detail always scrolls normally. */
+internal fun clockDetailPreviewMaxSide(viewportHeight: Dp): Dp = minOf(360.dp, viewportHeight * .65f)
+
+/**
+ * The outer row consumes the available width; only the inner artwork is square. Applying
+ * fillMaxWidth + capped height + aspectRatio to the SAME node gives impossible constraints in
+ * landscape, so Compose can draw an oversized square while reporting a shorter layout height.
+ * Here the artwork receives one exact, compatible width/height and cannot paint into metadata.
+ */
+@Composable
+internal fun ClockFacePreviewFrame(maxSide: Dp, modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
+    BoxWithConstraints(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        val side = minOf(maxWidth, maxSide).coerceAtLeast(0.dp)
+        Box(Modifier.size(side).clipToBounds(), contentAlignment = Alignment.Center, content = content)
     }
 }
 
@@ -270,20 +294,21 @@ internal class DetailClockPreview(context: Context, faceId: String, private val 
 private data class FacePreviewResult(val complete: Boolean = false, val bitmap: Bitmap? = null)
 
 @Composable
-private fun FacePreview(model: ClockFacesModel, id: String, name: String, generation: Long, detail: Boolean) {
+private fun FacePreview(model: ClockFacesModel, id: String, name: String, generation: Long, detail: Boolean, maxPreviewSide: Dp = 360.dp) {
     val zone = model.previewTimeZoneKey
     var retry by remember(id, generation, zone) { mutableIntStateOf(0) }
     val result by produceState(FacePreviewResult(), id, generation, detail, zone, retry) {
         value = FacePreviewResult()
         value = FacePreviewResult(complete = true, bitmap = model.preview(id, generation, if (detail) 720 else 240))
     }
-    val modifier = if (detail) Modifier.fillMaxWidth().heightIn(max = 360.dp).aspectRatio(1f) else Modifier.size(80.dp)
+    val artwork: @Composable BoxScope.() -> Unit = {
+        val ready = result.bitmap
+        if (ready != null) Image(ready.asImageBitmap(), "$name preview at 10:10", Modifier.matchParentSize())
+        else Text(if (result.complete) "Preview unavailable" else "Loading preview…", style = MaterialTheme.typography.labelSmall)
+    }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(modifier, contentAlignment = Alignment.Center) {
-            val ready = result.bitmap
-            if (ready != null) Image(ready.asImageBitmap(), "$name preview at 10:10", Modifier.fillMaxSize())
-            else Text(if (result.complete) "Preview unavailable" else "Loading preview…", style = MaterialTheme.typography.labelSmall)
-        }
+        if (detail) ClockFacePreviewFrame(maxPreviewSide, content = artwork)
+        else Box(Modifier.size(80.dp).clipToBounds(), contentAlignment = Alignment.Center, content = artwork)
         if (detail && result.complete && result.bitmap == null) TextButton(onClick = { retry++ }) { Text("Retry preview") }
     }
 }
