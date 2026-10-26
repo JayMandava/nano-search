@@ -59,6 +59,7 @@ class CarbonDialArt {
         hands: Boolean = true,
         showDate: Boolean = true,
         showRunningSeconds: Boolean = true,
+        lumeAlpha: Float = 0f,
     ) {
         val size = min(bounds.width(), bounds.height())
         if (size <= 0f) return
@@ -86,13 +87,14 @@ class CarbonDialArt {
         if (showDate) date(canvas, calendar.get(Calendar.DAY_OF_MONTH))
         val angles = CarbonTimeModel.angles(epochMillis, calendar.timeZone)
         if (hands) {
-            subHand(canvas, 350f, 465f, elapsedMillis / 43200000f * 360, 58f, orange)
-            subHand(canvas, 650f, 465f, elapsedMillis / 1800000f * 360, 59f, orange)
+            subHand(canvas, 350f, 465f, (elapsedMillis.coerceAtLeast(0L) % 43200000L) / 43200000f * 360, 58f, orange)
+            subHand(canvas, 650f, 465f, (elapsedMillis.coerceAtLeast(0L) % 1800000L) / 1800000f * 360, 59f, orange)
             if (showRunningSeconds) subHand(canvas, 500f, 693f, angles.second, 57f, yellow)
             // Seconds and the parked central chronograph pointer sit beneath local-time hands.
-            hand(canvas, 2, if (running || elapsedMillis > 0) elapsedMillis / 60000f * 360 else 0f)
+            hand(canvas, 2, if (running || elapsedMillis > 0) (elapsedMillis.coerceAtLeast(0L) % 60000L) / 60000f * 360 else 0f)
             hand(canvas, 0, angles.hour)
             hand(canvas, 1, angles.minute)
+            if (lumeAlpha > 0f) drawLume(canvas, angles.hour, angles.minute, lumeAlpha)
             hub(canvas, 500f, 500f, 18f)
         } else {
             subHand(canvas, 350f, 465f, 0f, 58f, orange)
@@ -179,16 +181,7 @@ class CarbonDialArt {
         }
     }
 
-    private fun inner(): Path = Path().apply {
-        moveTo(327f, 240f)
-        quadTo(500f, 220f, 673f, 240f)
-        cubicTo(724f, 290f, 766f, 405f, 760f, 500f)
-        cubicTo(766f, 600f, 724f, 720f, 673f, 770f)
-        quadTo(500f, 790f, 327f, 770f)
-        cubicTo(276f, 720f, 234f, 600f, 240f, 500f)
-        cubicTo(234f, 405f, 276f, 290f, 327f, 240f)
-        close()
-    }
+    private fun inner(): Path = CarbonPusherGeometry.innerDialPath()
 
     private fun faceRim(scaleX:Float,scaleY:Float):Path = inner().apply {
         transform(Matrix().apply{setScale(scaleX,scaleY,500f,500f)})
@@ -413,6 +406,29 @@ class CarbonDialArt {
             round(c,497f,526f,503f,554f,2f,if(kind==0)orange else cyan)
         }
         c.restoreToCount(s)
+    }
+
+    /** Light only the applied indices and the two luminous hand inserts, never the case or date. */
+    private fun drawLume(c: Canvas, hour: Float, minute: Float, alpha: Float) {
+        fun glow(path: Path) {
+            val a = alpha.coerceIn(0f, 1f)
+            stroke(c, path, 14f, Color.argb((a * 24).toInt(), 133, 255, 211))
+            stroke(c, path, 7f, Color.argb((a * 55).toInt(), 156, 255, 214))
+            fill(c, path, Color.argb((a * 225).toInt(), 199, 255, 213))
+        }
+        for ((x,y,angle) in arrayOf(Triple(500f,230f,0f),Triple(680f,252f,35f),Triple(747f,365f,65f),Triple(760f,500f,90f),Triple(741f,644f,115f),Triple(674f,763f,145f),Triple(500f,780f,180f),Triple(326f,763f,215f),Triple(259f,644f,245f),Triple(240f,500f,270f),Triple(253f,365f,295f),Triple(320f,252f,325f))) {
+            val saved=c.save();c.translate(x,y);c.rotate(angle)
+            glow(Path().apply { moveTo(-9f,-7f);lineTo(9f,-7f);lineTo(5f,15f);quadTo(0f,25f,-5f,15f);close() })
+            c.restoreToCount(saved)
+        }
+        for ((kind, angle) in arrayOf(0 to hour, 1 to minute)) {
+            val tip=if(kind==0)276f else 245f
+            val shoulder=if(kind==0)334f else 294f
+            val w=if(kind==0)18f else 14f
+            val saved=c.save();c.rotate(angle,500f,500f)
+            glow(polygon(floatArrayOf(500f,tip+16,500f+w-5,shoulder-1,500f,shoulder+14,500f-w+5,shoulder-1)))
+            c.restoreToCount(saved)
+        }
     }
 
     private fun subHand(c:Canvas,x:Float,y:Float,angle:Float,length:Float,color:Int) {

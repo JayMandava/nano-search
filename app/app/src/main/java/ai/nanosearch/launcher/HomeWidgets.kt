@@ -503,7 +503,7 @@ class HomeWidgets(
     /** A widget the launcher draws itself: no provider, no binding, no host view; it is an ordinary View in the page. */
     private fun showBuiltin(token: String) {
         val b = BuiltinWidgets.find(token.split(':').getOrNull(1) ?: return) ?: return
-        val view = b.create(activity)
+        val view = b.create(activity, token)
         val saved = savedSize(token)
         val heightPx = saved?.second?.takeIf { it > 0 }?.let { dp(it) } ?: dp(b.defaultHeightDp)
         val widthPx = saved?.first?.takeIf { it > 0 }?.let { dp(it) } ?: maxWidthPx

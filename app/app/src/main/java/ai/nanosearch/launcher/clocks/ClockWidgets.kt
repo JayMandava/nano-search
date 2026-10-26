@@ -15,6 +15,9 @@ object ClockWidgets {
             override val credit = definition.credit
             override val defaultHeightDp = definition.defaultHeightDp
             override fun create(context: Context): View = ClockFaceView(context, id)
+            override fun create(context: Context, instanceKey: String): View =
+                if (id == ClockFaces.CARBON_ID) CarbonHomeClockView(context, instanceKey)
+                else create(context)
             override fun preview(context: Context): Drawable = BitmapDrawable(context.resources, ClockFaces.preview(context, id))
         }
     }

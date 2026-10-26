@@ -55,6 +55,9 @@ class CarbonClockFaceRenderer : ClockFaceRenderer {
     override fun draw(canvas: Canvas, bounds: RectF, epochMillis: Long, motion: Boolean) {
         art.draw(canvas, bounds, ClockFaces.renderEpochMillis(epochMillis, motion), motion = motion)
     }
+    fun drawChronograph(canvas: Canvas, bounds: RectF, epochMillis: Long, motion: Boolean, elapsedMillis: Long, running: Boolean, lumeAlpha: Float = 0f) {
+        art.draw(canvas, bounds, ClockFaces.renderEpochMillis(epochMillis, motion), elapsedMillis, running, motion, lumeAlpha = lumeAlpha)
+    }
     override fun onTimeChanged() = art.onTimeChanged()
     override fun release() = art.release()
 }

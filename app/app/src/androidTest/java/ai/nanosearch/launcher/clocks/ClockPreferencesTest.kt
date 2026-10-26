@@ -15,12 +15,20 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /** Redirects only this fixture's prefs/files; never touches Nano's actual selection/photo/layout. */
-internal class IsolatedClockContext(base: Context, private val fixtureName: String) : ContextWrapper(base) {
-    override fun getSharedPreferences(name: String, mode: Int): SharedPreferences = super.getSharedPreferences("$name-$fixtureName", mode)
+internal open class IsolatedClockContext(base: Context, private val fixtureName: String) : ContextWrapper(base) {
+    private val preferenceFiles = mutableSetOf<String>()
+    override fun getSharedPreferences(name: String, mode: Int): SharedPreferences {
+        val actual = "$name-$fixtureName"
+        synchronized(preferenceFiles) { preferenceFiles += actual }
+        return super.getSharedPreferences(actual, mode)
+    }
     private val fixtureFiles = File(base.cacheDir, fixtureName).apply { mkdirs() }
     override fun getFilesDir(): File = fixtureFiles
     override fun getApplicationContext(): Context = this
-    fun clean() { baseContext.deleteSharedPreferences("nano-$fixtureName"); fixtureFiles.deleteRecursively() }
+    fun clean() {
+        synchronized(preferenceFiles) { preferenceFiles.toList() }.forEach { baseContext.deleteSharedPreferences(it) }
+        fixtureFiles.deleteRecursively()
+    }
 }
 
 @RunWith(AndroidJUnit4::class)

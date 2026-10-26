@@ -14,8 +14,8 @@ android {
         applicationId = "ai.nanosearch.launcher"
         minSdk = 33
         targetSdk = 35
-        versionCode = 12
-        versionName = "0.7.0"
+        versionCode = 14
+        versionName = "0.8.0-dev"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
@@ -132,6 +132,7 @@ tasks.named("preBuild") { dependsOn(buildGpuLib) }
 
 dependencies {
     testImplementation("junit:junit:4.13.2")
+    implementation("org.apache.commons:commons-compress:1.28.0")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test:rules:1.6.1")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

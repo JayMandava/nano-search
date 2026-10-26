@@ -15,6 +15,8 @@ interface BuiltinWidget {
     val credit: String? get() = null
     val defaultHeightDp: Int
     fun create(context: Context): View
+    /** Existing widgets retain their original factory; interactive clocks can key independent state. */
+    fun create(context: Context, instanceKey: String): View = create(context)
     /** A picture for the widget picker, or null. */
     fun preview(context: Context): Drawable?
 }

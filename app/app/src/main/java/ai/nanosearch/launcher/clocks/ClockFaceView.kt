@@ -26,7 +26,8 @@ open class ClockFaceView @JvmOverloads constructor(context: Context, faceId: Str
             lastDescription = Long.MIN_VALUE
             invalidate()
         }
-    private var renderer = ClockFaces.renderer(context, this.faceId)
+    protected var renderer = ClockFaces.renderer(context, this.faceId)
+        private set
     private val bounds = RectF()
     private val visibleRect = Rect()
     private var aggregateVisible = false
@@ -50,8 +51,8 @@ open class ClockFaceView @JvmOverloads constructor(context: Context, faceId: Str
     private val clockChanged = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
-                Intent.ACTION_SCREEN_OFF -> screenActive = false
-                Intent.ACTION_SCREEN_ON, Intent.ACTION_USER_PRESENT -> screenActive = true
+                Intent.ACTION_SCREEN_OFF -> { screenActive = false; onScreenInteractiveChanged(false) }
+                Intent.ACTION_SCREEN_ON, Intent.ACTION_USER_PRESENT -> { screenActive = true; onScreenInteractiveChanged(true) }
             }
             renderer.onTimeChanged()
             formatter = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.MEDIUM)
@@ -117,10 +118,10 @@ open class ClockFaceView @JvmOverloads constructor(context: Context, faceId: Str
 
     override fun onDraw(canvas: Canvas) {
         val now = System.currentTimeMillis()
-        renderer.draw(canvas, bounds, now, motionPolicy.smooth)
+        drawFace(canvas, bounds, now, motionPolicy.smooth)
         val wholeSecond = Math.floorDiv(now, 1000L)
         if (lastDescription != wholeSecond) {
-            contentDescription = "${ClockFaces.find(faceId).label}, ${formatter.format(Date(now))}"
+            contentDescription = accessibilityDescription(now)
             lastDescription = wholeSecond
         }
         cancelFrame()
@@ -130,6 +131,15 @@ open class ClockFaceView @JvmOverloads constructor(context: Context, faceId: Str
             else postDelayed(tick, motionPolicy.frameDelayMillis(now))
         }
     }
+
+    protected open fun drawFace(canvas: Canvas, bounds: RectF, epochMillis: Long, motion: Boolean) {
+        renderer.draw(canvas, bounds, epochMillis, motion)
+    }
+
+    protected open fun onScreenInteractiveChanged(interactive: Boolean) = Unit
+
+    protected open fun accessibilityDescription(epochMillis: Long): String =
+        "${ClockFaces.find(faceId).label}, ${formatter.format(Date(epochMillis))}"
 
     private fun cancelFrame() { removeCallbacks(tick); isFrameScheduled = false }
 }
