@@ -114,10 +114,16 @@ class PackRendererIntegrationTest {
         val first = fixture.install()
         val second = fixture.install(fixture.bytes(2, "Durable updated dial", "#FF805126"), update = true)
         assertEquals(first.id, second.id)
-        val root = File(fixture.context.noBackupFilesDir, "clock-face-packs-v1")
+        // Match get(context)'s trusted OS-alias normalization. A raw /data/user/0 parent
+        // may be a symlink, which the archive boundary must continue rejecting.
+        val root = File(fixture.context.noBackupFilesDir.canonicalFile, "clock-face-packs-v1")
+        assertEquals(root, second.directory.parentFile!!.parentFile!!.canonicalFile)
         assertTrue(File(root, "registry.bin").isFile)
+        val pointerBeforeReload = File(root, "registry.bin").readBytes()
         val reloaded = FacePackStore(root, 14).also { it.initialize() }
         assertNull(reloaded.snapshot().error)
+        assertTrue("A valid recovery must not quarantine any revision", reloaded.snapshot().unavailable.isEmpty())
+        assertArrayEquals("A healthy startup must not rewrite the registry", pointerBeforeReload, File(root, "registry.bin").readBytes())
         assertEquals(listOf(second.id), reloaded.snapshot().packs.map { it.id })
         assertEquals(second.digest, reloaded.find(second.id)?.digest)
         assertEquals(2, reloaded.find(second.id)?.spec?.packVersion)
@@ -147,7 +153,7 @@ class PackRendererIntegrationTest {
         val preview = ClockFaces.preview(fixture.context, pack.id, 256, midnight)
         try { assertEquals(0xff345678.toInt(), preview.getPixel(190, 190)) } finally { preview.recycle() }
         File(pack.directory, "assets/texture.png").writeBytes(byteArrayOf(0, 1, 2, 3))
-        val root = File(fixture.context.noBackupFilesDir, "clock-face-packs-v1")
+        val root = File(fixture.context.noBackupFilesDir.canonicalFile, "clock-face-packs-v1")
         val reloaded = FacePackStore(root, 14).also { it.initialize() }
         assertNull("A corrupt pack is quarantined, not a broken whole registry", reloaded.snapshot().error)
         assertNull(reloaded.find(pack.id))

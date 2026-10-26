@@ -490,6 +490,17 @@ internal object PngCheck {
                         checkPack(depth == 16 || sample < 1 shl depth, "PNG transparency exceeds bit depth")
                     }
                 }
+                "sBIT" -> {
+                    // Static uncompressed metadata emitted by Android/Skia's PNG encoder.
+                    // PNG requires one value per source channel (indexed palettes use RGB/8-bit),
+                    // strictly before PLTE/IDAT. This does not admit profiles, text, or animation.
+                    val expected = when (color) { 0 -> 1; 2, 3 -> 3; 4 -> 2; 6 -> 4; else -> 0 }
+                    val maximum = if (color == 3) 8 else depth
+                    checkPack(!idat && "PLTE" !in once && once.add(type) && length == expected,
+                        "Invalid PNG significant-bits ordering or length")
+                    for (i in 0 until length) checkPack((bytes[data + i].toInt() and 255) in 1..maximum,
+                        "PNG significant bits exceed sample depth")
+                }
                 "IDAT" -> {
                     checkPack(!idatClosed && (color != 3 || palette > 0), "Invalid PNG image-data ordering")
                     idat = true; compressed.write(bytes, data, length)
@@ -502,7 +513,7 @@ internal object PngCheck {
                     if (type == "gAMA") checkPack(be32(bytes, data) > 0, "Invalid PNG gamma")
                     if (type == "pHYs") checkPack((bytes[data + 8].toInt() and 255) <= 1, "Invalid PNG physical-unit metadata")
                 }
-                else -> throw FacePackException("Animated or unsupported PNG metadata")
+                else -> throw FacePackException("Animated or unsupported PNG metadata: $type")
             }
             at += length + 12
         }

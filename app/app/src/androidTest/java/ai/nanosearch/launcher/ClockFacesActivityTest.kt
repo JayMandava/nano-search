@@ -78,10 +78,14 @@ class ClockFacesActivityTest {
                 val before = original.snapshot.packs.map { it.id to it.digest }
                 val beforeChoices = clockChoices()
                 scenario.onActivity {
+                    assertNull("Blocking-provider fixture requires a healthy collection", original.snapshot.error)
                     original.importDocument(ClockFaceBlockingProvider.uri(it))
                     original.importDocument(ClockFaceBlockingProvider.uri(it)) // A repeated tap must not queue another operation.
                 }
-                assertTrue("Provider open must reach the deterministic blocking point", ClockFaceBlockingProvider.opened.await(15, TimeUnit.SECONDS))
+                val reachedProvider = ClockFaceBlockingProvider.opened.await(15, TimeUnit.SECONDS)
+                assertTrue("Provider open must reach the deterministic blocking point; UI result: ${original.notice}", reachedProvider)
+                assertEquals("Read-mode ContentResolver must reach the typed provider entry point", 1, ClockFaceBlockingProvider.typedRequests.get())
+                assertEquals("The typed provider must preserve the CancellationSignal", 1, ClockFaceBlockingProvider.cancellableRequests.get())
                 scenario.recreate()
                 scenario.onActivity {
                     assertSame(original, ViewModelProvider(it)[ClockFacesModel::class.java])
@@ -114,8 +118,14 @@ class ClockFacesActivityTest {
             lateinit var model: ClockFacesModel
             scenario.onActivity { model = ViewModelProvider(it)[ClockFacesModel::class.java] }
             await("Collection must finish loading") { model.snapshot.ready }
-            scenario.onActivity { model.importDocument(ClockFaceBlockingProvider.uri(it)) }
-            assertTrue(ClockFaceBlockingProvider.opened.await(15, TimeUnit.SECONDS))
+            scenario.onActivity {
+                assertNull("Blocking-provider fixture requires a healthy collection", model.snapshot.error)
+                model.importDocument(ClockFaceBlockingProvider.uri(it))
+            }
+            val reachedProvider = ClockFaceBlockingProvider.opened.await(15, TimeUnit.SECONDS)
+            assertTrue("Provider open must reach the deterministic blocking point; UI result: ${model.notice}", reachedProvider)
+            assertEquals(1, ClockFaceBlockingProvider.typedRequests.get())
+            assertEquals(1, ClockFaceBlockingProvider.cancellableRequests.get())
             scenario.close() // External Activity teardown, distinct from Back's in-screen cancel confirmation.
             assertTrue("ViewModel clearing must cancel an outstanding provider open", ClockFaceBlockingProvider.cancellationObserved.await(15, TimeUnit.SECONDS))
             assertEquals(grantsBefore, resolver.persistedUriPermissions.map { it.uri to it.isReadPermission })

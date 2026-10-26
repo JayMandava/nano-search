@@ -47,7 +47,7 @@ class FacePackArchiveTest {
         assertTrue(File(pack.directory, "assets").isDirectory)
     }
     @Test fun originalStaticPngIsHashCheckedFullyValidatedAndCounted() {
-        val png = ArchiveTestFixtures.png(32, 16)
+        val png = ArchiveTestFixtures.png(32, 16, beforeData = ArchiveTestFixtures.chunk("sBIT", byteArrayOf(8, 8, 8, 8)))
         val pack = accept(ArchiveTestFixtures.zip(ArchiveTestFixtures.pngEntries(png)))
         assertEquals(32L * 16 * 4, pack.decodedBytes)
         assertArrayEquals(png, File(pack.directory, "assets/texture.png").readBytes())

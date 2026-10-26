@@ -91,4 +91,49 @@ class FacePackPngTest {
         }
     }
 
+    @Test fun standardSignificantBitsFromAndroidEncoderAreAcceptedForEveryColorType() {
+        for (color in listOf(0, 2, 3, 4, 6)) {
+            val depths = when (color) { 0 -> listOf(1, 2, 4, 8, 16); 3 -> listOf(1, 2, 4, 8); else -> listOf(8, 16) }
+            val channels = when (color) { 0 -> 1; 2, 3 -> 3; 4 -> 2; else -> 4 }
+            for (depth in depths) {
+                val maximum = if (color == 3) 8 else depth
+                for (significant in listOf(1, maximum)) {
+                    val bits = ArchiveTestFixtures.chunk("sBIT", ByteArray(channels) { significant.toByte() })
+                    val palette = if (color == 3) ArchiveTestFixtures.chunk("PLTE", byteArrayOf(1, 2, 3)) else byteArrayOf()
+                    val rowBytes = (if (color == 3) depth else channels * depth) + 7
+                    val raw = ByteArray(1 + rowBytes / 8)
+                    assertEquals(1, PngCheck.inspect(ArchiveTestFixtures.png(1, 1, depth = depth, color = color,
+                        raw = raw, beforeData = bits + palette)).width)
+                }
+            }
+        }
+    }
+    @Test fun significantBitsRequireExactLengthLegalValuesAndValidCrc() {
+        for (color in listOf(0, 2, 3, 4, 6)) {
+            val channels = when (color) { 0 -> 1; 2, 3 -> 3; 4 -> 2; else -> 4 }
+            val palette = if (color == 3) ArchiveTestFixtures.chunk("PLTE", byteArrayOf(1, 2, 3)) else byteArrayOf()
+            for (length in listOf(channels - 1, channels + 1, 256)) {
+                reject(ArchiveTestFixtures.png(1, 1, color = color, beforeData =
+                    ArchiveTestFixtures.chunk("sBIT", ByteArray(length) { 8 }) + palette), "significant-bits")
+            }
+            for (bad in listOf(0, 9, 255)) {
+                reject(ArchiveTestFixtures.png(1, 1, color = color, beforeData =
+                    ArchiveTestFixtures.chunk("sBIT", ByteArray(channels) { if (it == channels - 1) bad.toByte() else 8 }) + palette), "significant bits")
+            }
+        }
+        reject(ArchiveTestFixtures.png(1, 1, color = 0, depth = 1, beforeData = ArchiveTestFixtures.chunk("sBIT", byteArrayOf(2))), "sample depth")
+        val valid = ArchiveTestFixtures.png(beforeData = ArchiveTestFixtures.chunk("sBIT", byteArrayOf(8, 8, 8, 8)))
+        reject(valid.copyOf().apply { this[44] = 7 }, "CRC")
+    }
+    @Test fun significantBitsCannotBeDuplicatedOrAppearAfterPaletteOrPixels() {
+        val bits = ArchiveTestFixtures.chunk("sBIT", byteArrayOf(8, 8, 8))
+        val palette = ArchiveTestFixtures.chunk("PLTE", byteArrayOf(1, 2, 3))
+        reject(ArchiveTestFixtures.png(color = 2, beforeData = bits + bits), "ordering")
+        reject(ArchiveTestFixtures.png(color = 3, beforeData = palette + bits), "ordering")
+        val png = ArchiveTestFixtures.png(color = 2)
+        reject(png.copyOfRange(0, png.size - 12) + bits + png.copyOfRange(png.size - 12, png.size), "ordering")
+        for (forbidden in listOf("acTL", "iCCP", "zTXt", "iTXt"))
+            reject(ArchiveTestFixtures.png(color = 2, beforeData = bits + ArchiveTestFixtures.chunk(forbidden, byteArrayOf(0))), "unsupported")
+    }
+
 }

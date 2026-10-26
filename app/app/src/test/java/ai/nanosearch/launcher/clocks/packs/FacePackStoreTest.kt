@@ -300,4 +300,24 @@ class FacePackStoreTest {
             assertNull(restored.snapshot().error); assertArrayEquals(pointer, index.read())
         }
     }
+    @Test fun freshRecoveryUsesCanonicalTrustedRootWithoutWeakeningArchiveLinkRejection() {
+        val first = import(store()); val pointer = index.read()!!
+        val alias = File(root.parentFile, "${root.name}-os-alias")
+        Files.createSymbolicLink(alias.toPath(), root.toPath())
+        try {
+            val rawPayload = File(alias, first.directory.relativeTo(root).path)
+            val rawZip = File(rawPayload.parentFile, "source.zip")
+            try {
+                FacePackArchive.validateInstalled(rawZip, rawPayload, 14, first.digest)
+                fail("An unchecked alias must still be rejected by the archive trust boundary")
+            } catch (e: FacePackException) { assertTrue(e.message!!.contains("links")) }
+            // Production get(context) resolves only the trusted app-data root before construction.
+            val restored = FacePackStore(alias.canonicalFile, 14, index, validation)
+            restored.initialize()
+            assertNull(restored.snapshot().error); assertTrue(restored.snapshot().unavailable.isEmpty())
+            assertEquals(first.id, restored.snapshot().packs.single().id)
+            assertEquals(first.digest, restored.find(first.id)!!.digest)
+            assertArrayEquals(pointer, index.read())
+        } finally { Files.deleteIfExists(alias.toPath()) }
+    }
 }
