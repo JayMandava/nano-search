@@ -6,5 +6,6 @@
             android:exported="false"
             android:grantUriPermissions="false" />
         <activity android:name="ai.nanosearch.launcher.clocks.ClockTestHostActivity" android:exported="false" android:theme="@android:style/Theme.Material.NoActionBar" />
+        <activity android:name="ai.nanosearch.launcher.clocks.ClockTestCoverActivity" android:exported="false" android:theme="@android:style/Theme.Material.NoActionBar" />
     </application>
 </manifest>

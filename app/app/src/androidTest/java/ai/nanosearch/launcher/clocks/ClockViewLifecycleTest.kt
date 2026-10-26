@@ -11,7 +11,6 @@ import android.view.View
 import android.view.accessibility.AccessibilityEvent
 import android.util.Log
 import android.widget.FrameLayout
-import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.util.UUID
@@ -33,7 +32,7 @@ class ClockViewLifecycleTest {
             flags = flags or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
         }
         try {
-            ActivityScenario.launch(ClockTestHostActivity::class.java).use { scenario ->
+            ClockActivitySession.launch(ClockTestHostActivity::class.java).use { scenario ->
                 lateinit var context: IsolatedClockContext
                 lateinit var view: ClockFaceView
                 lateinit var expectedPackage: String
@@ -104,7 +103,7 @@ class ClockViewLifecycleTest {
     }
 
     @Test fun frameCallbacksStopWhileHiddenDetachedAndActivityStoppedThenResume() {
-        ActivityScenario.launch(ClockTestHostActivity::class.java).use { scenario ->
+        ClockActivitySession.launch(ClockTestHostActivity::class.java).use { scenario ->
             lateinit var context: IsolatedClockContext
             lateinit var view: ClockFaceView
             scenario.onActivity { activity ->
@@ -134,7 +133,7 @@ class ClockViewLifecycleTest {
     }
 
     @Test fun preferenceChangesDisableSmoothMotionAndDetachedObserversStayReleased() {
-        ActivityScenario.launch(ClockTestHostActivity::class.java).use { scenario ->
+        ClockActivitySession.launch(ClockTestHostActivity::class.java).use { scenario ->
             lateinit var context: IsolatedClockContext
             lateinit var view: ClockFaceView
             scenario.onActivity { activity ->
@@ -161,7 +160,7 @@ class ClockViewLifecycleTest {
     }
 
     @Test fun changingFacesKeepsTheSameViewAndRefreshesItsAccessibleLabel() {
-        ActivityScenario.launch(ClockTestHostActivity::class.java).use { scenario ->
+        ClockActivitySession.launch(ClockTestHostActivity::class.java).use { scenario ->
             lateinit var context: IsolatedClockContext
             lateinit var view: ClockFaceView
             scenario.onActivity { activity ->

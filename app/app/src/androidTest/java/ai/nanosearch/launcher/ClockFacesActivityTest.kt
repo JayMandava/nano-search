@@ -1,6 +1,7 @@
 package ai.nanosearch.launcher
 
 import ai.nanosearch.launcher.clocks.ClockFaces
+import ai.nanosearch.launcher.clocks.ClockActivitySession
 import ai.nanosearch.launcher.clocks.ClockTestHostActivity
 import android.widget.FrameLayout
 import android.view.accessibility.AccessibilityNodeInfo
@@ -12,7 +13,6 @@ import android.net.Uri
 import android.os.SystemClock
 import android.util.Log
 import androidx.lifecycle.ViewModelProvider
-import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.*
@@ -36,7 +36,7 @@ class ClockFacesActivityTest {
 
     @Test fun detailSelectionSurvivesRecreationWithoutApplyingAnything() {
         val before = clockChoices()
-        ActivityScenario.launch(ClockFacesActivity::class.java).use { scenario ->
+        ClockActivitySession.launch(ClockFacesActivity::class.java).use { scenario ->
             lateinit var original: ClockFacesModel
             scenario.onActivity {
                 original = ViewModelProvider(it)[ClockFacesModel::class.java]
@@ -143,7 +143,7 @@ class ClockFacesActivityTest {
         }
     }
 
-    private fun pressBackOnReadyScreen(scenario: ActivityScenario<ClockFacesActivity>) {
+    private fun pressBackOnReadyScreen(scenario: ClockActivitySession<ClockFacesActivity>) {
         lateinit var activity: ClockFacesActivity
         scenario.onActivity { activity = it }
         // RESUMED alone does not imply the first Compose frame/BackHandler effect has run.
@@ -185,7 +185,7 @@ class ClockFacesActivityTest {
             flags = flags or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
         }
         try {
-            ActivityScenario.launch(ClockFacesActivity::class.java).use { scenario ->
+            ClockActivitySession.launch(ClockFacesActivity::class.java).use { scenario ->
                 lateinit var original: ClockFacesModel
                 scenario.onActivity { original = ViewModelProvider(it)[ClockFacesModel::class.java] }
                 await("Collection must finish loading") { original.snapshot.ready }
@@ -243,7 +243,7 @@ class ClockFacesActivityTest {
         ClockFaceBlockingProvider.reset()
         val resolver = instrumentation.targetContext.contentResolver
         val grantsBefore = resolver.persistedUriPermissions.map { it.uri to it.isReadPermission }
-        val scenario = ActivityScenario.launch(ClockFacesActivity::class.java)
+        val scenario = ClockActivitySession.launch(ClockFacesActivity::class.java)
         try {
             lateinit var model: ClockFacesModel
             scenario.onActivity { model = ViewModelProvider(it)[ClockFacesModel::class.java] }
@@ -263,7 +263,7 @@ class ClockFacesActivityTest {
     }
 
     @Test fun liveDetailIsNotAClockAppButtonAndDoesNotAnnounceEverySecond() {
-        ActivityScenario.launch(ClockTestHostActivity::class.java).use { scenario ->
+        ClockActivitySession.launch(ClockTestHostActivity::class.java).use { scenario ->
             lateinit var view: DetailClockPreview
             scenario.onActivity {
                 view = DetailClockPreview(it, ClockFaces.CARBON_ID, "Carbon 01")
@@ -283,7 +283,7 @@ class ClockFacesActivityTest {
 
     @Test fun unavailableDocumentEndsSafelyWithoutLeakingUriOrChangingCollection() {
         val beforeChoices = clockChoices()
-        ActivityScenario.launch(ClockFacesActivity::class.java).use { scenario ->
+        ClockActivitySession.launch(ClockFacesActivity::class.java).use { scenario ->
             lateinit var model: ClockFacesModel
             scenario.onActivity { model = ViewModelProvider(it)[ClockFacesModel::class.java] }
             await("Collection must finish loading") { model.snapshot.ready }
