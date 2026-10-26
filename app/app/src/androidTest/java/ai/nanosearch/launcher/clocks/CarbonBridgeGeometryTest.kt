@@ -58,7 +58,7 @@ class CarbonBridgeGeometryTest {
     }
 
     @Test fun allSixAnchorScrewsHaveFullSeatsOnConnectedSupportMaterial() {
-        val expectedCenters = listOf(418f to 333f, 584f to 331f, 303f to 579f, 686f to 578f, 419f to 748f, 583f to 747f)
+        val expectedCenters = listOf(418f to 333f, 584f to 331f, 303f to 579f, 686f to 578f, 416f to 748f, 583f to 747f)
         val bosses = CarbonBridgeGeometry.bosses
         assertEquals("Anchor checks must not pass after anchors are deleted", 6, bosses.size)
         for ((index, boss) in bosses.withIndex()) {

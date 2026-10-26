@@ -15,7 +15,7 @@ internal object CarbonBridgeGeometry {
     val bosses: List<Boss> = listOf(
         Boss(418f, 333f, 13f, 7.2f), Boss(584f, 331f, 12f, 6.8f),
         Boss(303f, 579f, 13f, 7.4f), Boss(686f, 578f, 12f, 6.8f),
-        Boss(419f, 748f, 12f, 6.8f), Boss(583f, 747f, 11f, 6.3f),
+        Boss(416f, 748f, 12f, 6.8f), Boss(583f, 747f, 11f, 6.3f),
     )
 
     /** A union removes fake seams: the fork, counter surrounds and lower feet are one frame. */
@@ -26,21 +26,21 @@ internal object CarbonBridgeGeometry {
         fun circle(x: Float, y: Float, radius: Float) = Path().apply { addCircle(x, y, radius, Path.Direction.CW) }
 
         // The two tapered upper arms meet below an off-centre, open fork, not a crossing X.
-        branch(412f,229f, 438f,232f, 424f,315f, 433f,341f, 472f,375f,
-            505f,395f, 539f,373f, 567f,337f, 575f,233f, 600f,236f,
+        branch(412f,229f, 438f,232f, 424f,315f, 438f,350f, 478f,395f,
+            503f,418f, 539f,390f, 577f,341f, 582f,233f, 600f,236f,
             595f,341f, 568f,389f, 526f,420f, 502f,438f, 478f,422f,
             420f,378f, 400f,343f, 401f,314f)
-        // A short unequal shoulder, rather than a repeated horizontal plate beneath twelve.
-        branch(424f,339f, 449f,338f, 481f,350f, 522f,355f, 521f,369f,
-            478f,369f, 449f,357f, 424f,352f)
+        // An asymmetric short shoulder ends at the fork neck, not across its open cell.
+        branch(424f,339f, 446f,341f, 466f,352f, 469f,360f,
+            456f,360f, 441f,353f, 424f,352f)
         branch(487f,407f, 502f,422f, 461f,435f, 438f,414f, 421f,398f,
             420f,381f, 439f,387f, 469f,410f)
         branch(516f,409f, 542f,392f, 571f,377f, 585f,382f, 580f,398f,
             558f,415f, 537f,435f, 508f,432f)
 
-        join(circle(350f, 465f, 109f))
-        join(circle(650f, 465f, 109f))
-        join(circle(500f, 693f, 96f))
+        join(circle(350f, 465f, 110f))
+        join(circle(650f, 465f, 110f))
+        join(circle(500f, 693f, 97f))
         // Short bearing arms touch counter exteriors; they never run across counter interiors.
         branch(448f,486f, 456f,469f, 485f,486f, 505f,491f, 507f,508f, 479f,509f)
         branch(493f,492f, 518f,482f, 544f,472f, 553f,489f, 521f,504f, 503f,511f)
@@ -59,13 +59,17 @@ internal object CarbonBridgeGeometry {
             555f,635f, 544f,608f, 535f,575f, 510f,535f)
         bosses.forEach { join(circle(it.x, it.y, it.radius)) }
 
-        // Counter and date clearances are cut after union, so no branch can invade their faces.
+        // Clearances include a real margin beyond the required apertures: Path-op curves and
+        // independently rasterized Region circles must stay disjoint even at 240-pixel size.
         val apertures = Path().apply {
-            addCircle(350f, 465f, 102f, Path.Direction.CW)
-            addCircle(650f, 465f, 102f, Path.Direction.CW)
-            addCircle(500f, 693f, 88f, Path.Direction.CW)
-            addRoundRect(333f, 263f, 391f, 364f, 7f, 7f, Path.Direction.CW)
-            addCircle(500f, 500f, 7f, Path.Direction.CW)
+            addCircle(350f, 465f, 103f, Path.Direction.CW)
+            addCircle(650f, 465f, 103f, Path.Direction.CW)
+            addCircle(500f, 693f, 89f, Path.Direction.CW)
+            addRoundRect(332f, 262f, 392f, 365f, 8f, 8f, Path.Direction.CW)
+            addCircle(500f, 500f, 8f, Path.Direction.CW)
+            // The lower counter covers this relief. Do not leave tangent hairline fragments
+            // where a complete annulus would meet the curved bottom of the dial envelope.
+            addRect(448f, 765f, 552f, 825f, Path.Direction.CW)
         }
         check(frame.op(apertures, Path.Op.DIFFERENCE))
         check(frame.op(CarbonPusherGeometry.innerDialPath(), Path.Op.INTERSECT))
