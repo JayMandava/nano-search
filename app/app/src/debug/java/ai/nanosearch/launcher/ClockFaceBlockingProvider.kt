@@ -9,6 +9,8 @@ import android.database.Cursor
 import android.net.Uri
 import android.os.CancellationSignal
 import android.os.Bundle
+import android.os.SystemClock
+import android.util.Log
 import java.io.FileNotFoundException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -35,15 +37,29 @@ class ClockFaceBlockingProvider : ContentProvider() {
         if (uri.lastPathSegment != "blocked-open" || mode != "r") throw FileNotFoundException("Test-only source")
         val localGate = gate
         val localCancelled = cancellationObserved
-        signal?.setOnCancelListener { localCancelled.countDown(); localGate.countDown() }
+        val started = SystemClock.uptimeMillis()
+        fun trace(phase: String) = Log.i("ClockFaceProviderTest", "phase=$phase uptime=${SystemClock.uptimeMillis()} elapsedMs=${SystemClock.uptimeMillis() - started} gate=${System.identityHashCode(localGate)} gatePending=${localGate.count} cancellationPending=${localCancelled.count} signalCancelled=${signal?.isCanceled}")
+        signal?.setOnCancelListener {
+            trace("cancel-signal")
+            localCancelled.countDown()
+            localGate.countDown()
+        }
         if (signal != null) cancellableRequests.incrementAndGet()
         requests.incrementAndGet()
+        trace("open")
         opened.countDown()
         try {
-            if (!localGate.await(90, TimeUnit.SECONDS)) throw FileNotFoundException("Test source timed out")
+            if (!localGate.await(90, TimeUnit.SECONDS)) {
+                trace("gate-expired")
+                throw FileNotFoundException("Test source timed out")
+            }
+            trace("gate-released")
             signal?.throwIfCanceled()
             throw FileNotFoundException("Test source released")
-        } finally { signal?.setOnCancelListener(null) }
+        } finally {
+            signal?.setOnCancelListener(null)
+            trace("closed")
+        }
     }
 
     companion object {
@@ -59,6 +75,10 @@ class ClockFaceBlockingProvider : ContentProvider() {
             gate = CountDownLatch(1); opened = CountDownLatch(1); cancellationObserved = CountDownLatch(1)
             requests.set(0); typedRequests.set(0); cancellableRequests.set(0)
         }
-        fun release() { gate.countDown() }
+        fun release() {
+            val localGate = gate
+            Log.i("ClockFaceProviderTest", "phase=release-request uptime=${SystemClock.uptimeMillis()} gate=${System.identityHashCode(localGate)} gatePending=${localGate.count}")
+            localGate.countDown()
+        }
     }
 }

@@ -1,8 +1,16 @@
 package ai.nanosearch.launcher.clocks
 
 import ai.nanosearch.launcher.LockClock
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.PointF
+import android.os.Handler
+import android.os.Looper
+import android.os.ParcelFileDescriptor
 import android.os.SystemClock
+import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
@@ -12,13 +20,25 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.*
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TestWatcher
+import org.junit.runner.Description
 import org.junit.runner.RunWith
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.FutureTask
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 @RunWith(AndroidJUnit4::class)
 class CarbonPusherGestureTest {
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
     private var elapsed = 1000L
+    @get:Rule val timing = object : TestWatcher() {
+        override fun starting(description: Description) { Log.i("CarbonPusherTest", "START ${description.methodName} elapsedRealtime=${SystemClock.elapsedRealtime()}") }
+        override fun finished(description: Description) { Log.i("CarbonPusherTest", "END ${description.methodName} elapsedRealtime=${SystemClock.elapsedRealtime()}") }
+    }
     private fun home(scene: CarbonPusherScene) = scene.view as CarbonHomeClockView
     private fun point(scene: CarbonPusherScene, action: CarbonPusherAction): PointF {
         lateinit var result: PointF
@@ -28,14 +48,40 @@ class CarbonPusherGestureTest {
         }
         return result
     }
-    private fun tap(scene: CarbonPusherScene, action: CarbonPusherAction) {
-        val start = SystemClock.uptimeMillis()
-        TouchGesture(point(scene, action)).apply { send(MotionEvent.ACTION_DOWN); SystemClock.sleep(40); send(MotionEvent.ACTION_UP) }
-        val dispatched = SystemClock.uptimeMillis()
-        // Pointer injection already waits for input dispatch. An ordered UI-thread barrier observes
-        // its result without waiting for animation idle, which can outlive the three-second glow.
+    private fun tap(scene: CarbonPusherScene, action: CarbonPusherAction, afterDispatch: (TouchDispatchReceipt) -> Unit = {}) {
+        val gesture = TouchGesture(point(scene, action))
+        val received = CountDownLatch(1)
+        val failure = AtomicReference<Throwable>()
         instrumentation.runOnMainSync {
-            android.util.Log.i("CarbonPusherTest", "tap=$action dispatchMs=${dispatched - start} barrierMs=${SystemClock.uptimeMillis() - dispatched} focus=${scene.view.hasWindowFocus()} visible=${scene.view.isRenderingVisible} frame=${scene.view.isFrameScheduled} lume=${home(scene).lumeActive} expiry=${home(scene).isLumeCallbackScheduled} longPresses=${scene.longPresses}")
+            var down: TouchDispatchReceipt? = null
+            scene.onTouchDispatched = { receipt ->
+                if (receipt.action == MotionEvent.ACTION_DOWN) down = receipt
+                if (receipt.action == MotionEvent.ACTION_UP) {
+                    try {
+                        val first = requireNotNull(down) { "Actual $action UP arrived without DOWN" }
+                        assertTrue("Real $action DOWN must reach the clock: $first", first.handled && first.reachedClock)
+                        assertEquals("DOWN and UP must be the same actual gesture", first.downTime, receipt.downTime)
+                        assertTrue("The input command must produce a short tap, not a long press", receipt.eventTime - first.eventTime in 0 until ViewConfiguration.getLongPressTimeout().toLong())
+                        assertTrue("Real $action UP must be handled by the fixture hierarchy: $receipt", receipt.handled)
+                        assertTrue("Real $action UP must reach the clock, not only its parent: $receipt", receipt.reachedClock)
+                        afterDispatch(receipt)
+                    } catch (error: Throwable) { failure.set(error) }
+                    finally { received.countDown() }
+                }
+            }
+        }
+        val start = SystemClock.uptimeMillis()
+        try {
+            gesture.tap()
+            // Observe transient state in its actual dispatch receipt, not after shell transport
+            // or an unrelated rendering/main-queue barrier has consumed the effect's lifetime.
+            assertTrue("The actual window must deliver $action UP", received.await(5, TimeUnit.SECONDS))
+            failure.get()?.let { throw it }
+        } finally {
+            instrumentation.runOnMainSync {
+                scene.onTouchDispatched = null
+                Log.i("CarbonPusherTest", "tap=$action transportMs=${SystemClock.uptimeMillis() - start} ${scene.describe()}")
+            }
         }
     }
     private fun await(message: String, condition: () -> Boolean) {
@@ -49,16 +95,23 @@ class CarbonPusherGestureTest {
     }
     private fun scene(block: (ActivityScenario<ClockTestHostActivity>, CarbonPusherScene) -> Unit) {
         elapsed = 1000L
+        // Connect before any transient gesture begins; shell setup is not part of touch duration.
+        instrumentation.uiAutomation
         ActivityScenario.launch(ClockTestHostActivity::class.java).use { scenario ->
             lateinit var scene: CarbonPusherScene
             scenario.onActivity { activity -> scene = CarbonPusherScene(activity, { CarbonHomeClockView(it, "home-test-instance", elapsedRealtime = { elapsed }) }) }
-            // Layout visibility alone can precede input focus and the expensive first dial draw.
-            // Inject only after the real window is focused and the first frame has completed.
-            await("Real gesture fixture must have input focus and a completed first frame") {
-                scene.view.hasWindowFocus() && scene.view.isRenderingVisible && scene.view.isFrameScheduled && scene.view.width > 0 && scene.view.height > 0
-            }
-            try { block(scenario, scene) } finally { scenario.onActivity { scene.detach(it) } }
+            try {
+                awaitReady(scene)
+                block(scenario, scene)
+            } finally { scenario.onActivity { scene.detach(it) } }
         }
+    }
+    private fun awaitReady(scene: CarbonPusherScene, afterDraw: Int = 0) {
+        try {
+            await("Real gesture fixture must have input focus and a completed draw traversal") {
+                scene.view.hasWindowFocus() && scene.view.isRenderingVisible && scene.completedDraws > afterDraw && scene.view.width > 0 && scene.view.height > 0
+            }
+        } finally { instrumentation.runOnMainSync { Log.i("CarbonPusherTest", "readiness ${scene.describe()}") } }
     }
 
     @Test fun actualButtonTapsTogglePauseSplitAndResetWithoutOpeningClock() = scene { scenario, scene ->
@@ -79,8 +132,7 @@ class CarbonPusherGestureTest {
     }
 
     @Test fun actualDialTapOpensClockOnceAndDoesNotChangeChronograph() = scene { scenario, scene ->
-        tap(scene, CarbonPusherAction.OPEN_CLOCK)
-        instrumentation.runOnMainSync { assertEquals(1, scene.context.clockLaunches.size); assertEquals(CarbonChronographState(), home(scene).chronographState) }
+        tap(scene, CarbonPusherAction.OPEN_CLOCK) { assertEquals(1, scene.context.clockLaunches.size); assertEquals(CarbonChronographState(), home(scene).chronographState) }
     }
 
     @Test fun draggingOutAndReturningToTheButtonNeverCommitsAnAction() = scene { scenario, scene ->
@@ -131,8 +183,8 @@ class CarbonPusherGestureTest {
         for (action in listOf(CarbonPusherAction.START_PAUSE, CarbonPusherAction.OPEN_CLOCK)) scene { scenario, scene ->
             TouchGesture(point(scene, action)).apply {
                 send(MotionEvent.ACTION_DOWN)
-                SystemClock.sleep(ViewConfiguration.getLongPressTimeout().toLong() + 150)
-                send(MotionEvent.ACTION_UP)
+                try { await("The actual LongPressFrame must fire while the finger is still down") { scene.longPresses == 1 } }
+                finally { send(MotionEvent.ACTION_UP) }
             }
             instrumentation.waitForIdleSync()
             instrumentation.runOnMainSync { assertEquals(1, scene.longPresses); assertFalse(home(scene).chronographState.running); assertTrue(scene.context.clockLaunches.isEmpty()) }
@@ -182,65 +234,62 @@ class CarbonPusherGestureTest {
     }
 
     @Test fun hiddenLifecycleStopsDrawingWhileElapsedChronographTimeContinues() = scene { scenario, scene ->
-        tap(scene, CarbonPusherAction.START_PAUSE)
+        tap(scene, CarbonPusherAction.START_PAUSE) { assertTrue("Start must commit before stopping the host", home(scene).chronographState.running) }
+        instrumentation.runOnMainSync { Log.i("CarbonPusherTest", "before CREATED ${scene.describe()}") }
         scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
-        instrumentation.runOnMainSync { assertFalse(home(scene).isFrameScheduled); elapsed = 61000 }
+        var drawsBeforeResume = 0
+        instrumentation.runOnMainSync { Log.i("CarbonPusherTest", "after CREATED ${scene.describe()}"); assertFalse(home(scene).isFrameScheduled); drawsBeforeResume = scene.completedDraws; elapsed = 61000 }
         scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
-        instrumentation.waitForIdleSync()
-        instrumentation.runOnMainSync { assertTrue(home(scene).chronographState.running); assertEquals(60000L, home(scene).chronographState.elapsed(elapsed)) }
+        awaitReady(scene, drawsBeforeResume)
+        instrumentation.runOnMainSync { Log.i("CarbonPusherTest", "after RESUMED ${scene.describe()}"); assertTrue(home(scene).chronographState.running); assertEquals(60000L, home(scene).chronographState.elapsed(elapsed)) }
         tap(scene, CarbonPusherAction.START_PAUSE)
         instrumentation.runOnMainSync { assertEquals(60000L, home(scene).chronographState.elapsed(elapsed)); assertTrue(scene.context.clockLaunches.isEmpty()) }
     }
 
     @Test fun crownConsumesItsOwnTapAndRepeatsWithoutChangingChronographOrPreferences() = scene { scenario, scene ->
-        tap(scene, CarbonPusherAction.START_PAUSE)
         lateinit var before: CarbonChronographState
         lateinit var preferences: Map<String, *>
-        instrumentation.runOnMainSync {
+        tap(scene, CarbonPusherAction.START_PAUSE) {
+            assertTrue("Start must commit before testing the crown", home(scene).chronographState.running)
             elapsed = 2000
             before = home(scene).chronographState
             preferences = scene.context.getSharedPreferences(CarbonChronographStore.PREFS_FILE, android.content.Context.MODE_PRIVATE).all.toMap()
         }
-        tap(scene, CarbonPusherAction.LUME)
-        instrumentation.runOnMainSync {
+        tap(scene, CarbonPusherAction.LUME) {
             assertTrue(home(scene).lumeActive); assertEquals(1f, home(scene).lumeAlpha, 0f)
             assertEquals(before, home(scene).chronographState)
             assertEquals(preferences, scene.context.getSharedPreferences(CarbonChronographStore.PREFS_FILE, android.content.Context.MODE_PRIVATE).all)
             elapsed = 3500
             home(scene).invalidate()
+            assertTrue(home(scene).lumeAlpha in 0.001f..0.999f)
         }
-        instrumentation.runOnMainSync {}
-        instrumentation.runOnMainSync { assertTrue(home(scene).lumeAlpha in 0.001f..0.999f) }
-        tap(scene, CarbonPusherAction.LUME)
-        instrumentation.runOnMainSync {
+        tap(scene, CarbonPusherAction.LUME) {
             assertEquals(1f, home(scene).lumeAlpha, 0f)
             assertEquals(before, home(scene).chronographState)
             assertEquals(2500L, home(scene).elapsedChronographMillis())
             elapsed = 6500
             home(scene).invalidate()
+            assertFalse(home(scene).lumeActive); assertEquals(0f, home(scene).lumeAlpha, 0f); assertTrue(scene.context.clockLaunches.isEmpty())
         }
-        instrumentation.runOnMainSync {}
-        instrumentation.runOnMainSync { assertFalse(home(scene).lumeActive); assertEquals(0f, home(scene).lumeAlpha, 0f); assertTrue(scene.context.clockLaunches.isEmpty()) }
     }
 
     @Test fun reducedMotionCrownIsStaticUntilExpiryThenOff() = scene { scenario, scene ->
         instrumentation.runOnMainSync { LockClock.setReducedMotion(scene.context, true) }
         await("Reduced-motion policy must be applied before the crown test") { !home(scene).isMotionEnabled }
-        tap(scene, CarbonPusherAction.LUME)
-        instrumentation.runOnMainSync { assertEquals(1f, home(scene).lumeAlpha, 0f); elapsed = 3999; home(scene).invalidate() }
-        instrumentation.runOnMainSync {}
-        instrumentation.runOnMainSync { assertEquals(1f, home(scene).lumeAlpha, 0f); elapsed = 4000; home(scene).invalidate() }
-        instrumentation.runOnMainSync {}
-        instrumentation.runOnMainSync { assertEquals(0f, home(scene).lumeAlpha, 0f); assertFalse(home(scene).lumeActive); assertTrue(scene.context.clockLaunches.isEmpty()) }
+        tap(scene, CarbonPusherAction.LUME) {
+            assertEquals(1f, home(scene).lumeAlpha, 0f); elapsed = 3999; home(scene).invalidate()
+            assertEquals(1f, home(scene).lumeAlpha, 0f); elapsed = 4000; home(scene).invalidate()
+            assertEquals(0f, home(scene).lumeAlpha, 0f); assertFalse(home(scene).lumeActive); assertTrue(scene.context.clockLaunches.isEmpty())
+        }
     }
 
     @Test fun hidingOrStoppingTheHostCancelsItsTransientGlow() = scene { scenario, scene ->
-        tap(scene, CarbonPusherAction.LUME)
-        instrumentation.runOnMainSync { assertTrue(home(scene).lumeActive); home(scene).visibility = View.GONE }
+        tap(scene, CarbonPusherAction.LUME) { assertTrue(home(scene).lumeActive); home(scene).visibility = View.GONE }
         await("A hidden home face must cancel its glow and callbacks") { !home(scene).lumeActive && !home(scene).isLumeCallbackScheduled && !home(scene).isFrameScheduled }
-        instrumentation.runOnMainSync { home(scene).visibility = View.VISIBLE }
-        await("Showing the face must resume ordinary time rendering") { home(scene).isRenderingVisible && home(scene).isFrameScheduled }
-        tap(scene, CarbonPusherAction.LUME)
+        var drawsBeforeShowing = 0
+        instrumentation.runOnMainSync { drawsBeforeShowing = scene.completedDraws; home(scene).visibility = View.VISIBLE }
+        awaitReady(scene, drawsBeforeShowing)
+        tap(scene, CarbonPusherAction.LUME) { assertTrue(home(scene).lumeActive); assertTrue(home(scene).isLumeCallbackScheduled) }
         scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
         instrumentation.runOnMainSync { assertFalse(home(scene).lumeActive); assertFalse(home(scene).isLumeCallbackScheduled); assertFalse(home(scene).isFrameScheduled) }
         scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
@@ -258,16 +307,95 @@ class CarbonPusherGestureTest {
             android.os.ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command)).use { it.readBytes() }
         }
         scene { scenario, scene ->
-            tap(scene, CarbonPusherAction.LUME)
-            instrumentation.runOnMainSync { assertTrue(home(scene).lumeActive) }
+            val glowDispatchedAt = AtomicLong()
+            val screenOffReceivedAt = AtomicLong()
+            val cancellationObservedAt = AtomicLong()
+            val cancellationReceived = CountDownLatch(1)
+            val cancellationFailure = AtomicReference<String>()
+            val mainHandler = Handler(Looper.getMainLooper())
+            val observeCancellation = object : Runnable {
+                override fun run() {
+                    if (cancellationReceived.count == 0L) return
+                    val now = SystemClock.uptimeMillis()
+                    // This deadline precedes the actual lumeOff deadline: deliveredAt was
+                    // recorded before the real UP handler scheduled its three-second callback.
+                    if (now - glowDispatchedAt.get() >= CarbonLumeState.DURATION_MILLIS) {
+                        cancellationFailure.set("No cancellation receipt before natural expiry: ${scene.describe()}")
+                        cancellationReceived.countDown()
+                        return
+                    }
+                    if (!home(scene).lumeActive && !home(scene).isLumeCallbackScheduled && !home(scene).isFrameScheduled && !home(scene).isRenderingVisible) {
+                        cancellationObservedAt.set(now)
+                        cancellationReceived.countDown()
+                        Log.i("CarbonPusherTest", "screen-off cancellation receipt ${scene.describe()}")
+                    } else {
+                        // Receiver order is not an assertion: let the real clock's broadcast
+                        // and visibility callbacks run, without waiting for the shell caller.
+                        mainHandler.postDelayed(this, 20)
+                    }
+                }
+            }
+            val receiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context, intent: Intent) {
+                    if (intent.action == Intent.ACTION_SCREEN_OFF) {
+                        screenOffReceivedAt.compareAndSet(0, SystemClock.uptimeMillis())
+                        observeCancellation.run()
+                        Log.i("CarbonPusherTest", "screen-off broadcast ${scene.describe()}")
+                    }
+                }
+            }
+            instrumentation.runOnMainSync {
+                scene.context.registerReceiver(receiver, IntentFilter(Intent.ACTION_SCREEN_OFF), Context.RECEIVER_NOT_EXPORTED)
+            }
+            val requestSleep = CountDownLatch(1)
+            val sleepOutput = AtomicReference<ParcelFileDescriptor.AutoCloseInputStream>()
+            val sleepCommand = FutureTask {
+                Log.i("CarbonPusherTest", "screen-off command uptime=${SystemClock.uptimeMillis()}")
+                val output = ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand("input keyevent 223"))
+                sleepOutput.set(output)
+                try { output.use { it.readBytes() }; Unit }
+                finally { sleepOutput.compareAndSet(output, null) }
+            }
+            // Arm this worker before touching the crown. It is signalled by actual UP delivery,
+            // not by the much later return from the test's input transport.
+            val worker = Thread({ requestSleep.await(); sleepCommand.run() }, "carbon-screen-off").apply { isDaemon = true; start() }
             try {
-                shell("input keyevent 223")
-                await("Real screen-off must cancel glow and recurring callbacks") { !home(scene).lumeActive && !home(scene).isLumeCallbackScheduled && !home(scene).isFrameScheduled && !home(scene).isRenderingVisible }
+                tap(scene, CarbonPusherAction.LUME) { receipt ->
+                    assertTrue(home(scene).lumeActive)
+                    assertTrue(home(scene).isLumeCallbackScheduled)
+                    glowDispatchedAt.set(receipt.deliveredAt)
+                    Log.i("CarbonPusherTest", "screen-off signal ${scene.describe()}")
+                    requestSleep.countDown()
+                }
+                sleepCommand.get(5, TimeUnit.SECONDS)
+                assertTrue("The real SCREEN_OFF receiver must record cancellation", cancellationReceived.await(5, TimeUnit.SECONDS))
+                cancellationFailure.get()?.let { fail(it) }
+                val broadcastAfter = screenOffReceivedAt.get() - glowDispatchedAt.get()
+                val cancelledAfter = cancellationObservedAt.get() - glowDispatchedAt.get()
+                assertTrue("Screen-off must arrive before natural lume expiry: ${broadcastAfter}ms", broadcastAfter in 0 until CarbonLumeState.DURATION_MILLIS)
+                assertTrue("Cancellation itself must be observed before natural expiry, not pass because of it: ${cancelledAfter}ms", cancelledAfter in 0 until CarbonLumeState.DURATION_MILLIS)
+                instrumentation.runOnMainSync { Log.i("CarbonPusherTest", "screen-off verified broadcastAfterMs=$broadcastAfter cancelledAfterMs=$cancelledAfter ${scene.describe()}") }
             } finally {
-                shell("input keyevent 224")
-                shell("wm dismiss-keyguard")
+                try {
+                    sleepCommand.cancel(false)
+                    requestSleep.countDown()
+                    try { sleepOutput.getAndSet(null)?.close() }
+                    finally { worker.join(5000) }
+                } finally {
+                    try {
+                        instrumentation.runOnMainSync {
+                            mainHandler.removeCallbacks(observeCancellation)
+                            scene.context.unregisterReceiver(receiver)
+                        }
+                    } finally {
+                        shell("input keyevent 224")
+                        shell("wm dismiss-keyguard")
+                    }
+                }
+                assertFalse("Screen-off command worker must terminate during cleanup", worker.isAlive)
             }
             await("Waking the test emulator must resume time without reviving glow") { home(scene).isRenderingVisible && !home(scene).lumeActive }
+            instrumentation.runOnMainSync { Log.i("CarbonPusherTest", "screen-on verified ${scene.describe()}") }
         }
     }
 }
