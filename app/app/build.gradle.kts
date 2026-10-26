@@ -131,7 +131,7 @@ android.sourceSets.getByName("main").jniLibs.srcDir(gpuLibs)
 tasks.named("preBuild") { dependsOn(buildGpuLib) }
 
 dependencies {
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.1")
     testImplementation("junit:junit:4.13.2")
     implementation("org.apache.commons:commons-compress:1.28.0")
     androidTestImplementation("androidx.test:runner:1.6.2")

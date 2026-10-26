@@ -527,7 +527,7 @@ class FacePackStore internal constructor(
         val input = AtomicReference<InputStream?>()
         val timedOut = AtomicBoolean(false)
         val watcher = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "face-import-cancel").apply { isDaemon = true } }
-        val watch = watcher.scheduleAtFixedRate({
+        val watch = watcher.scheduleWithFixedDelay({
             if (System.nanoTime() >= deadline) timedOut.set(true)
             if (timedOut.get() || cancelled()) { runCatching(abortInput); runCatching { input.get()?.close() } }
         }, 0, 50, TimeUnit.MILLISECONDS)

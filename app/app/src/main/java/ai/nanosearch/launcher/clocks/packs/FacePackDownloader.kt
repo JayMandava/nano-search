@@ -113,7 +113,7 @@ class FacePackDownloader internal constructor(
         val timedOut = AtomicBoolean(false)
         val wasCancelled = AtomicBoolean(false)
         val watcher = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "face-download-cancel").apply { isDaemon = true } }
-        val watch = watcher.scheduleAtFixedRate({
+        val watch = watcher.scheduleWithFixedDelay({
             if (cancelled() || requestThread.isInterrupted) { wasCancelled.set(true); cancelActive.get()?.invoke() }
             if (nowNanos() >= deadline) { timedOut.set(true); cancelActive.get()?.invoke() }
         }, 0, 50, TimeUnit.MILLISECONDS)

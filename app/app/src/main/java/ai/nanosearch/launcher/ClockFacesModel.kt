@@ -36,7 +36,7 @@ internal data class FaceUpdateReview(val source: FaceSource, val existingId: Str
 
 /** Retains the one foreground operation over rotation; no Activity, URI grant, or renderer is retained. */
 class ClockFacesModel(application: Application) : AndroidViewModel(application) {
-    private val context = application.applicationContext
+    private val context: Application = application
     private val main = Handler(Looper.getMainLooper())
     private val worker = Executors.newSingleThreadExecutor { r -> Thread(r, "clock-faces-ui-work").apply { isDaemon = true } }
     private val closed = AtomicBoolean(false)
