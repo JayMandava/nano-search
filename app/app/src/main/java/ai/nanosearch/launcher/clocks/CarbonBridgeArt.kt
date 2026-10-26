@@ -3,6 +3,7 @@ package ai.nanosearch.launcher.clocks
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Shader
@@ -67,12 +68,17 @@ internal object CarbonBridgeGeometry {
             addCircle(500f, 693f, 89f, Path.Direction.CW)
             addRoundRect(332f, 262f, 392f, 365f, 8f, 8f, Path.Direction.CW)
             addCircle(500f, 500f, 8f, Path.Direction.CW)
-            // The lower counter covers this relief. Do not leave tangent hairline fragments
-            // where a complete annulus would meet the curved bottom of the dial envelope.
+            // Relieve the bottom collar without altering the counter itself. Do not leave
+            // tangent hairline fragments where the annulus meets the curved dial envelope.
             addRect(448f, 765f, 552f, 825f, Path.Direction.CW)
         }
         check(frame.op(apertures, Path.Op.DIFFERENCE))
-        check(frame.op(CarbonPusherGeometry.innerDialPath(), Path.Op.INTERSECT))
+        // The actual dial/case path stays untouched. Give only the framework's edge a small
+        // physical clearance so independent native curve rasters cannot protrude beyond it.
+        val insideDial = CarbonPusherGeometry.innerDialPath().apply {
+            transform(Matrix().apply { setScale(.99f, .99f, 500f, 500f) })
+        }
+        check(frame.op(insideDial, Path.Op.INTERSECT))
         return frame
     }
 

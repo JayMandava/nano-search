@@ -53,7 +53,7 @@ class CarbonBridgeGeometryTest {
                 assertTrue("Support invades $name clearance at $side px: ${overlap.bounds}", overlap.isEmpty)
             }
             val outside = Region(material).apply { op(raster(CarbonPusherGeometry.innerDialPath(), side), Region.Op.DIFFERENCE) }
-            assertTrue("The support must remain inside the unchanged dial envelope", outside.isEmpty)
+            assertTrue("The support must remain inside the unchanged dial envelope at $side px: ${outside.bounds}", outside.isEmpty)
         }
     }
 
