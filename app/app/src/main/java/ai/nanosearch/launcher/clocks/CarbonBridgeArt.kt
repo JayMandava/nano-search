@@ -13,51 +13,56 @@ import kotlin.math.min
 /** Original decorative framework, not a reconstruction of any proprietary movement. */
 internal object CarbonBridgeGeometry {
     data class Boss(val x: Float, val y: Float, val radius: Float, val screwRadius: Float)
+    // Flush fasteners sit on the straight spars, not on oversized circular lobes.
     val bosses: List<Boss> = listOf(
-        Boss(418f, 333f, 13f, 7.2f), Boss(584f, 331f, 12f, 6.8f),
-        Boss(303f, 579f, 13f, 7.4f), Boss(686f, 578f, 12f, 6.8f),
-        Boss(416f, 748f, 12f, 6.8f), Boss(583f, 747f, 11f, 6.3f),
+        Boss(420f, 300f, 8.5f, 3.5f), Boss(580f, 300f, 8.5f, 3.5f),
+        Boss(330f, 586f, 8.5f, 3.5f), Boss(670f, 586f, 8.5f, 3.5f),
+        Boss(402f, 755f, 8.5f, 3.5f), Boss(598f, 755f, 8.5f, 3.5f),
     )
 
-    /** A union removes fake seams: the fork, counter surrounds and lower feet are one frame. */
+    /** Counter rims, splayed spars and the faceted bearing collar form one continuous support. */
     fun frame(): Path {
         val frame = Path()
         fun join(path: Path) { check(frame.op(path, Path.Op.UNION)) }
-        fun branch(vararg points: Float) = join(rounded(points, 7f))
+        fun branch(vararg points: Float) = join(rounded(points, 2f))
         fun circle(x: Float, y: Float, radius: Float) = Path().apply { addCircle(x, y, radius, Path.Direction.CW) }
 
-        // The two tapered upper arms meet below an off-centre, open fork, not a crossing X.
-        branch(412f,229f, 438f,232f, 424f,315f, 438f,350f, 478f,395f,
-            503f,418f, 539f,390f, 577f,341f, 582f,233f, 600f,236f,
-            595f,341f, 568f,389f, 526f,420f, 502f,438f, 478f,422f,
-            420f,378f, 400f,343f, 401f,314f)
-        // An asymmetric short shoulder ends at the fork neck, not across its open cell.
-        branch(424f,339f, 446f,341f, 466f,352f, 469f,360f,
-            456f,360f, 441f,353f, 424f,352f)
-        branch(487f,407f, 502f,422f, 461f,435f, 438f,414f, 421f,398f,
-            420f,381f, 439f,387f, 469f,410f)
-        branch(516f,409f, 542f,392f, 571f,377f, 585f,382f, 580f,398f,
-            558f,415f, 537f,435f, 508f,432f)
+        // The reference's upper spars spread OUT toward the counter shoulders. They do not
+        // fold into the old rounded Y at the centre. Narrow faces leave the upper cell open.
+        branch(426f, 235f, 442f, 237f, 415f, 352f, 403f, 376f,
+            383f, 379f, 398f, 348f)
+        branch(558f, 237f, 574f, 235f, 602f, 348f, 617f, 379f,
+            597f, 376f, 585f, 352f)
 
         join(circle(350f, 465f, 110f))
         join(circle(650f, 465f, 110f))
         join(circle(500f, 693f, 97f))
-        // Short bearing arms touch counter exteriors; they never run across counter interiors.
-        branch(448f,486f, 456f,469f, 485f,486f, 505f,491f, 507f,508f, 479f,509f)
-        branch(493f,492f, 518f,482f, 544f,472f, 553f,489f, 521f,504f, 503f,511f)
-        join(circle(500f, 500f, 22f))
 
-        // Unequal lower cells: a broad swept left opening and a narrower, angled right opening.
-        branch(301f,552f, 327f,557f, 364f,591f, 396f,639f, 416f,680f,
-            432f,740f, 415f,774f, 393f,765f, 401f,736f, 386f,686f,
-            363f,643f, 335f,611f, 307f,590f, 289f,578f)
-        branch(698f,557f, 711f,568f, 685f,599f, 660f,626f, 624f,663f,
-            600f,698f, 581f,758f, 566f,772f, 551f,760f, 571f,698f,
-            600f,653f, 641f,614f, 661f,587f)
-        branch(484f,510f, 501f,517f, 475f,569f, 458f,610f, 444f,630f,
-            431f,618f, 443f,590f, 457f,549f)
-        branch(516f,510f, 533f,523f, 554f,563f, 565f,600f, 572f,626f,
-            555f,635f, 544f,608f, 535f,575f, 510f,535f)
+        // A crisp, open faceted collar ties the upper and lower counter tangencies together.
+        // Cut its cell before unioning bearing arms: the cell must not sever their support.
+        val collar = rounded(floatArrayOf(
+            442f, 440f, 466f, 414f, 534f, 414f, 558f, 440f,
+            577f, 464f, 577f, 512f, 549f, 546f, 521f, 562f,
+            479f, 562f, 451f, 546f, 423f, 512f, 423f, 464f), 2f)
+        check(collar.op(rounded(floatArrayOf(
+            449f, 450f, 470f, 427f, 530f, 427f, 551f, 450f,
+            564f, 474f, 564f, 507f, 540f, 537f, 518f, 549f,
+            482f, 549f, 460f, 537f, 436f, 507f, 436f, 474f), 2f), Path.Op.DIFFERENCE))
+        join(collar)
+        // Short dark bearing webs support the hand spindle, without a competing bright X.
+        branch(447f, 480f, 455f, 473f, 487f, 491f, 503f, 493f,
+            503f, 505f, 482f, 506f)
+        branch(497f, 493f, 513f, 491f, 545f, 473f, 553f, 480f,
+            518f, 506f, 497f, 505f)
+        branch(493f, 511f, 507f, 511f, 507f, 555f, 493f, 555f)
+        join(circle(500f, 500f, 20f))
+
+        // Long, almost straight lower spars replace the old broad hooked/S-shaped feet.
+        branch(311f, 559f, 329f, 560f, 421f, 778f, 404f, 781f)
+        branch(671f, 560f, 689f, 559f, 596f, 781f, 579f, 778f)
+        // One compact shoulder connects the lower register without adding two outlined
+        // triangular braces to the reference's otherwise open lower cells.
+        branch(488f, 552f, 512f, 552f, 516f, 602f, 484f, 602f)
         bosses.forEach { join(circle(it.x, it.y, it.radius)) }
 
         // Clearances include a real margin beyond the required apertures: Path-op curves and
@@ -118,9 +123,9 @@ internal class CarbonBridgeArt {
     private val frame = CarbonBridgeGeometry.frame()
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val body = LinearGradient(320f, 235f, 690f, 785f,
-        intArrayOf(0xff657075.toInt(), 0xff343e43.toInt(), 0xff556167.toInt(), 0xff293338.toInt()), null, Shader.TileMode.CLAMP)
+        intArrayOf(0xff484b49.toInt(), 0xff303332.toInt(), 0xff454947.toInt(), 0xff292d2c.toInt()), null, Shader.TileMode.CLAMP)
     private val bevel = LinearGradient(300f, 225f, 720f, 780f,
-        intArrayOf(0xffaab5b5.toInt(), 0xff465256.toInt(), 0xffbac4bf.toInt(), 0xff3d4c52.toInt()), null, Shader.TileMode.CLAMP)
+        intArrayOf(0xffd1d5cc.toInt(), 0xff909b96.toInt(), 0xffc5ccc1.toInt(), 0xff747f79.toInt()), null, Shader.TileMode.CLAMP)
 
     fun draw(canvas: Canvas) {
         recessedLattice(canvas, 675f, 267f, .92f, -13f, 4)
@@ -131,18 +136,22 @@ internal class CarbonBridgeArt {
         paint.color = 0xb8000000.toInt(); paint.shader = null; paint.style = Paint.Style.FILL
         canvas.drawPath(frame, paint)
         canvas.restoreToCount(shadow)
-        // The bevel is substantially narrower and darker than the unchanged counter rims.
-        paint.color = Color.WHITE; paint.shader = bevel; paint.style = Paint.Style.STROKE; paint.strokeWidth = 2.2f
-        paint.strokeJoin = Paint.Join.ROUND
+        paint.color = Color.WHITE; paint.shader = body; paint.style = Paint.Style.FILL
         canvas.drawPath(frame, paint)
-        paint.shader = body; paint.style = Paint.Style.FILL
+        // A narrow machined edge is visibly separate from the flat graphite face. Clip the
+        // chamfer into the support, so no bright stroke spills into protected apertures.
+        val chamfer = canvas.save()
+        canvas.clipPath(frame)
+        paint.color = Color.WHITE; paint.shader = bevel; paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 5.6f; paint.strokeJoin = Paint.Join.ROUND
         canvas.drawPath(frame, paint)
+        canvas.restoreToCount(chamfer)
         paint.shader = null
         val grain = canvas.save()
         canvas.clipPath(frame)
         paint.style = Paint.Style.STROKE; paint.strokeWidth = .35f
         for (i in 0..210) {
-            paint.color = if (i % 4 == 0) 0x265e747d else 0x14202e34
+            paint.color = if (i % 4 == 0) 0x185e6862 else 0x10202a25
             val y = 230f + i * 2.7f
             canvas.drawLine(235f, y, 770f, y - 2f, paint)
         }
