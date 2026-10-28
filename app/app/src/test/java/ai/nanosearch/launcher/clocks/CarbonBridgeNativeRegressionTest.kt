@@ -12,8 +12,8 @@ import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Exact same-process Robolectric/native-Skia comparisons to Nano 0.8.1 (d515470).
- * Frozen fixtures are identifier-only copies of the public dial and bridge sources.
+/** Exact same-process Robolectric/native-Skia comparisons to the previous review candidate (ed1d39c).
+ * Frozen fixtures are identifier-only copies of the previous candidate dial and bridge sources.
  * These renderer tests do not exercise host touch, lifecycle, or Android device integration. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], manifest = Config.NONE, application = android.app.Application::class)
@@ -24,7 +24,7 @@ class CarbonBridgeNativeRegressionTest {
 
     @Test fun bridgeOnlyRefinementPreservesCasePushersDateAndCounterInteriorsExactly() {
         val zone = TimeZone.getDefault()
-        val baseline = Baseline081CarbonDialArt()
+        val baseline = BaselineReviewCarbonDialArt()
         val refined = CarbonDialArt()
         try {
             TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
@@ -49,7 +49,7 @@ class CarbonBridgeNativeRegressionTest {
     }
 
     @Test fun everyIsolatedHandAndRunningSecondsRasterMatchesTheFrozenBaseline() {
-        val baseline = Baseline081CarbonDialArt()
+        val baseline = BaselineReviewCarbonDialArt()
         val refined = CarbonDialArt()
         try {
             for (side in listOf(240, 720)) for (kind in 0..2) for (angle in listOf(0f, 90f, 180f, 315.25f)) {
@@ -75,16 +75,54 @@ class CarbonBridgeNativeRegressionTest {
         } finally { baseline.release(); refined.release() }
     }
 
+    @Test fun oldFrontScrewLocationsAreNowExactBareBridgePixelsInTheCompleteDial() {
+        val previous=BaselineReviewCarbonDialArt(); val current=CarbonDialArt()
+        val zone=TimeZone.getDefault()
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("UTC")); previous.onTimeChanged(); current.onTimeChanged()
+            val formerScrews=listOf(420f to 300f,580f to 300f,330f to 586f,670f to 586f,402f to 755f,598f to 755f)
+            for(side in listOf(720,1000)) {
+                val expected=Bitmap.createBitmap(side,side,Bitmap.Config.ARGB_8888)
+                val actual=Bitmap.createBitmap(side,side,Bitmap.Config.ARGB_8888)
+                val old=Bitmap.createBitmap(side,side,Bitmap.Config.ARGB_8888)
+                try {
+                    val c=Canvas(expected);c.scale(side/1000f,side/1000f)
+                    c.scale(CarbonDialGeometry.ASSEMBLY_SCALE,CarbonDialGeometry.ASSEMBLY_SCALE,500f,500f)
+                    CarbonBridgeArt().draw(c)
+                    val bounds=RectF(0f,0f,side.toFloat(),side.toFloat())
+                    current.draw(Canvas(actual),bounds,epoch,motion=false)
+                    previous.draw(Canvas(old),bounds,epoch,motion=false)
+                    for((sx,sy) in formerScrews) {
+                        var samples=0;var removedPixels=0
+                        for(y in 0 until side) for(x in 0 until side) {
+                            val dx=500f+((x+.5f)*1000f/side-500f)/CarbonDialGeometry.ASSEMBLY_SCALE
+                            val dy=500f+((y+.5f)*1000f/side-500f)/CarbonDialGeometry.ASSEMBLY_SCALE
+                            if(insideCircle(dx,dy,sx,sy,2f)) {
+                                samples++
+                                val plain=expected.getPixel(x,y)
+                                assertEquals("Bare support sample must be opaque",255,plain ushr 24)
+                                assertEquals("No front screw pixels remain at $sx,$sy / $side px",plain,actual.getPixel(x,y))
+                                if(old.getPixel(x,y)!=actual.getPixel(x,y)) removedPixels++
+                            }
+                        }
+                        assertTrue("Every former screw must exercise actual pixels",samples>=4)
+                        assertTrue("The frozen screw-bearing candidate must fail this bare-material check",removedPixels>0)
+                    }
+                } finally { expected.recycle();actual.recycle();old.recycle() }
+            }
+        } finally { previous.release();current.release();TimeZone.setDefault(zone) }
+    }
+
     @Test fun hostAssemblyDateAndSecondsGeometryRemainExactlyAtTheBaseline() {
-        assertEquals(Baseline081CarbonDialGeometry.ASSEMBLY_SCALE, CarbonDialGeometry.ASSEMBLY_SCALE, 0f)
-        assertEquals(Baseline081CarbonDialGeometry.SECONDS_CENTER_Y, CarbonDialGeometry.SECONDS_CENTER_Y, 0f)
-        assertEquals(Baseline081CarbonDialGeometry.SECONDS_DIAMETER, CarbonDialGeometry.SECONDS_DIAMETER, 0f)
-        assertEquals(Baseline081CarbonDialGeometry.DATE_LEFT, CarbonDialGeometry.DATE_LEFT, 0f)
-        assertEquals(Baseline081CarbonDialGeometry.DATE_TOP, CarbonDialGeometry.DATE_TOP, 0f)
-        assertEquals(Baseline081CarbonDialGeometry.DATE_WIDTH, CarbonDialGeometry.DATE_WIDTH, 0f)
-        assertEquals(Baseline081CarbonDialGeometry.DATE_HEIGHT, CarbonDialGeometry.DATE_HEIGHT, 0f)
-        assertEquals(Baseline081CarbonDialGeometry.DATE_TEXT_LEFT, CarbonDialGeometry.DATE_TEXT_LEFT, 0f)
-        assertEquals(Baseline081CarbonDialGeometry.DATE_TEXT_WIDTH, CarbonDialGeometry.DATE_TEXT_WIDTH, 0f)
+        assertEquals(BaselineReviewCarbonDialGeometry.ASSEMBLY_SCALE, CarbonDialGeometry.ASSEMBLY_SCALE, 0f)
+        assertEquals(BaselineReviewCarbonDialGeometry.SECONDS_CENTER_Y, CarbonDialGeometry.SECONDS_CENTER_Y, 0f)
+        assertEquals(BaselineReviewCarbonDialGeometry.SECONDS_DIAMETER, CarbonDialGeometry.SECONDS_DIAMETER, 0f)
+        assertEquals(BaselineReviewCarbonDialGeometry.DATE_LEFT, CarbonDialGeometry.DATE_LEFT, 0f)
+        assertEquals(BaselineReviewCarbonDialGeometry.DATE_TOP, CarbonDialGeometry.DATE_TOP, 0f)
+        assertEquals(BaselineReviewCarbonDialGeometry.DATE_WIDTH, CarbonDialGeometry.DATE_WIDTH, 0f)
+        assertEquals(BaselineReviewCarbonDialGeometry.DATE_HEIGHT, CarbonDialGeometry.DATE_HEIGHT, 0f)
+        assertEquals(BaselineReviewCarbonDialGeometry.DATE_TEXT_LEFT, CarbonDialGeometry.DATE_TEXT_LEFT, 0f)
+        assertEquals(BaselineReviewCarbonDialGeometry.DATE_TEXT_WIDTH, CarbonDialGeometry.DATE_TEXT_WIDTH, 0f)
     }
 
     private fun assertProtectedPixelsEqual(expected: Bitmap, actual: Bitmap, label: String) {
@@ -98,8 +136,8 @@ class CarbonBridgeNativeRegressionTest {
         for (y in 0 until side) for (x in 0 until side) {
             val designX = (x + .5f) * 1000f / side
             val designY = (y + .5f) * 1000f / side
-            val assemblyX = 500f + (designX - 500f) / Baseline081CarbonDialGeometry.ASSEMBLY_SCALE
-            val assemblyY = 500f + (designY - 500f) / Baseline081CarbonDialGeometry.ASSEMBLY_SCALE
+            val assemblyX = 500f + (designX - 500f) / BaselineReviewCarbonDialGeometry.ASSEMBLY_SCALE
+            val assemblyY = 500f + (designY - 500f) / BaselineReviewCarbonDialGeometry.ASSEMBLY_SCALE
             // These masks come from the frozen case/counter/date geometry, never the new frame.
             // Excluding aperture-edge antialias pixels is a geometric mask, not a color tolerance:
             // every included pixel must match exactly, including all opaque counter interiors.

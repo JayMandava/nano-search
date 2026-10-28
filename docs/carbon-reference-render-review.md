@@ -1,72 +1,88 @@
 # Carbon bridge: local renderer review
 
-This review harness compares the actual Carbon Canvas renderer with the frozen
-public Nano 0.8.1 renderer (`d515470860d410b127df088b571fd41ea7d3da8d`). It uses
-Robolectric 4.17, API 35 framework classes and **native Skia graphics on the JVM**.
-It is not an Android emulator, physical-device screenshot, integration test or
-approval to publish/install a new version.
+The current comparison is the actual Carbon Canvas renderer against the frozen
+previous review candidate, `ed1d39cd871b81ee0ad84b86dd68e777af3ffd78`. The earlier
+Nano 0.8.1 fixtures remain unchanged and independently hash-checked. New captures
+use **ed1d39c versus the revised candidate**, not the released 0.8.1 image.
 
-## Reproduce
+The harness uses Robolectric 4.17, API 35 framework classes and **native Skia
+on the JVM**. It is not an Android emulator, device screenshot, integration test
+or approval to publish/install. A focused standalone renderer run must not be
+reported as a full app build, R8, lint or Android instrumentation pass.
 
-From the `app/` Gradle root, with JDK 17 and the normal Android build dependencies:
+## Requested revision
+
+The final clarified design intentionally removes the central octagon's short
+connection to the six-o'clock counter. The centre still joins three and nine;
+the lower counter retains its own independent collar/support. The chronograph
+hand still crosses that dark gap: a hand is not a bridge connection.
+
+The front bridge has no visible screws, seats or enlarged bosses. Case, rear
+plate and counter movement screws are deliberately retained. Rear supports use
+one repeated concentric/radial pattern registered to the existing wheel centres,
+with a common angular datum, rib width and slot rhythm. They render in the static
+base, below the animated wheels, rather than as independently rotated hash grids
+on the front overlay. Case, counters, hand/date geometry, pushers, layout, state
+and font handling remain outside this revision.
+
+## Reproduce in the normal Android build environment
+
+From the `app/` Gradle root with the project Android dependencies installed:
 
 ```sh
 ./gradlew -PunsignedRelease=true -PincludePersonalOverlay=false \
   :app:testDebugUnitTest :app:testReleaseUnitTest
 ```
 
-The capture export test skips unless explicitly enabled. For actual before/after
-PNGs, select a **new, nonexistent absolute directory** (it refuses to overwrite
-evidence):
+PNG export skips unless explicitly enabled. Select a **new, nonexistent absolute
+directory**; the exporter refuses to overwrite evidence:
 
 ```sh
 CARBON_REVIEW_OUTPUT=/absolute/path/to/new-review-directory \
 CARBON_REVIEW_REVISION="$(git rev-parse HEAD) plus reviewed working tree" \
 ./gradlew -PunsignedRelease=true -PincludePersonalOverlay=false \
   :app:cleanTestDebugUnitTest :app:testDebugUnitTest \
-  --tests ai.nanosearch.launcher.clocks.CarbonBridgeNativeCaptureTest
+  --tests 'ai.nanosearch.launcher.clocks.CarbonBridge*'
 ```
 
-The PNGs cover parked, running and illuminated states at 240, 360 and 720 pixels,
-fixed to 2026-10-15 10:10:30 UTC. `metadata.json` records the state, source identity,
-changed-pixel count and SHA-256 of each PNG. Both sides are drawn in the same
-process with the same native graphics engine; neither side is an image mockup.
+The images cover parked, running and illuminated states at 240, 360 and 720
+pixels, fixed to 2026-10-15 10:10:30 UTC. Metadata records states, source identity,
+changed-pixel counts and PNG hashes. Both sides use actual renderer code in the
+same native-graphics process; neither side is an image mockup.
 
-## Guardrails
+A separate support-only comparison omits hands and counter faces, making the
+removed neck unambiguous. It calls the bridge painter only: the previous painter
+contains recessed seats, but the separate screw-head painter is not included in
+that detail. The revised rear supports are now in the base, so they are also
+omitted from this front-layer diagnostic. The complete-dial comparison and regression tests remain the actual
+front-screw-removal evidence. This detail must not be presented as a whole watch.
 
-- Frozen baseline source is checked byte-for-byte by SHA-256 after reversing
-  identifier-only renames. Do not update fixtures to make a regression pass.
-- The changed bridge must have one four-neighbor-connected material region at
-  240, 360, 720 and 1000 pixels, not merely tangent or diagonal contacts.
-- Counters, date and central pivot retain clear apertures; the bridge stays
-  inside the unchanged dial envelope. Every fastener must have a complete seat.
-- Protected case/pusher, date and counter-interior pixels must match 0.8.1 exactly
-  in all three states at 240, 360, 720 and 1000 pixels. These masks are derived from
-  frozen geometry, not adapted to the new image.
-- Isolated time hands and the separate seconds layer must match exactly.
-- Repeated drawing must be deterministic and preserve Canvas transform, clip and
-  save stack; construction must not return shared mutable Path objects.
+## Non-vacuous guardrails
 
-The six small flush anchor positions intentionally follow the new straight
-spars. The Android instrumentation geometry test mirrors these coordinates; its
-presence does not mean it was run on Android for this refinement.
+- Frozen fixtures must recover exact source SHA-256 after identifier renames.
+- The front path must have exactly two four-neighbour components at phone and
+  design sizes: a substantial main 3/9 bridge, and the exact original lower
+  counter collar. Extra fragments, deleted support and diagonal-only joins fail.
+- The removed neck must be geometrically clear and paint-transparent away from
+  boundary shadows; this does not incorrectly require the hand to disappear.
+- Counter, date and spindle apertures remain clear; support stays in the same
+  dial envelope. The lower collar is compared to its unchanged construction.
+- Actual full-dial pixels at all six former front-screw centres must equal bare
+  opaque bridge pixels. The screw-bearing frozen candidate must differ, proving
+  the check exercises previously visible screw pixels. Source wiring additionally
+  rejects front screw/seat painting while retaining unrelated screws.
+- Every rear panel must contain its expected aligned ribs and concentric rings,
+  while intervening slots remain genuinely open. Rear paths also avoid all
+  apertures and the removed neck gap. Draw order is checked separately.
+- Case/pusher, date and counter-interior pixels match the frozen candidate exactly
+  across all states and 240/360/720/1000px masks. The masks are not adapted to the
+  new drawing. Isolated hands, seconds and host geometry remain exact.
+- Repeated painting is deterministic and preserves Canvas transform, clipping
+  and save stack. Returned paths must not share mutable state. Graphite faces
+  stay opaque after the shadow pass.
 
-No tests here exercise touch routing, screen-off lifecycle, system Clock launch,
-live-wallpaper hosts, OEM behavior, frame timing or the private local font.
-Existing device evidence belongs to the previous release, not this new draft.
-
-## Reference-driven geometry, without a layout redesign
-
-The refinement changes only `CarbonBridgeArt.kt` in production. The upper spars
-spread outward into the counter shoulders; the lower legs are straight tapered
-rails rather than swept, rounded feet. Smaller flush fasteners and an opaque
-satin-graphite face with a clipped silver edge keep the material distinct from
-the unchanged bright hand and counter details.
-
-The central collar's upper facet is at design y=414, 86 units above the y=500
-hand spindle. An initial 110-unit arch was visibly too tall against the supplied
-photographs, so this shorter, wider facet was reviewed instead. One compact
-lower shoulder replaces two distracting outlined triangular braces. All register
-centers, date geometry, case, pushers, host layout, time/chronograph behavior and
-fonts remain unchanged. The source is original procedural artwork, not a
-simulation or reconstruction of the photographed movement.
+The Android instrumentation geometry test mirrors the revised topology, but its
+presence does not mean it was executed on Android. No renderer test validates
+touch routing, screen-off lifecycle, system Clock launch, live-wallpaper hosts,
+OEM behaviour, frame timing or the private local font. Previous release/device
+results must not be attributed to this revised draft.

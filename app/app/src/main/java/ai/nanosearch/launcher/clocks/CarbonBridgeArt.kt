@@ -12,15 +12,7 @@ import kotlin.math.min
 
 /** Original decorative framework, not a reconstruction of any proprietary movement. */
 internal object CarbonBridgeGeometry {
-    data class Boss(val x: Float, val y: Float, val radius: Float, val screwRadius: Float)
-    // Flush fasteners sit on the straight spars, not on oversized circular lobes.
-    val bosses: List<Boss> = listOf(
-        Boss(420f, 300f, 8.5f, 3.5f), Boss(580f, 300f, 8.5f, 3.5f),
-        Boss(330f, 586f, 8.5f, 3.5f), Boss(670f, 586f, 8.5f, 3.5f),
-        Boss(402f, 755f, 8.5f, 3.5f), Boss(598f, 755f, 8.5f, 3.5f),
-    )
-
-    /** Counter rims, splayed spars and the faceted bearing collar form one continuous support. */
+    /** The side-register frame is continuous; the lower register retains its separate collar. */
     fun frame(): Path {
         val frame = Path()
         fun join(path: Path) { check(frame.op(path, Path.Op.UNION)) }
@@ -60,10 +52,8 @@ internal object CarbonBridgeGeometry {
         // Long, almost straight lower spars replace the old broad hooked/S-shaped feet.
         branch(311f, 559f, 329f, 560f, 421f, 778f, 404f, 781f)
         branch(671f, 560f, 689f, 559f, 596f, 781f, 579f, 778f)
-        // One compact shoulder connects the lower register without adding two outlined
-        // triangular braces to the reference's otherwise open lower cells.
-        branch(488f, 552f, 512f, 552f, 516f, 602f, 484f, 602f)
-        bosses.forEach { join(circle(it.x, it.y, it.radius)) }
+        // The central octagon connects only the side registers. The six-o'clock register
+        // retains its own surround, with a real open gap above it rather than a centre neck.
 
         // Clearances include a real margin beyond the required apertures: Path-op curves and
         // independently rasterized Region circles must stay disjoint even at 240-pixel size.
@@ -121,16 +111,17 @@ internal object CarbonBridgeGeometry {
 /** Baked into Carbon's static overlay; no path construction or material work occurs per frame. */
 internal class CarbonBridgeArt {
     private val frame = CarbonBridgeGeometry.frame()
+    private val rearSupports = CarbonRearSupportArt()
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val body = LinearGradient(320f, 235f, 690f, 785f,
         intArrayOf(0xff484b49.toInt(), 0xff303332.toInt(), 0xff454947.toInt(), 0xff292d2c.toInt()), null, Shader.TileMode.CLAMP)
     private val bevel = LinearGradient(300f, 225f, 720f, 780f,
         intArrayOf(0xffd1d5cc.toInt(), 0xff909b96.toInt(), 0xffc5ccc1.toInt(), 0xff747f79.toInt()), null, Shader.TileMode.CLAMP)
 
+    /** Rear material is baked into the base, below the animated wheels, never over them. */
+    fun drawRear(canvas: Canvas) = rearSupports.draw(canvas)
+
     fun draw(canvas: Canvas) {
-        recessedLattice(canvas, 675f, 267f, .92f, -13f, 4)
-        recessedLattice(canvas, 301f, 657f, .83f, 7f, 3)
-        recessedLattice(canvas, 690f, 677f, .68f, -18f, 3)
         val shadow = canvas.save()
         canvas.translate(1.5f, 2.5f)
         paint.color = 0xb8000000.toInt(); paint.shader = null; paint.style = Paint.Style.FILL
@@ -156,30 +147,7 @@ internal class CarbonBridgeArt {
             canvas.drawLine(235f, y, 770f, y - 2f, paint)
         }
         canvas.restoreToCount(grain)
-        // Recessed seats are centred on real support material, not floating surface screws.
-        paint.style = Paint.Style.STROKE; paint.strokeWidth = 1.2f; paint.color = 0xff202b31.toInt()
-        CarbonBridgeGeometry.bosses.forEach { canvas.drawCircle(it.x, it.y, it.screwRadius + 2.4f, paint) }
-        paint.style = Paint.Style.FILL
-    }
-
-    private fun recessedLattice(canvas: Canvas, x: Float, y: Float, scale: Float, degrees: Float, crossBars: Int) {
-        val saved = canvas.save()
-        canvas.translate(x, y); canvas.scale(scale, scale); canvas.rotate(degrees)
-        paint.shader = null; paint.style = Paint.Style.STROKE; paint.strokeWidth = 5f
-        paint.strokeCap = Paint.Cap.ROUND; paint.color = 0xff202b30.toInt()
-        for (i in 0..3) {
-            val px = -30f + i * 19f
-            canvas.drawLine(px, -56f, px + 8f, 54f, paint)
-        }
-        paint.strokeWidth = 4f
-        for (i in 0 until crossBars) {
-            val py = -35f + i * 25f
-            canvas.drawLine(-35f, py, 36f, py - 8f, paint)
-        }
-        // One restrained edge cue; no repeated bright chamfer around every cell.
-        paint.strokeWidth = .7f; paint.color = 0xff3c484d.toInt()
-        canvas.drawLine(-30f, -56f, -22f, 54f, paint)
-        canvas.restoreToCount(saved)
+        // The front bridge is deliberately smooth: no screws, bosses or recessed seats.
         paint.style = Paint.Style.FILL
     }
 }

@@ -21,4 +21,18 @@ class CarbonBridgeBaselineProvenanceTest {
             assertEquals("Frozen $name must remain an exact public d515470 source copy", sha256, actual)
         }
     }
+    @Test fun frozenReviewRenderersAreExactIdentifierOnlyCopiesOfEd1d39c() {
+        val sources = mapOf(
+            "CarbonDialArt" to "fd235ae07c1b52e7e35199b02cd1da3f93848ee4c6b874e81e0c09446c01d124",
+            "CarbonBridgeArt" to "041fe77b0d37212a06dffd1d9b145abd6dc403d8911c36d1893953f16470a934",
+        )
+        val identifiers = listOf("CarbonDialArt", "CarbonDialGeometry", "CarbonBridgeArt", "CarbonBridgeGeometry")
+        for ((name, sha256) in sources) {
+            var original = File("src/test/java/ai/nanosearch/launcher/clocks/BaselineReview$name.kt").readText()
+            identifiers.forEach { original = original.replace("BaselineReview$it", it) }
+            val actual = MessageDigest.getInstance("SHA-256").digest(original.toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it) }
+            assertEquals("Frozen $name must remain an exact ed1d39c source copy", sha256, actual)
+        }
+    }
 }
