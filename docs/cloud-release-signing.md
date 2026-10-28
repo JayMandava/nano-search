@@ -63,6 +63,20 @@ draft release and final published release. Only the publication job gets content
 write permission. No Gradle/build code runs in the signing job, and no production
 key is provided to build, setup, artifact download or publication steps.
 
+## Independent v2 verification
+
+Signed validation first uses `apksigner verify` with the actual manifest SDK range
+and requires exactly the pinned production signer. It then verifies the same APK
+separately with `--min-sdk-version 24 --max-sdk-version 27`, requiring a successful
+v2 result and exactly the same pinned signer. This checks the v2 signature itself;
+it does not change the app's minimum SDK (33) or its signing options. A missing or
+invalid v2 signature still blocks publication.
+
+With a minimum SDK of 28 or newer, Android's verifier can find v3 and skip v2.
+Thus the default verbose `v2: false` result alone cannot establish v2 absence.
+See the [Android verifier source](https://android.googlesource.com/platform/tools/apksig/+/refs/heads/main/src/main/java/com/android/apksig/ApkVerifier.java)
+and [apksigner verification options](https://developer.android.com/tools/apksigner#verify).
+
 ## Gate setup approval and current blocker
 
 The owner approved this exact gate: sole reviewer `JayMandava`,

@@ -205,7 +205,16 @@ def verify_apk(path, version, code, signed):
         output = run(str(build_tools / 'apksigner'), 'verify', '--verbose', '--print-certs', str(path))
         certs = re.findall(r'^Signer #[0-9]+ certificate SHA-256 digest: ([0-9a-f]+)$', output, re.M)
         require(certs == [CERT], 'APK must have exactly the existing production signer')
-        require('Verified using v2 scheme (APK Signature Scheme v2): true' in output, 'APK v2 signature required')
+        # At minSdk 33, apksig may verify v3 and deliberately skip v2. Keep the
+        # normal supported-platform check above, then independently verify v2 on
+        # API 24-27, where v3 cannot satisfy verification. This does not change
+        # the manifest's minSdk or the signing configuration.
+        v2_output = run(str(build_tools / 'apksigner'), 'verify', '--verbose', '--print-certs',
+                        '--min-sdk-version', '24', '--max-sdk-version', '27', str(path))
+        v2_certs = re.findall(r'^Signer #[0-9]+ certificate SHA-256 digest: ([0-9a-f]+)$', v2_output, re.M)
+        require(v2_certs == [CERT], 'APK v2 must have exactly the existing production signer')
+        require(re.findall(r'^Verified using v2 scheme \(APK Signature Scheme v2\): (true|false)$',
+                           v2_output, re.M) == ['true'], 'APK v2 signature required')
     else:
         unsigned_structure(Path(path).read_bytes())
         result = subprocess.run([str(build_tools / 'apksigner'), 'verify', str(path)], text=True, capture_output=True)

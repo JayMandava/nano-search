@@ -126,6 +126,57 @@ class AssetTests(unittest.TestCase):
 
 
 class ArtifactTests(unittest.TestCase):
+    def check_signature_reports(self, default_report, v2_report):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'test.apk'
+            with zipfile.ZipFile(path, 'w') as out:
+                out.writestr('lib/arm64-v8a/libnanollm.so', b'fixture')
+            calls = []
+
+            def command(*args):
+                if args[0].endswith('/aapt'):
+                    return "package: name='ai.nanosearch.launcher' versionCode='17' versionName='0.8.2'\nsdkVersion:'33'\ntargetSdkVersion:'35'\nnative-code: 'arm64-v8a'"
+                if args[0].endswith('/apkanalyzer'):
+                    return 'false'
+                if args[0].endswith('/apksigner'):
+                    calls.append(args[1:])
+                    if '--min-sdk-version' in args:
+                        self.assertEqual(args[1:], ('verify', '--verbose', '--print-certs',
+                                                    '--min-sdk-version', '24', '--max-sdk-version', '27', str(path)))
+                        if isinstance(v2_report, Exception):
+                            raise v2_report
+                        return v2_report
+                    self.assertEqual(args[1:], ('verify', '--verbose', '--print-certs', str(path)))
+                    return default_report
+                return ''
+
+            with patch.dict(os.environ, {'ANDROID_HOME': tmp}), patch.object(release, 'run', side_effect=command), patch.object(release, 'verify_assets'), patch.object(release, 'verify_native'):
+                release.verify_apk(path, '0.8.2', 17, True)
+            self.assertEqual(len(calls), 2)
+
+    def signature_report(self, v2, cert=None):
+        return (f'Signer #1 certificate SHA-256 digest: {cert or release.CERT}\n'
+                f'Verified using v2 scheme (APK Signature Scheme v2): {v2}\n'
+                'Verified using v3 scheme (APK Signature Scheme v3): true')
+
+    def test_v3_platform_success_still_requires_independent_v2_verification(self):
+        # apksig skips v2 when minSdk >= 28 and a v3 block is found.
+        self.check_signature_reports(self.signature_report('false'), self.signature_report('true'))
+
+    def test_missing_invalid_or_ambiguous_v2_report_is_rejected(self):
+        reports = [self.signature_report('false'),
+                   self.signature_report('true').replace('scheme (APK Signature Scheme v2)', 'scheme (unknown)'),
+                   self.signature_report('true') + '\nVerified using v2 scheme (APK Signature Scheme v2): false',
+                   ValueError('APK verification command failed: apksigner')]
+        for report in reports:
+            with self.subTest(report=str(report)), self.assertRaises(ValueError):
+                self.check_signature_reports(self.signature_report('false'), report)
+
+    def test_v2_signer_is_pinned_independently_of_v3_signer(self):
+        for cert in ['0' * 64, release.CERT + '\nSigner #2 certificate SHA-256 digest: ' + release.CERT]:
+            with self.subTest(cert=cert), self.assertRaisesRegex(ValueError, 'v2 must have exactly'):
+                self.check_signature_reports(self.signature_report('false'), self.signature_report('true', cert))
+
     def test_manifest_tamper_stops_before_apk_tools(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp); (path/'candidate.json').write_text('{}')
