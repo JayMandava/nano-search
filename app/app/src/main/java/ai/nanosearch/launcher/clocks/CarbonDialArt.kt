@@ -255,10 +255,16 @@ class CarbonDialArt {
         // Four matched, mirrored window frames replace the independently shaped rear plates.
         bridgeArt.drawRear(c)
         // Engine-turned arcs under the central train read as curved machined plates.
+        // Keep their upper cap out of the open twelve-o'clock bay: those detached lines
+        // read as leftover marks. The clip ends behind the opaque side counters, while
+        // all lower engraving remains unchanged.
+        val engravingSave = c.save()
+        c.clipRect(0f, 390f, 1000f, 1000f)
         // The former plate painter left BUTT caps here. Preserve that explicit state so
         // native oval-seam antialiasing cannot change unrelated engraved arc pixels.
         paint.strokeCap = Paint.Cap.BUTT
         for(i in 0..10) ovalStroke(c,362f-i*3,329f-i*3,660f+i*3,648f+i*3,.65f,if(i%3==0)0xff3d4648.toInt() else 0xff1f282c.toInt())
+        c.restoreToCount(engravingSave)
         for ((x,y) in arrayOf(280f to 245f, 715f to 268f, 299f to 760f, 700f to 734f, 478f to 318f)) screw(c,x,y,7f)
         c.restoreToCount(save2)
         c.restoreToCount(faceSave)

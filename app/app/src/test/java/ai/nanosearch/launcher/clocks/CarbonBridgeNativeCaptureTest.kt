@@ -34,7 +34,7 @@ class CarbonBridgeNativeCaptureTest {
     )
 
     @Test fun frozenPreviousReviewProducesNonemptyDeterministicNativePixels() = inUtc {
-        val art = BaselineAlignedCarbonDialArt()
+        val art = BaselineApprovedCarbonDialArt()
         try {
             art.onTimeChanged()
             val a = bitmap(360); val b = bitmap(360)
@@ -63,11 +63,12 @@ class CarbonBridgeNativeCaptureTest {
         assumeTrue("PNG export is opt-in with CARBON_REVIEW_OUTPUT", destination.isNotBlank())
         val directory = File(destination)
         check(directory.mkdirs()) { "Use a new output directory; never overwrite render evidence: $directory" }
-        val before = BaselineAlignedCarbonDialArt()
+        val before = BaselineApprovedCarbonDialArt()
         val after = CarbonDialArt()
         val comparisons = JSONArray()
         var supportDetail: JSONObject? = null
         var rearDetail: JSONObject? = null
+        var cleanupDetail: JSONObject? = null
         try {
             before.onTimeChanged(); after.onTimeChanged()
             for (side in listOf(240, 360, 720)) for (state in states) {
@@ -83,6 +84,7 @@ class CarbonBridgeNativeCaptureTest {
                     val comparisonFile = if (side == 720 && state.name == "parked") {
                         File(directory, "comparison-parked-720px.png").also { writeComparison(it, a, b) }
                     } else null
+                    if(side==720 && state.name=="parked") cleanupDetail=exportCleanupDetail(directory,a,b)
                     val oldPixels = pixels(a); val newPixels = pixels(b)
                     val changed = oldPixels.indices.count { oldPixels[it] != newPixels[it] }
                     assertTrue("Capture must contain an actual refinement, not a relabeled baseline", changed > 0)
@@ -101,12 +103,13 @@ class CarbonBridgeNativeCaptureTest {
             File(directory, "metadata.json").writeText(JSONObject()
                 .put("renderer", "Robolectric 4.17 / API 35 / native Skia graphics; not an Android emulator or device")
                 .put("fixedUtc", "2026-10-15T10:10:30Z").put("epochMillis", epoch)
-                .put("baselineRevision", "a44fc7f566a355c30867e711e09f8b21e9382a6e")
+                .put("baselineRevision", "4058d215b5c08b68b072547e8ff3d544e013aa83")
                 .put("sourceRevision", System.getenv("CARBON_REVIEW_REVISION") ?: "working tree; not committed")
                 .put("baselineTransform", "Identifier-only renames, protected by exact SHA-256 provenance test")
                 .put("comparisons", comparisons)
                 .put("supportDetail", supportDetail ?: JSONObject.NULL)
                 .put("rearDetail", rearDetail ?: JSONObject.NULL)
+                .put("cleanupDetail", cleanupDetail ?: JSONObject.NULL)
                 .put("meaning", "Human review evidence, not design approval or device integration validation")
                 .toString(2))
         }
@@ -120,8 +123,8 @@ class CarbonBridgeNativeCaptureTest {
         check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
     }
     /** Labels and untouched render bitmaps are composed by native Android Canvas, not retouched. */
-    private fun writeComparison(file: File, before: Bitmap, after: Bitmap, supportOnly: Boolean = false, rearOnly: Boolean = false) {
-        val sheet = Bitmap.createBitmap(1488, 848, Bitmap.Config.ARGB_8888)
+    private fun writeComparison(file: File, before: Bitmap, after: Bitmap, supportOnly: Boolean = false, rearOnly: Boolean = false, cleanupOnly: Boolean = false) {
+        val sheet = Bitmap.createBitmap(1488, before.height+128, Bitmap.Config.ARGB_8888)
         try {
             val canvas = Canvas(sheet)
             canvas.drawColor(0xff111419.toInt())
@@ -129,16 +132,17 @@ class CarbonBridgeNativeCaptureTest {
                 color = Color.WHITE; textSize = 25f
                 typeface = Typeface.create("sans-serif", Typeface.BOLD)
             }
-            canvas.drawText(if (supportOnly) "PREVIOUS FRONT BRIDGE" else if (rearOnly) "PREVIOUS BASE LAYER" else "PREVIOUS CANDIDATE · a44fc7f", 24f, 42f, text)
-            canvas.drawText(if (supportOnly) "UNCHANGED FRONT BRIDGE" else if (rearOnly) "REVISED BASE LAYER" else "REVISED · ORDERED REAR SUPPORTS", 768f, 42f, text)
+            canvas.drawText(if (cleanupOnly) "BEFORE · 12 O’CLOCK DETAIL" else if (supportOnly) "PREVIOUS FRONT BRIDGE" else if (rearOnly) "PREVIOUS BASE LAYER" else "APPROVED CANDIDATE · 4058d21", 24f, 42f, text)
+            canvas.drawText(if (cleanupOnly) "AFTER · STRAY LINES REMOVED" else if (supportOnly) "UNCHANGED FRONT BRIDGE" else if (rearOnly) "REVISED BASE LAYER" else "REVISED · 12 O’CLOCK CLEANUP", 768f, 42f, text)
             canvas.drawBitmap(before, 12f, 64f, null)
             canvas.drawBitmap(after, 756f, 64f, null)
             text.textSize = 20f; text.color = 0xffb3bec9.toInt()
             text.typeface = Typeface.create("sans-serif", Typeface.NORMAL)
-            val footer = if (supportOnly) "Front bridge is pixel-identical · Rear supports and jewels are not included · No hands or counter faces"
+            val footer = if(cleanupOnly) "Actual 720 px render crop · 4× nearest-neighbour pixels · JVM native graphics, not a device screenshot"
+                else if (supportOnly) "Front bridge is pixel-identical · Rear supports and jewels are not included · No hands or counter faces"
                 else if (rearOnly) "Actual base layer · Rear plates and unchanged case · No wheels, front bridge, counters, hands or jewels"
                 else "Actual Canvas render · JVM native graphics, NOT a device screenshot · 2026-10-15 10:10:30 UTC"
-            canvas.drawText(footer, 24f, 824f, text)
+            canvas.drawText(footer, 24f, sheet.height-24f, text)
             writePng(file, sheet)
         } finally { sheet.recycle() }
     }
@@ -151,7 +155,7 @@ class CarbonBridgeNativeCaptureTest {
                 scale(CarbonDialGeometry.ASSEMBLY_SCALE,CarbonDialGeometry.ASSEMBLY_SCALE,500f,500f)
                 clipPath(CarbonPusherGeometry.innerDialPath())
             }
-            BaselineAlignedCarbonBridgeArt().draw(canvas(before))
+            BaselineApprovedCarbonBridgeArt().draw(canvas(before))
             CarbonBridgeArt().draw(canvas(after))
             val oldFile=File(directory,"support-only-before-720px.png")
             val newFile=File(directory,"support-only-after-720px.png")
@@ -166,7 +170,7 @@ class CarbonBridgeNativeCaptureTest {
     }
     /** Actual cached-base entry points, including former broad plates and their shadows. */
     private fun exportRearDetail(directory:File):JSONObject {
-        val previous=BaselineAlignedCarbonDialArt();val current=CarbonDialArt()
+        val previous=BaselineApprovedCarbonDialArt();val current=CarbonDialArt()
         val before=bitmap(720);val after=bitmap(720)
         try {
             fun draw(art:Any,target:Bitmap) {
@@ -174,7 +178,7 @@ class CarbonBridgeNativeCaptureTest {
                 art.javaClass.getDeclaredMethod("underlay",Canvas::class.java).apply {isAccessible=true}.invoke(art,c)
             }
             draw(previous,before);draw(current,after)
-            assertFalse("Actual base layers must show changed rear plates",before.sameAs(after))
+            assertFalse("Actual base layers must show the localized engraving cleanup",before.sameAs(after))
             val oldFile=File(directory,"rear-base-before-720px.png")
             val newFile=File(directory,"rear-base-after-720px.png")
             val comparison=File(directory,"comparison-rear-base-720px.png")
@@ -182,8 +186,26 @@ class CarbonBridgeNativeCaptureTest {
             writeComparison(comparison,before,after,rearOnly=true)
             return JSONObject().put("before",record(oldFile)).put("after",record(newFile))
                 .put("comparison",record(comparison))
-                .put("meaning","Actual base layer with rear supports, old broad plates/radial backing versus new mirrored frames, plus unchanged case. Omits moving wheels and the entire front overlay; not a complete watch.")
+                .put("meaning","Actual base layer: only the upper engraving cap differs. Approved rear supports and case remain unchanged. Omits moving wheels and entire front overlay; not a complete watch.")
         } finally {before.recycle();after.recycle();previous.release();current.release()}
+    }
+    /** Pixel-exact crop of the complete720px renders; enlargement uses no smoothing. */
+    private fun exportCleanupDetail(directory:File,before:Bitmap,after:Bitmap):JSONObject {
+        fun crop(source:Bitmap):Bitmap {
+            val clipped=Bitmap.createBitmap(source,297,164,173,110)
+            return try {Bitmap.createScaledBitmap(clipped,692,440,false)} finally {clipped.recycle()}
+        }
+        val a=crop(before);val b=crop(after)
+        try {
+            val oldFile=File(directory,"cleanup-12-before-4x.png")
+            val newFile=File(directory,"cleanup-12-after-4x.png")
+            val comparison=File(directory,"comparison-cleanup-12-4x.png")
+            writePng(oldFile,a);writePng(newFile,b);writeComparison(comparison,a,b,cleanupOnly=true)
+            assertFalse("The actual12 o’clock crop must contain the requested cleanup",a.sameAs(b))
+            return JSONObject().put("before",record(oldFile)).put("after",record(newFile)).put("comparison",record(comparison))
+                .put("sourceBitmapPx",720).put("cropPx",JSONArray(listOf(297,164,173,110))).put("nearestNeighbourScale",4)
+                .put("meaning","Unretouched crop of the complete dial at fixed time, enlarged4x without smoothing; not a device screenshot.")
+        } finally {a.recycle();b.recycle()}
     }
     private fun record(file: File) = JSONObject().put("file", file.name).put("bytes", file.length())
         .put("sha256", MessageDigest.getInstance("SHA-256").digest(file.readBytes()).joinToString("") { "%02x".format(it) })
