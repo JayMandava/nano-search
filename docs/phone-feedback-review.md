@@ -1,8 +1,8 @@
 # Post-0.8.2 phone feedback: local review
 
-Base: `29caeb2e6b494524f361fbe7150b98075078c8f8`. These changes are local review
-work; they do not prepare or authorize another public release. Version remains
-0.8.2 / code 17. Approved RM artwork and production signing policy are unchanged.
+Base: `29caeb2e6b494524f361fbe7150b98075078c8f8`. The fixes were first validated as local review
+work at 0.8.2 / code 17. Subsequent owner authorization promotes the unchanged
+fix commits into the 0.8.3 / code 18 candidate; see `releases/0.8.3.md`. Approved RM artwork and production signing policy are unchanged.
 
 ## Clock-change notice
 
@@ -82,5 +82,6 @@ OEM inset/gesture behavior, TalkBack service, or real-network download evidence.
 A physical follow-up should check portrait/landscape/cutout and large-text notice
 layout, repeated clock changes, TalkBack timing, model downloads over interrupted
 connections, and the installed-model fallback during an actual verified download.
-No push, tag, workflow dispatch, signing, phone install or publication is part of
-this review.
+The initial review performed no publication. Subsequent source publication is
+owner-authorized; protected workflow dispatch and both signing approvals remain
+owner actions. No phone install or signing was performed locally.

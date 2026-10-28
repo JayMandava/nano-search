@@ -14,8 +14,8 @@ android {
         applicationId = "ai.nanosearch.launcher"
         minSdk = 33
         targetSdk = 35
-        versionCode = 17
-        versionName = "0.8.2"
+        versionCode = 18
+        versionName = "0.8.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["nanoAppLabel"] = "Nano Search"
         manifestPlaceholders["nanoHomeCategory"] = "android.intent.category.HOME"
