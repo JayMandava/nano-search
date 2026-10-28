@@ -1,41 +1,44 @@
-# Carbon bridge: local renderer review
+# Carbon bridge: annotated rear-support review
 
-The current comparison is the actual Carbon Canvas renderer against the frozen
-previous review candidate, `ed1d39cd871b81ee0ad84b86dd68e777af3ffd78`. The earlier
-Nano 0.8.1 fixtures remain unchanged and independently hash-checked. New captures
-use **ed1d39c versus the revised candidate**, not the released 0.8.1 image.
+The current comparison uses actual Carbon Canvas code against the frozen last
+reviewed candidate, `a44fc7f566a355c30867e711e09f8b21e9382a6e`. Frozen a44 dial,
+front bridge and rear-support renderers are identifier-only copies, independently
+SHA-256 checked. The earlier ed1d39c and public Nano 0.8.1 fixtures are retained.
 
-The harness uses Robolectric 4.17, API 35 framework classes and **native Skia
-on the JVM**. It is not an Android emulator, device screenshot, integration test
-or approval to publish/install. A focused standalone renderer run must not be
-reported as a full app build, R8, lint or Android instrumentation pass.
+This is Robolectric 4.17 with API 35 framework classes and **native Skia on the
+JVM**, not Android emulator/device evidence. A standalone renderer run is not a
+full app build, R8, lint, Android instrumentation or permission to publish/install.
 
-## Requested revision
+## Annotated request
 
-The final clarified design intentionally removes the central octagon's short
-connection to the six-o'clock counter. The centre still joins three and nine;
-the lower counter retains its own independent collar/support. The chronograph
-hand still crosses that dark gap: a hand is not a bridge connection.
+The white marks identify the broad irregular plates behind the wheels, not the
+already approved silver front bridge. The two circles identify only the side
+jewels at design coordinates `(275,621)` and `(737,586)`. The unmarked top jewel
+and all three counter jewels remain.
 
-The front bridge has no visible screws, seats or enlarged bosses. Case, rear
-plate and counter movement screws are deliberately retained. Rear supports use
-one repeated concentric/radial pattern registered to the existing wheel centres,
-with a common angular datum, rib width and slot rhythm. They render in the static
-base, below the animated wheels, rather than as independently rotated hash grids
-on the front overlay. Case, counters, hand/date geometry, pushers, layout, state
-and font handling remain outside this revision.
+Four independently shaped recessed plates and the former radial backing pattern
+are replaced by two mirrored pairs of octagonal window frames. Both pairs share
+horizontal alignment, 45-degree chamfers and a common normal web thickness; only
+their heights follow the available upper/lower spaces. They remain in the cached
+base, below the animated wheels. The central engraved arcs remain unchanged.
 
-## Reproduce in the normal Android build environment
+The approved front bridge source and native pixels must remain exact. Its centre
+joins three and nine, not six; the lower counter has its own independent collar.
+The chronograph hand crosses the gap but is not a bridge connection. No front
+bridge screws are reintroduced. Case, rear plate and counter movement screws,
+case/pushers, hands, date, counter geometry, layout, state and font handling remain
+outside this revision.
 
-From the `app/` Gradle root with the project Android dependencies installed:
+## Reproduce in the normal Android environment
+
+From the `app/` Gradle root with Android dependencies installed:
 
 ```sh
 ./gradlew -PunsignedRelease=true -PincludePersonalOverlay=false \
   :app:testDebugUnitTest :app:testReleaseUnitTest
 ```
 
-PNG export skips unless explicitly enabled. Select a **new, nonexistent absolute
-directory**; the exporter refuses to overwrite evidence:
+Export is opt-in and requires a **new, nonexistent absolute directory**:
 
 ```sh
 CARBON_REVIEW_OUTPUT=/absolute/path/to/new-review-directory \
@@ -45,44 +48,45 @@ CARBON_REVIEW_REVISION="$(git rev-parse HEAD) plus reviewed working tree" \
   --tests 'ai.nanosearch.launcher.clocks.CarbonBridge*'
 ```
 
-The images cover parked, running and illuminated states at 240, 360 and 720
-pixels, fixed to 2026-10-15 10:10:30 UTC. Metadata records states, source identity,
-changed-pixel counts and PNG hashes. Both sides use actual renderer code in the
-same native-graphics process; neither side is an image mockup.
+Captures cover parked, running and illuminated states at 240, 360 and 720 pixels,
+fixed to 2026-10-15 10:10:30 UTC. Metadata records the source identity, states,
+changed-pixel counts and PNG hashes. Both sides use the actual renderer in the
+same process, never retouched artwork.
 
-A separate support-only comparison omits hands and counter faces, making the
-removed neck unambiguous. It calls the bridge painter only: the previous painter
-contains recessed seats, but the separate screw-head painter is not included in
-that detail. The revised rear supports are now in the base, so they are also
-omitted from this front-layer diagnostic. The complete-dial comparison and regression tests remain the actual
-front-screw-removal evidence. This detail must not be presented as a whole watch.
+The front-only diagnostic is intentionally pixel-identical: it proves this rear
+revision preserves the approved bridge. It excludes rear supports, jewels, hands
+and counter faces. A base-layer diagnostic shows the actual former broad plates
+and radial backing versus the actual new rear assembly without wheels/overlay;
+it also includes the unchanged case. Neither diagnostic is a whole watch. The
+complete-dial images remain the primary design comparison.
 
-## Non-vacuous guardrails
+## Guardrails
 
-- Frozen fixtures must recover exact source SHA-256 after identifier renames.
-- The front path must have exactly two four-neighbour components at phone and
-  design sizes: a substantial main 3/9 bridge, and the exact original lower
-  counter collar. Extra fragments, deleted support and diagonal-only joins fail.
-- The removed neck must be geometrically clear and paint-transparent away from
-  boundary shadows; this does not incorrectly require the hand to disappear.
-- Counter, date and spindle apertures remain clear; support stays in the same
-  dial envelope. The lower collar is compared to its unchanged construction.
-- Actual full-dial pixels at all six former front-screw centres must equal bare
-  opaque bridge pixels. The screw-bearing frozen candidate must differ, proving
-  the check exercises previously visible screw pixels. Source wiring additionally
-  rejects front screw/seat painting while retaining unrelated screws.
-- Every rear panel must contain its expected aligned ribs and concentric rings,
-  while intervening slots remain genuinely open. Rear paths also avoid all
-  apertures and the removed neck gap. Draw order is checked separately.
-- Case/pusher, date and counter-interior pixels match the frozen candidate exactly
-  across all states and 240/360/720/1000px masks. The masks are not adapted to the
-  new drawing. Isolated hands, seconds and host geometry remain exact.
-- Repeated painting is deterministic and preserves Canvas transform, clipping
-  and save stack. Returned paths must not share mutable state. Graphite faces
-  stay opaque after the shadow pass.
+- Frozen fixtures recover exact source hashes after undoing identifier renames.
+- Approved front source and actual native raster remain exact against a44.
+- Actual front overlay pixels are exact everywhere except the two circled jewel
+  patches. Their former opaque purple cores become transparent, not recoloured.
+  The unmarked top and all counter jewels retain actual visible purple pixels.
+- Full-dial changes are restricted to a fixed old/new rear-panel envelope plus
+  the two jewel patches; case/date/counter-interior masks still match exactly at
+  240/360/720/1000px in parked/running/lume states. The date uses actual opaque
+  pixels from the frozen cached overlay; at240px, 11 outer-bezel antialias pixels
+  mix with the intentionally changed rear material. Those fringe pixels are not
+  called opaque date content. The whole isolated overlay, including its bezel,
+  remains exact. No numeric colour tolerance is used. Hands, seconds and host geometry
+  are independently compared exactly.
+- Mirrored rear paths must agree exactly, have the common web thickness and
+  chamfers, and retain genuinely open windows. Rear paths avoid all apertures and
+  the centre-to-six gap. Actual layer order remains base, wheels, front overlay.
+- The front path retains exactly two four-neighbour components, clear apertures,
+  the original lower collar and a paint-transparent neck gap. Former front screw
+  centres still equal bare opaque material; ed1's old screw-bearing renderer is
+  retained as a positive control for those pixel checks.
+- Painting is deterministic and preserves Canvas transforms, clipping and save
+  stack. Returned paths cannot share mutable state.
 
-The Android instrumentation geometry test mirrors the revised topology, but its
-presence does not mean it was executed on Android. No renderer test validates
-touch routing, screen-off lifecycle, system Clock launch, live-wallpaper hosts,
-OEM behaviour, frame timing or the private local font. Previous release/device
-results must not be attributed to this revised draft.
+The Android instrumentation geometry source mirrors the front topology, but was
+not executed by this standalone renderer workflow. No current test validates
+live-wallpaper/widget hosts, touch routing, screen-off lifecycle, system Clock
+launch, OEM behaviour, frame timing or the private local font. Prior releases'
+full-app/device results must not be attributed to this draft.

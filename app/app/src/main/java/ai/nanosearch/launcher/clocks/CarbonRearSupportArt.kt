@@ -4,62 +4,50 @@ import android.graphics.Canvas
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
-import kotlin.math.cos
-import kotlin.math.sin
+import kotlin.math.sqrt
 
-/** Original repeated machining pattern, registered to the unchanged decorative wheel centres. */
+/** Four visibly matched rear plates: shared side walls, web width and 45-degree shoulders. */
 internal object CarbonRearSupportGeometry {
-    data class Support(val x: Float, val y: Float, val wheelRadius: Float)
+    data class Panel(val mirrorX: Boolean, val top: Float, val bottom: Float)
 
-    const val RIB_PHASE_DEGREES = 22.5f
-    const val RIB_STEP_DEGREES = 45f
-    const val RIB_WIDTH = 6f
-    const val INNER_RADIUS_SCALE = .62f
-    const val OUTER_CLEARANCE = 10f
+    const val LEFT = 250f
+    const val RIGHT = 445f
+    const val OUTER_CORNER = 28f
+    const val WEB_WIDTH = 14f
+    // Offset the 45-degree facets by the same normal distance as the straight walls.
+    val INNER_CORNER = OUTER_CORNER + WEB_WIDTH * (sqrt(2f) - 2f)
 
-    // Same centres/radii as CarbonDialArt's existing train. No independent panel rotations,
-    // stretching or skew: all four supports use the same angular datum and rib/slot rhythm.
-    val supports = listOf(
-        Support(446f, 270f, 97f), Support(624f, 296f, 67f),
-        Support(358f, 632f, 83f), Support(655f, 639f, 77f),
+    // The upper and lower pairs share the same horizontal datum. Only their height follows
+    // the available spaces between the unchanged registers; neither pair rotates or skews.
+    val panels = listOf(
+        Panel(false, 210f, 398f), Panel(true, 210f, 398f),
+        Panel(false, 552f, 800f), Panel(true, 552f, 800f),
     )
 
-    fun panelPath(support: Support): Path {
-        val inner = support.wheelRadius * INNER_RADIUS_SCALE
-        val outer = support.wheelRadius + OUTER_CLEARANCE
-        val result = Path()
-        fun ring(radius: Float) {
-            val band = Path().apply { addCircle(support.x, support.y, radius + RIB_WIDTH / 2, Path.Direction.CW) }
-            check(band.op(Path().apply {
-                addCircle(support.x, support.y, radius - RIB_WIDTH / 2, Path.Direction.CW)
-            }, Path.Op.DIFFERENCE))
-            check(result.op(band, Path.Op.UNION))
+    fun panelPath(panel: Panel): Path {
+        fun octagon(left: Float, top: Float, right: Float, bottom: Float, corner: Float) = Path().apply {
+            moveTo(left + corner, top); lineTo(right - corner, top)
+            lineTo(right, top + corner); lineTo(right, bottom - corner)
+            lineTo(right - corner, bottom); lineTo(left + corner, bottom)
+            lineTo(left, bottom - corner); lineTo(left, top + corner); close()
         }
-        ring(inner); ring(outer)
-        repeat(8) { index ->
-            val angle = Math.toRadians((RIB_PHASE_DEGREES + index * RIB_STEP_DEGREES).toDouble())
-            val ux = cos(angle).toFloat(); val uy = sin(angle).toFloat()
-            val nx = -uy * RIB_WIDTH / 2; val ny = ux * RIB_WIDTH / 2
-            val x1 = support.x + inner * ux; val y1 = support.y + inner * uy
-            val x2 = support.x + outer * ux; val y2 = support.y + outer * uy
-            val rib = Path().apply {
-                moveTo(x1 + nx, y1 + ny); lineTo(x2 + nx, y2 + ny)
-                lineTo(x2 - nx, y2 - ny); lineTo(x1 - nx, y1 - ny); close()
-            }
-            check(result.op(rib, Path.Op.UNION))
-        }
+        val result = octagon(LEFT, panel.top, RIGHT, panel.bottom, OUTER_CORNER)
+        val window = octagon(LEFT + WEB_WIDTH, panel.top + WEB_WIDTH,
+            RIGHT - WEB_WIDTH, panel.bottom - WEB_WIDTH, INNER_CORNER)
+        check(result.op(window, Path.Op.DIFFERENCE))
+        if (panel.mirrorX) result.transform(Matrix().apply { setScale(-1f, 1f, 500f, 500f) })
         return result
     }
 
     fun frame(): Path {
         val result = Path()
-        supports.forEach { check(result.op(panelPath(it), Path.Op.UNION)) }
+        panels.forEach { check(result.op(panelPath(it), Path.Op.UNION)) }
         val inside = CarbonPusherGeometry.innerDialPath().apply {
             transform(Matrix().apply { setScale(.99f, .99f, 500f, 500f) })
         }
         check(result.op(inside, Path.Op.INTERSECT))
-        // Keep even this lower layer out of the functional openings. The centre-to-six gap
-        // remains clear; no rear rib substitutes for the removed front neck.
+        // The lower register remains independent. These rear frames cannot replace the
+        // removed front neck or intrude into counter, date or spindle apertures.
         val openings = Path().apply {
             addCircle(350f, 465f, 103f, Path.Direction.CW)
             addCircle(650f, 465f, 103f, Path.Direction.CW)
@@ -73,7 +61,7 @@ internal object CarbonRearSupportGeometry {
     }
 }
 
-/** Cached with the static base bitmap; no geometry generation occurs during a live frame. */
+/** Cached static rear layer, underneath the unchanged animated wheels and front bridge. */
 internal class CarbonRearSupportArt {
     private val frame = CarbonRearSupportGeometry.frame()
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -84,12 +72,12 @@ internal class CarbonRearSupportArt {
         paint.style = Paint.Style.FILL; paint.color = 0x80000000.toInt()
         canvas.drawPath(frame, paint)
         canvas.restoreToCount(shadow)
-        paint.color = 0xff242c2e.toInt()
+        paint.color = 0xff2b3537.toInt()
         canvas.drawPath(frame, paint)
         val edge = canvas.save()
         canvas.clipPath(frame)
-        paint.style = Paint.Style.STROKE; paint.strokeWidth = .8f
-        paint.color = 0xff414d4f.toInt()
+        paint.style = Paint.Style.STROKE; paint.strokeWidth = 1.4f
+        paint.color = 0xff64716f.toInt()
         canvas.drawPath(frame, paint)
         canvas.restoreToCount(edge)
         paint.style = Paint.Style.FILL

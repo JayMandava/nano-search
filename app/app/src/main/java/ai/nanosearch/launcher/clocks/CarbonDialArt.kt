@@ -252,18 +252,12 @@ class CarbonDialArt {
         stroke(c, dial, 18f, 0xff1b2024.toInt())
         val save2 = c.save()
         c.clipPath(dial)
-        // The recessed baseplate has irregular milled windows, rather than a punched grid.
-        plate(c,floatArrayOf(265f,199f, 388f,181f, 399f,268f, 360f,370f, 273f,402f, 233f,343f),
-            arrayOf(floatArrayOf(281f,227f, 362f,207f, 372f,255f, 332f,338f, 274f,354f)),false)
-        plate(c,floatArrayOf(630f,188f, 719f,202f, 771f,341f, 722f,391f, 649f,355f),
-            arrayOf(floatArrayOf(663f,225f, 704f,234f, 738f,323f, 704f,345f, 675f,317f)),false)
-        plate(c,floatArrayOf(252f,551f, 339f,565f, 409f,655f, 385f,766f, 304f,809f, 251f,716f),
-            arrayOf(floatArrayOf(270f,595f, 314f,601f, 362f,659f, 349f,736f, 309f,759f, 277f,703f)),false)
-        plate(c,floatArrayOf(586f,588f, 702f,555f, 753f,616f, 733f,750f, 655f,814f, 598f,758f),
-            arrayOf(floatArrayOf(626f,623f, 685f,595f, 718f,632f, 701f,726f, 655f,763f, 628f,732f)),false)
-        // Ordered wheel-centred supports belong behind the animated train, not on top of it.
+        // Four matched, mirrored window frames replace the independently shaped rear plates.
         bridgeArt.drawRear(c)
         // Engine-turned arcs under the central train read as curved machined plates.
+        // The former plate painter left BUTT caps here. Preserve that explicit state so
+        // native oval-seam antialiasing cannot change unrelated engraved arc pixels.
+        paint.strokeCap = Paint.Cap.BUTT
         for(i in 0..10) ovalStroke(c,362f-i*3,329f-i*3,660f+i*3,648f+i*3,.65f,if(i%3==0)0xff3d4648.toInt() else 0xff1f282c.toInt())
         for ((x,y) in arrayOf(280f to 245f, 715f to 268f, 299f to 760f, 700f to 734f, 478f to 318f)) screw(c,x,y,7f)
         c.restoreToCount(save2)
@@ -277,7 +271,7 @@ class CarbonDialArt {
         c.clipPath(inner())
         // The side-register framework and separate lower collar sit below counters/hands.
         bridgeArt.draw(c)
-        for ((x,y) in arrayOf(275f to 621f, 737f to 586f, 594f to 234f)) {
+        for ((x,y) in arrayOf(594f to 234f)) {
             oval(c,x-7,y-9,x+7,y+9,0xff381347.toInt())
             ovalStroke(c,x-7,y-9,x+7,y+9,1.7f,0xffa062a8.toInt())
         }

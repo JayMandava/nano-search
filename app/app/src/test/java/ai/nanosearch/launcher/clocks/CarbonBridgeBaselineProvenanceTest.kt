@@ -35,4 +35,19 @@ class CarbonBridgeBaselineProvenanceTest {
             assertEquals("Frozen $name must remain an exact ed1d39c source copy", sha256, actual)
         }
     }
+    @Test fun frozenAlignedRenderersAreExactIdentifierOnlyCopiesOfA44fc7f() {
+        val sources = mapOf(
+            "CarbonDialArt" to "d007b7046c8bc9ada81ca62a8b6e54b995403f71532dea65b9d17bf54c241f7e",
+            "CarbonBridgeArt" to "bef33fa0f10c4e195bd270339ed9dad4d80d39d2e5f16aea28cfc07e656cf46e",
+            "CarbonRearSupportArt" to "3baa7dcdf33dfa65f54af7854d6cc7009b5b4878d69464440d36ef4df886a467",
+        )
+        val identifiers = listOf("CarbonDialArt", "CarbonDialGeometry", "CarbonBridgeArt", "CarbonBridgeGeometry", "CarbonRearSupportArt", "CarbonRearSupportGeometry")
+        for ((name, sha256) in sources) {
+            var original = File("src/test/java/ai/nanosearch/launcher/clocks/BaselineAligned$name.kt").readText()
+            identifiers.forEach { original = original.replace("BaselineAligned$it", it) }
+            val actual = MessageDigest.getInstance("SHA-256").digest(original.toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it) }
+            assertEquals("Frozen $name must remain an exact a44fc7f source copy", sha256, actual)
+        }
+    }
 }

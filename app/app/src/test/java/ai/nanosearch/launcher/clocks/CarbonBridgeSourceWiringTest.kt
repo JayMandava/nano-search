@@ -29,6 +29,8 @@ class CarbonBridgeSourceWiringTest {
         val base=dial.substringAfter("private fun underlay(c: Canvas)").substringBefore("private fun upper(c: Canvas)")
         val upper=dial.substringAfter("private fun upper(c: Canvas)").substringBefore("private fun track(c: Canvas)")
         assertTrue(base.contains("bridgeArt.drawRear(c)"))
+        assertFalse("The four independently shaped old rear plates must actually be removed",Regex("""\bplate\s*\(""").containsMatchIn(base))
+        assertTrue("Counter movement plates are unrelated and remain",dial.substringAfter("private fun subDial(").substringBefore("private fun date(").contains("plate(c,"))
         assertFalse(upper.contains("drawRear"))
         assertEquals("Rear support must be installed exactly once",1,Regex("bridgeArt\\.drawRear\\(c\\)").findAll(dial).count())
         val draw=dial.substringAfter("    fun draw(").substringBefore("    fun drawHand(")

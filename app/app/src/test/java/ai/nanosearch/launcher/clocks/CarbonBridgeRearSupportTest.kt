@@ -12,8 +12,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import kotlin.math.cos
-import kotlin.math.sin
 
 /** Checks the actual repeated machining paths, not just configuration/list equality. */
 @RunWith(RobolectricTestRunner::class)
@@ -33,31 +31,43 @@ class CarbonBridgeRearSupportTest {
         assertTrue(label, result.isEmpty)
     }
 
-    @Test fun allRearPanelsUseTheSameWheelCentresAngularDatumAndOpenSlotRhythm() {
-        val expected = listOf(Triple(446f,270f,97f), Triple(624f,296f,67f), Triple(358f,632f,83f), Triple(655f,639f,77f))
-        val supports = CarbonRearSupportGeometry.supports
-        assertEquals(4, supports.size)
-        assertEquals(22.5f, CarbonRearSupportGeometry.RIB_PHASE_DEGREES, 0f)
-        assertEquals(45f, CarbonRearSupportGeometry.RIB_STEP_DEGREES, 0f)
-        assertEquals(6f, CarbonRearSupportGeometry.RIB_WIDTH, 0f)
-        assertEquals(.62f, CarbonRearSupportGeometry.INNER_RADIUS_SCALE, 0f)
-        assertEquals(10f, CarbonRearSupportGeometry.OUTER_CLEARANCE, 0f)
-        supports.forEachIndexed { index, support ->
-            val (x,y,r) = expected[index]
-            assertEquals(x,support.x,0f); assertEquals(y,support.y,0f); assertEquals(r,support.wheelRadius,0f)
-            for (side in listOf(1000,2000)) {
-                val material = raster(CarbonRearSupportGeometry.panelPath(support), side)
-                val inner = r * .62f; val outer = r + 10f; val middle = (inner + outer) / 2
-                fun at(radius: Float, degrees: Float): Region {
-                    val angle = Math.toRadians(degrees.toDouble())
-                    return sample(x + radius * cos(angle).toFloat(), y + radius * sin(angle).toFloat(), 1f, side)
+    @Test fun allFourRearFramesHaveMirroredWallsCommonWebWidthAndMatchingChamfers() {
+        val panels=CarbonRearSupportGeometry.panels
+        assertEquals(listOf(false,false,true,true),panels.sortedBy { it.mirrorX }.map { it.mirrorX })
+        assertEquals(listOf(210f to 398f,210f to 398f,552f to 800f,552f to 800f),panels.map { it.top to it.bottom })
+        assertEquals(listOf(false,true,false,true),panels.map { it.mirrorX })
+        assertEquals(250f,CarbonRearSupportGeometry.LEFT,0f)
+        assertEquals(445f,CarbonRearSupportGeometry.RIGHT,0f)
+        assertEquals(28f,CarbonRearSupportGeometry.OUTER_CORNER,0f)
+        assertEquals(14f,CarbonRearSupportGeometry.WEB_WIDTH,0f)
+        assertEquals(28f+14f*(kotlin.math.sqrt(2f)-2f),CarbonRearSupportGeometry.INNER_CORNER,.0001f)
+        for(side in listOf(1000,2000)) {
+            for(index in listOf(0,2)) {
+                val left=panels[index];val right=panels[index+1]
+                val material=raster(CarbonRearSupportGeometry.panelPath(left),side)
+                val mirrored=Path(CarbonRearSupportGeometry.panelPath(right)).apply {
+                    transform(Matrix().apply {setScale(-1f,1f,500f,500f)})
                 }
-                for (rib in 0..7) {
-                    val angle = 22.5f + rib * 45f
-                    checkSample(material,at(middle,angle),true,"Panel $index rib $rib is aligned at $side px")
-                    checkSample(material,at(middle,angle+22.5f),false,"Panel $index slot $rib stays open at $side px")
-                    checkSample(material,at(inner,angle+22.5f),true,"Panel $index inner ring is concentric at $side px")
-                    checkSample(material,at(outer,angle+22.5f),true,"Panel $index outer ring is concentric at $side px")
+                assertTrue("Both actual panel paths must be exact mirror partners",Region(material).apply {
+                    op(raster(mirrored,side),Region.Op.XOR)
+                }.isEmpty)
+                val top=left.top;val bottom=left.bottom
+                val solid=listOf(257f to (top+60f),438f to (top+60f),347f to (top+7f),347f to (bottom-7f),267f to (top+17f),267f to (bottom-17f))
+                val open=listOf(280f to (top+60f),420f to (top+60f),347f to (top+25f),347f to (bottom-25f),251f to (top+1f),251f to (bottom-1f))
+                solid.forEach { (x,y) -> checkSample(material,sample(x,y,1f,side),true,"Common wall/chamfer at $x,$y") }
+                open.forEach { (x,y) -> checkSample(material,sample(x,y,1f,side),false,"Window/corner cut stays open at $x,$y") }
+                // Probe the real 45-degree chamfer along its inward unit normal. Its web
+                // must be the same 14 units as straight walls, not 14/sqrt(2).
+                for(distance in listOf(-2f,2f,7f,12f,16f)) {
+                    val offset=distance/kotlin.math.sqrt(2f)
+                    checkSample(material,sample(264f+offset,top+14f+offset,.6f,side),
+                        distance>0f && distance<14f,"True diagonal normal web at distance $distance/$side")
+                }
+                // The long straight walls retain precisely the shared 14-unit web, not arbitrary thickness.
+                for(x in 247..448) {
+                    val expected=x in 250 until 264 || x in 431 until 445
+                    assertEquals("Exact shared wall width at x=$x, side=$side",expected,
+                        material.contains(((x+.5f)*side/1000f).toInt(),((top+60.5f)*side/1000f).toInt()))
                 }
             }
         }

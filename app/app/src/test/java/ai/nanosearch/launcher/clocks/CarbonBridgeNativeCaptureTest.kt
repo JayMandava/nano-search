@@ -34,7 +34,7 @@ class CarbonBridgeNativeCaptureTest {
     )
 
     @Test fun frozenPreviousReviewProducesNonemptyDeterministicNativePixels() = inUtc {
-        val art = BaselineReviewCarbonDialArt()
+        val art = BaselineAlignedCarbonDialArt()
         try {
             art.onTimeChanged()
             val a = bitmap(360); val b = bitmap(360)
@@ -63,10 +63,11 @@ class CarbonBridgeNativeCaptureTest {
         assumeTrue("PNG export is opt-in with CARBON_REVIEW_OUTPUT", destination.isNotBlank())
         val directory = File(destination)
         check(directory.mkdirs()) { "Use a new output directory; never overwrite render evidence: $directory" }
-        val before = BaselineReviewCarbonDialArt()
+        val before = BaselineAlignedCarbonDialArt()
         val after = CarbonDialArt()
         val comparisons = JSONArray()
         var supportDetail: JSONObject? = null
+        var rearDetail: JSONObject? = null
         try {
             before.onTimeChanged(); after.onTimeChanged()
             for (side in listOf(240, 360, 720)) for (state in states) {
@@ -94,16 +95,18 @@ class CarbonBridgeNativeCaptureTest {
                 } finally { a.recycle(); b.recycle() }
             }
             supportDetail = exportSupportDetail(directory)
+            rearDetail = exportRearDetail(directory)
         } finally {
             before.release(); after.release()
             File(directory, "metadata.json").writeText(JSONObject()
                 .put("renderer", "Robolectric 4.17 / API 35 / native Skia graphics; not an Android emulator or device")
                 .put("fixedUtc", "2026-10-15T10:10:30Z").put("epochMillis", epoch)
-                .put("baselineRevision", "ed1d39cd871b81ee0ad84b86dd68e777af3ffd78")
+                .put("baselineRevision", "a44fc7f566a355c30867e711e09f8b21e9382a6e")
                 .put("sourceRevision", System.getenv("CARBON_REVIEW_REVISION") ?: "working tree; not committed")
                 .put("baselineTransform", "Identifier-only renames, protected by exact SHA-256 provenance test")
                 .put("comparisons", comparisons)
                 .put("supportDetail", supportDetail ?: JSONObject.NULL)
+                .put("rearDetail", rearDetail ?: JSONObject.NULL)
                 .put("meaning", "Human review evidence, not design approval or device integration validation")
                 .toString(2))
         }
@@ -117,7 +120,7 @@ class CarbonBridgeNativeCaptureTest {
         check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
     }
     /** Labels and untouched render bitmaps are composed by native Android Canvas, not retouched. */
-    private fun writeComparison(file: File, before: Bitmap, after: Bitmap, supportOnly: Boolean = false) {
+    private fun writeComparison(file: File, before: Bitmap, after: Bitmap, supportOnly: Boolean = false, rearOnly: Boolean = false) {
         val sheet = Bitmap.createBitmap(1488, 848, Bitmap.Config.ARGB_8888)
         try {
             val canvas = Canvas(sheet)
@@ -126,19 +129,20 @@ class CarbonBridgeNativeCaptureTest {
                 color = Color.WHITE; textSize = 25f
                 typeface = Typeface.create("sans-serif", Typeface.BOLD)
             }
-            canvas.drawText(if (supportOnly) "PREVIOUS FRONT LAYER" else "PREVIOUS CANDIDATE · ed1d39c", 24f, 42f, text)
-            canvas.drawText(if (supportOnly) "REVISED FRONT LAYER" else "REVISED · NO FRONT SCREWS", 768f, 42f, text)
+            canvas.drawText(if (supportOnly) "PREVIOUS FRONT BRIDGE" else if (rearOnly) "PREVIOUS BASE LAYER" else "PREVIOUS CANDIDATE · a44fc7f", 24f, 42f, text)
+            canvas.drawText(if (supportOnly) "UNCHANGED FRONT BRIDGE" else if (rearOnly) "REVISED BASE LAYER" else "REVISED · ORDERED REAR SUPPORTS", 768f, 42f, text)
             canvas.drawBitmap(before, 12f, 64f, null)
             canvas.drawBitmap(after, 756f, 64f, null)
             text.textSize = 20f; text.color = 0xffb3bec9.toInt()
             text.typeface = Typeface.create("sans-serif", Typeface.NORMAL)
-            val footer = if (supportOnly) "Front layer only · Revised rear supports moved behind wheels (not shown here) · No hands or counter faces"
+            val footer = if (supportOnly) "Front bridge is pixel-identical · Rear supports and jewels are not included · No hands or counter faces"
+                else if (rearOnly) "Actual base layer · Rear plates and unchanged case · No wheels, front bridge, counters, hands or jewels"
                 else "Actual Canvas render · JVM native graphics, NOT a device screenshot · 2026-10-15 10:10:30 UTC"
             canvas.drawText(footer, 24f, 824f, text)
             writePng(file, sheet)
         } finally { sheet.recycle() }
     }
-    /** Isolates the neck geometry: the complete-dial chronograph hand intentionally crosses it. */
+    /** Confirms this rear-only revision leaves the approved front support geometry unchanged. */
     private fun exportSupportDetail(directory: File): JSONObject {
         val before=bitmap(720); val after=bitmap(720)
         try {
@@ -147,18 +151,39 @@ class CarbonBridgeNativeCaptureTest {
                 scale(CarbonDialGeometry.ASSEMBLY_SCALE,CarbonDialGeometry.ASSEMBLY_SCALE,500f,500f)
                 clipPath(CarbonPusherGeometry.innerDialPath())
             }
-            BaselineReviewCarbonBridgeArt().draw(canvas(before))
+            BaselineAlignedCarbonBridgeArt().draw(canvas(before))
             CarbonBridgeArt().draw(canvas(after))
             val oldFile=File(directory,"support-only-before-720px.png")
             val newFile=File(directory,"support-only-after-720px.png")
             val comparison=File(directory,"comparison-support-only-720px.png")
             writePng(oldFile,before);writePng(newFile,after)
             writeComparison(comparison,before,after,supportOnly=true)
-            assertFalse("Support detail must show the actual neck/seat removal",before.sameAs(after))
+            assertTrue("The approved front bridge must remain pixel-identical",before.sameAs(after))
             return JSONObject().put("before",record(oldFile)).put("after",record(newFile))
                 .put("comparison",record(comparison))
-                .put("meaning","Support painter only, without hands, counter faces or the separate screw-head painter. The full-dial images are the screw-removal evidence.")
+                .put("meaning","Front bridge painter only, pixel-identical before/after. Rear supports, jewels, hands and counter faces are not included; complete-dial images show the requested revision.")
         } finally {before.recycle();after.recycle()}
+    }
+    /** Actual cached-base entry points, including former broad plates and their shadows. */
+    private fun exportRearDetail(directory:File):JSONObject {
+        val previous=BaselineAlignedCarbonDialArt();val current=CarbonDialArt()
+        val before=bitmap(720);val after=bitmap(720)
+        try {
+            fun draw(art:Any,target:Bitmap) {
+                val c=Canvas(target);c.scale(.72f,.72f)
+                art.javaClass.getDeclaredMethod("underlay",Canvas::class.java).apply {isAccessible=true}.invoke(art,c)
+            }
+            draw(previous,before);draw(current,after)
+            assertFalse("Actual base layers must show changed rear plates",before.sameAs(after))
+            val oldFile=File(directory,"rear-base-before-720px.png")
+            val newFile=File(directory,"rear-base-after-720px.png")
+            val comparison=File(directory,"comparison-rear-base-720px.png")
+            writePng(oldFile,before);writePng(newFile,after)
+            writeComparison(comparison,before,after,rearOnly=true)
+            return JSONObject().put("before",record(oldFile)).put("after",record(newFile))
+                .put("comparison",record(comparison))
+                .put("meaning","Actual base layer with rear supports, old broad plates/radial backing versus new mirrored frames, plus unchanged case. Omits moving wheels and the entire front overlay; not a complete watch.")
+        } finally {before.recycle();after.recycle();previous.release();current.release()}
     }
     private fun record(file: File) = JSONObject().put("file", file.name).put("bytes", file.length())
         .put("sha256", MessageDigest.getInstance("SHA-256").digest(file.readBytes()).joinToString("") { "%02x".format(it) })
