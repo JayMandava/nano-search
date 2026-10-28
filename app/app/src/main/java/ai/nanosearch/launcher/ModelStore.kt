@@ -38,12 +38,21 @@ object ModelStore {
 
     fun entries(slot: Slot): List<ModelEntry> = ModelCatalog.forSlot(slot) + customs().filter { it.slot == slot }
 
-    fun selected(slot: Slot): ModelEntry {
+    private fun preferred(slot: Slot): ModelEntry {
         val id = prefs.getString("sel_${slot.name}", null)
-        val all = entries(slot)
-        val chosen = all.firstOrNull { it.id == id } ?: ModelCatalog.defaultFor(slot)
-        // If the chosen model is gone (deleted, or never downloaded), use one that is on the phone rather than nothing.
-        return if (installed(chosen)) chosen else all.firstOrNull { installed(it) } ?: chosen
+        return entries(slot).firstOrNull { it.id == id } ?: ModelCatalog.defaultFor(slot)
+    }
+
+    fun selected(slot: Slot): ModelEntry {
+        val chosen = preferred(slot)
+        // Keep inference usable while the requested choice is downloading or unavailable.
+        return if (installed(chosen)) chosen else entries(slot).firstOrNull { installed(it) } ?: chosen
+    }
+
+    /** One displayed choice per job: a requested download, otherwise the usable model. */
+    fun displayChoice(slot: Slot): ModelEntry {
+        val chosen = preferred(slot)
+        return if (active(chosen)) chosen else selected(slot)
     }
 
     fun select(entry: ModelEntry) = prefs.edit().putString("sel_${entry.slot.name}", entry.id).apply()
@@ -132,6 +141,9 @@ object ModelStore {
             prefs.edit().putLong("dl_${p.file}", manager.enqueue(req)).apply()
             status[p.file] = Transfer.Downloading(0, p.bytes)
         }
+        // Download is an explicit choice for this job, not whichever fallback is installed.
+        // Other jobs may share the file, but keep their independent preferred IDs.
+        if (active(entry)) select(entry)
     }
 
     fun cancel(entry: ModelEntry) {

@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Card
@@ -49,6 +50,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
@@ -64,12 +70,17 @@ class ModelsActivity : ComponentActivity() {
 private fun wifiOnly(c: Context) = c.getSharedPreferences("nano", Context.MODE_PRIVATE).getBoolean("wifiOnly", true)
 
 @Composable
-private fun ModelsScreen(onBack: () -> Unit) {
+internal fun ModelsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     var version by remember { mutableIntStateOf(0) } // bumped after a choice or delete so every card re-reads the store
     var wifi by remember { mutableStateOf(wifiOnly(context)) }
     val totalRam = remember { ActivityManager.MemoryInfo().also { (context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).getMemoryInfo(it) }.totalMem }
-    LaunchedEffect(Unit) { while (true) { ModelStore.poll(); version++; delay(900) } }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) { ModelStore.poll(); version++; delay(900) }
+        }
+    }
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
@@ -106,7 +117,7 @@ private fun ModelsScreen(onBack: () -> Unit) {
                     }
                 }
                 val entries = ModelStore.entries(slot)
-                val chosen = ModelStore.selected(slot)
+                val chosen = ModelStore.displayChoice(slot)
                 for (e in entries) item(key = e.id) { ModelCard(e, e.id == chosen.id, current, totalRam, wifi) { version++ } }
                 if (slot != Slot.PHOTO && slot != Slot.OCR) item(key = "i-${slot.name}") { ImportButton(slot) { version++ } }
             }
@@ -121,10 +132,14 @@ internal fun ModelCard(entry: ModelEntry, selected: Boolean, version: Int, total
     val active = ModelStore.active(entry)
     val tooBig = entry.ramBytes > totalRam * 0.75
     val failure = entry.parts.firstNotNullOfOrNull { ModelStore.status[it.file] as? Transfer.Failed }
-    Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = if (selected && installed) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh)) {
+    val chosen = selected && (installed || active)
+    Card(modifier = Modifier.fillMaxWidth().testTag("model-${entry.id}")
+        .selectable(selected = chosen, enabled = installed, role = Role.RadioButton,
+            onClick = { ModelStore.select(entry); changed() }),
+        shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = if (chosen) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh)) {
         Column(Modifier.padding(12.dp, 12.dp, 16.dp, 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                RadioButton(selected = selected && installed, enabled = installed, onClick = { ModelStore.select(entry); changed() })
+                RadioButton(selected = chosen, enabled = installed, onClick = null)
                 Column(Modifier.weight(1f)) {
                     Text(entry.name, style = MaterialTheme.typography.titleMedium)
                     Text(entry.note, style = MaterialTheme.typography.bodyMedium)
@@ -141,6 +156,12 @@ internal fun ModelCard(entry: ModelEntry, selected: Boolean, version: Int, total
                     tooBig -> Text("Too big", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
                     else -> FilledTonalButton(onClick = { ModelStore.download(entry, wifi); changed() }) { Text("Download") }
                 }
+            }
+            if (chosen && active && !installed) {
+                val fallback = ModelStore.selected(entry.slot)
+                Text(if (ModelStore.installed(fallback)) "Selected when ready. Using ${fallback.name} until the download is verified."
+                    else "Selected when ready. The download must finish and pass verification first.",
+                    style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
             }
             val downloading = entry.parts.mapNotNull { ModelStore.status[it.file] as? Transfer.Downloading }
             val verifying = entry.parts.any { ModelStore.status[it.file] == Transfer.Verifying }

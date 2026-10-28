@@ -140,6 +140,6 @@ private fun Starter() {
                 Text(if (missing.isEmpty()) "All downloading or installed" else "Download all")
             }
         }
-        items(starters, key = { it.id }) { ModelCard(it, ModelStore.selected(it.slot).id == it.id, current, totalRam, wifi) { version++ } }
+        items(starters, key = { it.id }) { ModelCard(it, ModelStore.displayChoice(it.slot).id == it.id, current, totalRam, wifi) { version++ } }
     }
 }

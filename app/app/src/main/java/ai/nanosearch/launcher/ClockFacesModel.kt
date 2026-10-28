@@ -47,7 +47,9 @@ class ClockFacesModel(application: Application) : AndroidViewModel(application) 
     internal var snapshot by mutableStateOf(store.snapshot()); private set
     internal var operation by mutableStateOf<FaceOperation?>(null); private set
     internal var updateReview by mutableStateOf<FaceUpdateReview?>(null); private set
-    internal var notice by mutableStateOf<String?>(null); private set
+    private val notices = ClockNotices()
+    internal val notice get() = notices.text
+    internal val noticeRevision get() = notices.revision
     internal var selectedId by mutableStateOf<String?>(null)
     private val observation = store.observe { post { snapshot = store.snapshot() } }
     private val previewMutex = Mutex()
@@ -62,8 +64,9 @@ class ClockFacesModel(application: Application) : AndroidViewModel(application) 
     }.timeInMillis
 
     private fun post(block: () -> Unit) { if (!closed.get()) main.post { if (!closed.get()) block() } }
-    internal fun message(value: String) { notice = value }
-    internal fun dismissNotice() { notice = null }
+    internal fun message(value: String) { notices.show(value) }
+    internal fun dismissNotice() { notices.clear() }
+    internal fun expireNotice(revision: Long) { notices.expire(revision) }
     internal fun dismissUpdate() { updateReview = null }
 
     internal suspend fun preview(id: String, generation: Long, size: Int): Bitmap? = withContext(Dispatchers.Default) {
@@ -139,19 +142,19 @@ class ClockFacesModel(application: Application) : AndroidViewModel(application) 
     private fun start(title: String, cancellable: Boolean, source: FaceSource? = null, previousId: String? = null, work: () -> String) {
         if (operation != null || updateReview != null || closed.get()) return
         cancelled.set(false)
-        notice = null
+        notices.clear()
         operation = FaceOperation(title, FacePackProgress(if (source is FaceSource.Catalog) FacePackStage.DOWNLOADING else if (source is FaceSource.Document) FacePackStage.COPYING else FacePackStage.INSTALLING), cancellable)
         worker.execute {
             try {
                 val result = work()
-                post { notice = result }
+                post { message(result) }
             } catch (update: FacePackUpdateRequiredException) {
                 if (source != null && !cancelled.get()) post { updateReview = FaceUpdateReview(source, update.existingId, update.name, update.version, update.digest) }
-                else post { notice = "Operation cancelled. No face was installed." }
+                else post { message("Operation cancelled. No face was installed.") }
             } catch (failure: Exception) {
                 val preserved = previousId != null && store.find(previousId) != null
-                post { notice = if (cancelled.get()) "Operation cancelled. No new face was installed." + if (preserved) " The previous version is still installed." else ""
-                    else safeFaceFailure(failure) + if (preserved) " The previous version is still installed." else "" }
+                post { message(if (cancelled.get()) "Operation cancelled. No new face was installed." + if (preserved) " The previous version is still installed." else ""
+                    else safeFaceFailure(failure) + if (preserved) " The previous version is still installed." else "") }
             } finally {
                 runCatching { activeInput.getAndSet(null)?.close() }
                 providerSignal.set(null)

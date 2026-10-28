@@ -95,18 +95,18 @@ private fun ClockFacesScreen(model: ClockFacesModel, finish: () -> Unit) {
         else finish()
     }
     BackHandler { back() }
-    Scaffold(topBar = {
+    ClockNoticeExpiry(model.notice, model.noticeRevision, model::expireNotice)
+    Scaffold(contentWindowInsets = WindowInsets.safeDrawing, topBar = {
         TopAppBar(title = { Text(pack?.spec?.name ?: builtin?.label ?: "Clock Faces") },
             navigationIcon = { IconButton(onClick = back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } })
     }) { padding ->
-        BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
+        BoxWithConstraints(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
         val detailSideLimit = clockDetailPreviewMaxSide(maxHeight)
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             model.operation?.let { operation -> item(key = "operation") { OperationCard(operation, model::cancelOperation) } }
-            model.notice?.let { notice -> item(key = "notice") { Card { Column(Modifier.padding(16.dp)) {
-                Text(notice)
-                TextButton(onClick = model::dismissNotice) { Text("Dismiss") }
-            } } } }
+            model.notice?.let { notice -> item(key = "notice") {
+                ClockNoticeCard(notice, model::dismissNotice)
+            } }
             if (selected == null) {
                 item { Text("A face collection for your Home clocks and optional Lock Clock wallpaper. Installing a face does not apply it.", style = MaterialTheme.typography.bodyLarge) }
                 item { Button(onClick = chooseFile, enabled = !busy && state.ready && state.error == null, modifier = Modifier.fillMaxWidth()) { Text("Import face ZIP…") } }
