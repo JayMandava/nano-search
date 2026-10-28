@@ -1,9 +1,7 @@
 # Reviewed release notes
 
-Before a production release, commit a reviewed `X.Y.Z.md` here alongside the source
+Before production publication, commit a versioned `X.Y.Z.md` alongside its source
 version change. It becomes the exact release body after hash-bound artifact checks.
 Do not add signing material or private assets. Existing versions/tags are never
-overwritten. Current public latest is 0.8.1 / code 16; the next candidate is 0.8.2 /
-code 17 only after its actual source is integrated and verified.
-
-The cloud workflow draft does not include the pending local RM review source.
+overwritten. The 0.8.2 / code 17 candidate includes the exact approved RM history
+ending at `f1c96f85dedc8f1bcb1167afa689d4c3778737c6`.

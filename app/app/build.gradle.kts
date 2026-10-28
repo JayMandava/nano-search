@@ -14,8 +14,8 @@ android {
         applicationId = "ai.nanosearch.launcher"
         minSdk = 33
         targetSdk = 35
-        versionCode = 16
-        versionName = "0.8.1"
+        versionCode = 17
+        versionName = "0.8.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["nanoAppLabel"] = "Nano Search"
         manifestPlaceholders["nanoHomeCategory"] = "android.intent.category.HOME"
@@ -153,6 +153,8 @@ tasks.named("preBuild") { dependsOn(buildGpuLib) }
 dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.1")
     testImplementation("junit:junit:4.13.2")
+    // Test-only native Skia review of the actual Canvas renderer; not an emulator/device.
+    testImplementation("org.robolectric:robolectric:4.17")
     implementation("org.apache.commons:commons-compress:1.28.0")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test:rules:1.6.1")

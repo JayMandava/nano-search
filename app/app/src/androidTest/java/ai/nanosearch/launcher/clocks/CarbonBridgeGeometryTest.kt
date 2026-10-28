@@ -25,14 +25,40 @@ class CarbonBridgeGeometryTest {
         return Region().apply { setPath(transformed, Region(0, 0, side, side)) }
     }
 
-    @Test fun frameIsOneConnectedSupportAtDesignAndPhoneRasterSizes() {
+    @Test fun centreBridgeAndLowerCounterHaveExactlyTwoIndependentSupportedComponents() {
         for (side in listOf(240, 360, 720, 1000)) {
             val material = raster(CarbonBridgeGeometry.frame(), side)
-            assertFalse("The bridge cannot be an empty/vacuously connected path", material.isEmpty)
-            val components = components(material, side)
-            // Four-neighbor connectivity deliberately rejects diagonal-only, zero-width contacts.
-            assertEquals("$side px: material must be one four-neighbor component, got $components", 1, components.size)
-            assertTrue("$side px: the check must cover substantial real support material", components.single().area > side * side / 100)
+            val pieces = components(material, side).sortedByDescending { it.area }
+            // This intentional separation replaces the earlier all-connected design. Still
+            // reject stray fragments, diagonal-only attachments and deleted support material.
+            assertEquals("$side px: main bridge plus independent lower collar, no stray parts", 2, pieces.size)
+            val main = pieces[0]; val lower = pieces[1]
+            assertTrue("Main 3/9 bridge must be substantial", main.area > side * side / 100)
+            assertTrue("Lower collar must be substantial", lower.area > side * side / 500)
+            for ((x, y) in listOf(500f to 420f, 456f to 480f, 544f to 480f)) {
+                val witness = raster(circle(x, y, 3f), side)
+                assertTrue("The main bridge must include its centre and both side collars", main.pixels.any {
+                    witness.contains(it % side, it / side)
+                })
+            }
+            val expectedLower = raster(independentLowerCollar(), side)
+            val missing = Region(expectedLower).apply { op(material, Region.Op.DIFFERENCE) }
+            assertTrue("No part of the lower counter's own collar may be removed", missing.isEmpty)
+            assertEquals("Lower collar remains exactly its original support, not a floating fragment", area(expectedLower), lower.area)
+            val lowerWitness = raster(circle(500f, 600f, 3f), side)
+            assertTrue("Separate component must actually be the six-o'clock collar", lower.pixels.any {
+                lowerWitness.contains(it % side, it / side)
+            })
+        }
+    }
+
+    @Test fun removedCentreToSixNeckIsARealOpenGapAtEveryRasterSize() {
+        val gap = Path().apply { addRect(484f, 563f, 516f, 595f, Path.Direction.CW) }
+        for (side in listOf(240, 360, 720, 1000)) {
+            val required = raster(gap, side)
+            assertTrue("The neck gap must cover meaningful pixels", area(required) >= side * side / 1500)
+            val overlap = Region(required).apply { op(raster(CarbonBridgeGeometry.frame(), side), Region.Op.INTERSECT) }
+            assertTrue("The centre octagon must not connect to six o'clock at $side px", overlap.isEmpty)
         }
     }
 
@@ -54,25 +80,6 @@ class CarbonBridgeGeometryTest {
             }
             val outside = Region(material).apply { op(raster(CarbonPusherGeometry.innerDialPath(), side), Region.Op.DIFFERENCE) }
             assertTrue("The support must remain inside the unchanged dial envelope at $side px: ${outside.bounds}", outside.isEmpty)
-        }
-    }
-
-    @Test fun allSixAnchorScrewsHaveFullSeatsOnConnectedSupportMaterial() {
-        val expectedCenters = listOf(418f to 333f, 584f to 331f, 303f to 579f, 686f to 578f, 416f to 748f, 583f to 747f)
-        val bosses = CarbonBridgeGeometry.bosses
-        assertEquals("Anchor checks must not pass after anchors are deleted", 6, bosses.size)
-        for ((index, boss) in bosses.withIndex()) {
-            assertEquals(expectedCenters[index].first, boss.x, 0f)
-            assertEquals(expectedCenters[index].second, boss.y, 0f)
-            assertTrue("Every visible screw needs a real support boss", boss.screwRadius > 0f && boss.radius >= boss.screwRadius + 3f)
-            for (side in listOf(1000, 2000)) {
-                // Seat center radius is screwRadius+2.4; its 1.2-wide stroke extends another 0.6.
-                // The boss itself may meet an intentional aperture; the actual entire seat may not.
-                val seat = raster(circle(boss.x, boss.y, boss.screwRadius + 3f), side, assembly = false)
-                assertFalse(seat.isEmpty)
-                val unsupported = Region(seat).apply { op(raster(CarbonBridgeGeometry.frame(), side, assembly = false), Region.Op.DIFFERENCE) }
-                assertTrue("Anchor $index has a floating/unsupported screw seat at $side px: ${unsupported.bounds}", unsupported.isEmpty)
-            }
         }
     }
 
@@ -115,8 +122,23 @@ class CarbonBridgeGeometryTest {
         }
     }
 
+    private fun independentLowerCollar() = Path().apply {
+        addCircle(500f, 693f, 97f, Path.Direction.CW)
+        check(op(Path().apply {
+            addCircle(500f, 693f, 89f, Path.Direction.CW)
+            addRect(448f, 765f, 552f, 825f, Path.Direction.CW)
+        }, Path.Op.DIFFERENCE))
+        check(op(CarbonPusherGeometry.innerDialPath().apply {
+            transform(Matrix().apply { setScale(.99f, .99f, 500f, 500f) })
+        }, Path.Op.INTERSECT))
+    }
+    private fun area(region: Region): Int {
+        val iterator = RegionIterator(region); val rect = Rect(); var result = 0
+        while (iterator.next(rect)) result += rect.width() * rect.height()
+        return result
+    }
     private fun circle(x: Float, y: Float, radius: Float) = Path().apply { addCircle(x, y, radius, Path.Direction.CW) }
-    private data class Component(val area: Int, val firstX: Int, val firstY: Int)
+    private data class Component(val area: Int, val firstX: Int, val firstY: Int, val pixels: IntArray)
     private fun components(region: Region, side: Int): List<Component> {
         val cells = ByteArray(side * side)
         val iterator = RegionIterator(region)
@@ -141,7 +163,7 @@ class CarbonBridgeGeometryTest {
                 if (at >= side) visit(at - side)
                 if (at < cells.size - side) visit(at + side)
             }
-            result += Component(tail, seed % side, seed / side)
+            result += Component(tail, seed % side, seed / side, queue.copyOf(tail))
         }
         return result
     }

@@ -1,6 +1,6 @@
 # Cloud release build and private signing handoff
 
-Nano 0.8.1 uses versionCode 16. Build the official package's **unsigned release input** in the cloud without accessing private signing configuration:
+Nano 0.8.2 uses versionCode 17. Build the official package's **unsigned release input** in the cloud without accessing private signing configuration:
 
 ```sh
 cd app
@@ -11,15 +11,15 @@ cd app
 
 This remains the non-debuggable release variant with R8 and resource shrinking. It uses the official `ai.nanosearch.launcher` application ID, not the optional debug QA identity. Private `src/personal` overlays remain excluded from release regardless of the overlay flag; passing `false` also makes the cloud intent explicit. The isolated `-PclockQaBuild=true` debug profile is unchanged. The `minified` testing variant remains debug-signed and is not the publication artifact.
 
-Before handoff, record the source commit and APK SHA-256; inspect the manifest for versionName `0.8.1`, versionCode `16`, official package ID and non-debuggable status. Verify public asset provenance and inspect the actual artifact for excluded private assets. Confirm the unsigned APK has no signer; it is not yet installable as a production update.
+Before handoff, record the source commit and APK SHA-256; inspect the manifest for versionName `0.8.2`, versionCode `17`, official package ID and non-debuggable status. Verify public asset provenance and inspect the actual artifact for excluded private assets. Confirm the unsigned APK has no signer; it is not yet installable as a production update.
 
 The separately authorized signing step must use the existing release identity where its private key already resides. Do not transfer signing keys, passwords, private fonts or personal overlays into the cloud. Align the APK before signing if alignment is needed; modifying it after signing invalidates the signature. After signing, verify the signer against the established release certificate, the APK signature and alignment, and record the signed artifact's separate SHA-256 before publishing. See the official [apksigner reference](https://developer.android.com/tools/apksigner).
 
 Without `-PunsignedRelease=true` (or with `false`), the existing developer behavior is unchanged: load the external signing configuration when present, otherwise sign release with the debug key. That fallback is useful for developer builds but must not be confused with the official production-signed update.
 
-## Protected GitHub Actions route (prepared; not enabled)
+## Protected GitHub Actions route
 
-The local workflow draft in `.github/workflows/release.yml` separates unsigned
+The workflow in `.github/workflows/release.yml` separates unsigned
 builds from production signing on fresh GitHub-hosted jobs. No environment
 protection, signing secret, workflow dispatch, tag or release is created by adding
 these files. The existing local-signing route remains available. The production
@@ -80,14 +80,16 @@ branch `main`. Save and verify the configuration. Do not add secrets in this ste
 The workflow checks this policy before scheduling an environment job so a missing
 environment cannot silently be created as an unprotected signing gate.
 
-## Separate approval required for the existing key
+## Existing key provisioning and verification boundary
 
-The earlier instruction against transferring keys stays in force until the owner
-explicitly approves this GitHub destination as an exception. Gate setup approval
-and Android SDK license approval do not authorize key transfer. No Personal Vault,
-new debug key or private signer repository is part of this production route.
+The owner selected the protected GitHub production route and reports manually
+provisioning all four environment secrets below. This is owner-reported setup,
+not independent confirmation of their contents, scope or successful signing.
+No key material has been read by this cloud task. GitHub signing must still pass
+the owner gate and the pinned-certificate verification. No Personal Vault, new
+debug key or private signer repository is part of this production route.
 
-After that separate approval, the owner manually provisions the **existing Nano
+The owner manually provisions the **existing Nano
 production** key into GitHub **Nano repository > production-release environment
 secrets**, never repository-wide/organization-wide secrets or source files:
 
@@ -116,6 +118,8 @@ could allow malicious updates; deleting a secret cannot revoke an already copied
 key. Temporary files/diagnostics are removed on exit and by an always-run cleanup,
 but no claim of forensic secure erasure is made.
 
-Nano's pending RM review bundle remains unimported because supported Library
-materialization failed. This workflow draft and baseline checks do not claim that
-reviewed artwork is included or that application UI/phone QA has been performed.
+The approved RM history ending at `f1c96f85dedc8f1bcb1167afa689d4c3778737c6`
+is included with all four original commit objects and metadata preserved. Each
+source-text patch and resulting Git tree was independently hash-verified before
+integration. Native renderer/JVM checks are separate from Android device, host
+lifecycle or phone QA; no new phone execution is claimed.
