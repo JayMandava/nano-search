@@ -73,6 +73,11 @@ class LocalVoice(
         val minBuf = AudioRecord.getMinBufferSize(RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
         val rec = try {
             AudioRecord(MediaRecorder.AudioSource.MIC, RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, maxOf(minBuf, RATE))
+        } catch (_: SecurityException) {
+            // Permission can be revoked after the caller's check.
+            recording = false
+            onError(SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS)
+            return
         } catch (e: Exception) {
             null
         }

@@ -68,7 +68,7 @@ private fun spiritTypography(context: Context): Typography {
 
 /** Spirit's colours and typeface, with Material 3 Expressive's springy motion. */
 @Composable
-fun NanoTheme(content: @Composable () -> Unit) {
+fun NanoTheme(colorScheme: ColorScheme? = null, content: @Composable () -> Unit) {
     val context = LocalContext.current
-    MaterialExpressiveTheme(colorScheme = nanoColorScheme(context), typography = spiritTypography(context), motionScheme = MotionScheme.expressive(), content = content)
+    MaterialExpressiveTheme(colorScheme = colorScheme ?: nanoColorScheme(context), typography = spiritTypography(context), motionScheme = MotionScheme.expressive(), content = content)
 }

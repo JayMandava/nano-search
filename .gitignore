@@ -12,5 +12,6 @@ app/app/src/personal/
 models/*
 !models/README.md
 .DS_Store
+__pycache__/
 bakeoff/prompts*/
 bakeoff/*.log

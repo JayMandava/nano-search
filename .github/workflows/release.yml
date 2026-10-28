@@ -1,0 +1,258 @@
+name: Protected Nano release
+run-name: '${{ inputs.operation }} Nano ${{ inputs.version }} at ${{ inputs.commit_sha }}'
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Validate runs unsigned checks only; publish requires owner release approvals
+        type: choice
+        options: [validate, publish]
+        default: validate
+        required: true
+      version:
+        description: Exact stable source version X.Y.Z
+        type: string
+        required: true
+      commit_sha:
+        description: Full reviewed main SHA; must equal this workflow's dispatched commit
+        type: string
+        required: true
+
+permissions: {}
+concurrency:
+  group: nano-production-release
+  cancel-in-progress: false
+defaults:
+  run:
+    shell: bash
+env:
+  VERSION: ${{ inputs.version }}
+  COMMIT_SHA: ${{ inputs.commit_sha }}
+  OPERATION: ${{ inputs.operation }}
+
+jobs:
+  preflight:
+    if: github.repository == 'JayMandava/nano-search' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      code: ${{ steps.check.outputs.version_code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Check source, version and existing gate before scheduling protected jobs
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/release/release.py preflight --version "$VERSION" --commit "$COMMIT_SHA" --operation "$OPERATION"
+
+  validate:
+    if: inputs.operation == 'validate'
+    needs: preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          submodules: recursive
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17.0.18+8'
+      - name: Install checksum-pinned public tools; no new license acceptance
+        run: python3 tools/release/install_tools.py
+      - name: Test release safeguards
+        run: python3 -m unittest discover -s tests -p 'test_release_workflow.py' -v
+      - name: Run all JVM tests, explicit lint and unsigned R8 assembly
+        working-directory: app
+        run: ./gradlew --no-daemon --max-workers=2 --continue -PunsignedRelease=true -PincludePersonalOverlay=false -Pandroid.builder.sdkDownload=false :app:testDebugUnitTest :app:testReleaseUnitTest :app:lintDebug :app:lintRelease :app:assembleRelease
+      - name: Verify unsigned APK locally without uploading it
+        env:
+          VERSION_CODE: ${{ needs.preflight.outputs.code }}
+        run: python3 tools/release/release.py inspect --version "$VERSION" --commit "$COMMIT_SHA" --code "$VERSION_CODE"
+      # Deliberately no APK uploads or signing in validation-only runs.
+
+  build_unsigned:
+    name: Approve intended release and unsigned artifact handoff
+    if: inputs.operation == 'publish'
+    needs: preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    # First approval authorizes an intended release and reader-accessible APK handoff.
+    # Public-repository Actions artifacts must never be described as private storage.
+    environment: production-release
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      manifest_sha: ${{ steps.prepare.outputs.manifest_sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          submodules: recursive
+      - name: Recheck release intent and protection after first approval
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/release/release.py preflight --version "$VERSION" --commit "$COMMIT_SHA" --operation publish
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17.0.18+8'
+      - name: Install checksum-pinned public tools; no new license acceptance
+        run: python3 tools/release/install_tools.py
+      - name: Test release safeguards
+        run: python3 -m unittest discover -s tests -p 'test_release_workflow.py' -v
+      - name: Test, lint and build with no signing credentials
+        working-directory: app
+        run: ./gradlew --no-daemon --max-workers=2 --continue -PunsignedRelease=true -PincludePersonalOverlay=false -Pandroid.builder.sdkDownload=false :app:testDebugUnitTest :app:testReleaseUnitTest :app:lintDebug :app:lintRelease :app:assembleRelease
+      - name: Verify fresh unsigned APK, public assets, ARM64 alignment and provenance
+        id: prepare
+        env:
+          VERSION_CODE: ${{ needs.preflight.outputs.code }}
+        run: |
+          mkdir candidate
+          python3 tools/release/release.py collect --version "$VERSION" --commit "$COMMIT_SHA" --code "$VERSION_CODE"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        id: upload
+        with:
+          name: nano-unsigned-${{ github.run_id }}-${{ github.run_attempt }}
+          path: candidate/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  sign:
+    name: Approve signing the exact verified APK
+    if: inputs.operation == 'publish'
+    needs: [preflight, build_unsigned]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    environment: production-release
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      manifest_sha: ${{ steps.prepare.outputs.manifest_sha }}
+    env:
+      VERSION_CODE: ${{ needs.preflight.outputs.code }}
+      MANIFEST_SHA: ${{ needs.build_unsigned.outputs.manifest_sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Recheck source and gate after signing approval
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/release/release.py preflight --version "$VERSION" --commit "$COMMIT_SHA" --operation publish
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17.0.18+8'
+      - name: Prepare pinned inspection tools before credentials are available
+        run: python3 tools/release/install_tools.py --signer-only
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.build_unsigned.outputs.artifact_id }}
+          path: candidate
+          merge-multiple: true
+          digest-mismatch: error
+      - name: Verify exact unsigned handoff before reading signing credentials
+        run: python3 tools/release/release.py verify --version "$VERSION" --commit "$COMMIT_SHA" --code "$VERSION_CODE" --manifest-sha "$MANIFEST_SHA"
+      - name: Sign only with the existing pinned Nano production identity
+        id: key_material
+        env:
+          NANO_RELEASE_KEYSTORE_BASE64: ${{ secrets.NANO_RELEASE_KEYSTORE_BASE64 }}
+          NANO_RELEASE_STORE_PASSWORD: ${{ secrets.NANO_RELEASE_STORE_PASSWORD }}
+          NANO_RELEASE_KEY_ALIAS: ${{ secrets.NANO_RELEASE_KEY_ALIAS }}
+          NANO_RELEASE_KEY_PASSWORD: ${{ secrets.NANO_RELEASE_KEY_PASSWORD }}
+        run: |
+          set +x
+          set -euo pipefail
+          umask 077
+          key_dir="$(mktemp -d "$RUNNER_TEMP/nano-release-key.XXXXXX")"
+          printf 'key_dir=%s\n' "$key_dir" >> "$GITHUB_OUTPUT"
+          trap 'rm -rf -- "$key_dir"' EXIT
+          for name in NANO_RELEASE_KEYSTORE_BASE64 NANO_RELEASE_STORE_PASSWORD NANO_RELEASE_KEY_ALIAS NANO_RELEASE_KEY_PASSWORD; do
+            if [[ -z "${!name}" ]]; then echo 'Required environment signing secret missing.' >&2; exit 1; fi
+          done
+          if [[ "${NANO_RELEASE_KEY_ALIAS,,}" == androiddebugkey ]]; then echo 'Debug alias forbidden.' >&2; exit 1; fi
+          printf '%s' "$NANO_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$key_dir/release.keystore" 2>/dev/null
+          test -s "$key_dir/release.keystore"
+          # Public certificate only: stop on a wrong key before creating any signature.
+          if ! "$JAVA_HOME/bin/keytool" -exportcert -keystore "$key_dir/release.keystore" -alias "$NANO_RELEASE_KEY_ALIAS" -storepass:env NANO_RELEASE_STORE_PASSWORD -file "$key_dir/certificate.der" > "$key_dir/certificate.log" 2>&1; then
+            echo 'Cannot verify configured production certificate.' >&2; exit 1
+          fi
+          expected=1f08d7d9aa073e5d7c4f2c9fd8caca761fc42f108c05e7a5ac88ea9dbc5332ce
+          actual="$(sha256sum "$key_dir/certificate.der" | cut -d' ' -f1)"
+          if [[ "$actual" != "$expected" ]]; then echo 'Production certificate mismatch; refusing to sign.' >&2; exit 1; fi
+          mkdir signed
+          cp candidate/release-notes.md signed/release-notes.md
+          if ! "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign --ks "$key_dir/release.keystore" --ks-key-alias "$NANO_RELEASE_KEY_ALIAS" --ks-pass env:NANO_RELEASE_STORE_PASSWORD --key-pass env:NANO_RELEASE_KEY_PASSWORD --debuggable-apk-permitted false --alignment-preserved true --v1-signing-enabled false --v2-signing-enabled true --v3-signing-enabled true --v4-signing-enabled false --out "signed/nano-search-$VERSION.apk" candidate/unsigned.apk > "$key_dir/signing.log" 2>&1; then
+            echo 'Signing failed; confidential diagnostics discarded.' >&2; exit 1
+          fi
+      - name: Remove only this step's temporary signing material
+        if: always()
+        env:
+          KEY_DIR: ${{ steps.key_material.outputs.key_dir }}
+        run: |
+          if [[ -n "$KEY_DIR" && "$KEY_DIR" == "$RUNNER_TEMP"/nano-release-key.* ]]; then
+            rm -rf -- "$KEY_DIR"
+          fi
+      - name: Verify pinned signer, public assets, version and native alignment
+        id: prepare
+        run: python3 tools/release/release.py prepare --signed --directory signed --version "$VERSION" --commit "$COMMIT_SHA" --code "$VERSION_CODE"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        id: upload
+        with:
+          name: nano-verified-signed-${{ github.run_id }}-${{ github.run_attempt }}
+          path: signed/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  publish:
+    if: inputs.operation == 'publish'
+    needs: [preflight, sign]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: write
+      actions: read
+    env:
+      VERSION_CODE: ${{ needs.preflight.outputs.code }}
+      MANIFEST_SHA: ${{ needs.sign.outputs.manifest_sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17.0.18+8'
+      - run: python3 tools/release/install_tools.py --signer-only
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.sign.outputs.artifact_id }}
+          path: signed
+          merge-multiple: true
+          digest-mismatch: error
+      - name: Recheck and create new tag, draft, verified assets, then publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/release/release.py publish --signed --directory signed --version "$VERSION" --commit "$COMMIT_SHA" --code "$VERSION_CODE" --manifest-sha "$MANIFEST_SHA"

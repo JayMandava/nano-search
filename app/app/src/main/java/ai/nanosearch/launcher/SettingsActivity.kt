@@ -3,6 +3,7 @@
 package ai.nanosearch.launcher
 
 import ai.nanosearch.launcher.ui.NanoTheme
+import ai.nanosearch.launcher.ui.nanoColorScheme
 import android.Manifest
 import android.app.role.RoleManager
 import android.content.Context
@@ -81,8 +82,9 @@ class SettingsActivity : ComponentActivity() {
             // A change of style does not restart the screen: the old look fades into the new one, and the scroll position stays where it was.
             val listState = rememberLazyListState()
             val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-            Crossfade(targetState = SettingsTheme.version, animationSpec = tween(260), label = "style") { _ ->
-                NanoTheme { SettingsScreen(onBack = { finish() }, listState, scroll) }
+            val appearance = SettingsTheme.version to nanoColorScheme(LocalContext.current)
+            Crossfade(targetState = appearance, animationSpec = tween(260), label = "style") { state ->
+                NanoTheme(colorScheme = state.second) { SettingsScreen(onBack = { finish() }, listState, scroll) }
             }
         }
     }

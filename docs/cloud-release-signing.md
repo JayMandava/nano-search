@@ -16,3 +16,106 @@ Before handoff, record the source commit and APK SHA-256; inspect the manifest f
 The separately authorized signing step must use the existing release identity where its private key already resides. Do not transfer signing keys, passwords, private fonts or personal overlays into the cloud. Align the APK before signing if alignment is needed; modifying it after signing invalidates the signature. After signing, verify the signer against the established release certificate, the APK signature and alignment, and record the signed artifact's separate SHA-256 before publishing. See the official [apksigner reference](https://developer.android.com/tools/apksigner).
 
 Without `-PunsignedRelease=true` (or with `false`), the existing developer behavior is unchanged: load the external signing configuration when present, otherwise sign release with the debug key. That fallback is useful for developer builds but must not be confused with the official production-signed update.
+
+## Protected GitHub Actions route (prepared; not enabled)
+
+The local workflow draft in `.github/workflows/release.yml` separates unsigned
+builds from production signing on fresh GitHub-hosted jobs. No environment
+protection, signing secret, workflow dispatch, tag or release is created by adding
+these files. The existing local-signing route remains available. The production
+key has not been read or transferred during preparation.
+
+The reference is `JayMandava/bold-keys` at
+`cde20679729fce28cbc1ca90ec42045c841945fa`. Nano uses its nested `app/` Gradle root,
+public-only flags, pinned SDK 36 / Build Tools 35 / NDK 27.0.12077973 / CMake 3.22.1,
+and its exact ten-asset SHA-256 allowlist. All five ARM64 native libraries are
+checked for 16 KB ELF alignment; APK alignment, signature absence/presence,
+package, version, release debug flag and artifact hashes are checked independently.
+
+`validate` runs both JVM suites, both explicit lint variants and unsigned R8
+assembly, then inspects the APK locally. It uploads no APK and reads no signing
+credentials. Three former errors are fixed in the local review: explicit microphone
+permission-denial handling, a captured Crossfade theme, and optional telephony.
+The remaining `ProtectedPermissions` and `QueryAllPackagesPermission` findings were
+reviewed as intentional declarations. The owner explicitly approved one
+`tools:ignore` on each corresponding permission leaf, with rationale comments and
+`ManifestLintPolicyTest` enforcing exactly those two declaration/check pairs.
+These are two deliberate, disclosed exclusions; the permissions and their behavior
+are unchanged. There is no manifest-wide ignore, baseline, Gradle check disable or
+`continue-on-error`. All other/new/fatal lint findings continue to block release.
+The broad-visibility declaration still requires separate necessity/declaration
+review before Play distribution; this lint policy is not Play approval.
+
+`publish` requires the reviewed full main commit, matching workflow commit, exact
+source version and version code greater than the latest published source. It
+rejects existing tags/releases and rechecks main after approval and before
+publication. Reviewed `docs/releases/X.Y.Z.md` is mandatory. A partial publication
+stops for manual inspection; there is no force, overwrite or automatic retry.
+
+Public-repository Actions artifacts are downloadable by signed-in readers.
+Consequently, `publish` first requires owner approval on the unsigned-build job,
+authorizing the intended release and this unsigned artifact handoff. A second
+protected approval gates signing after the APK digest is available. Both jobs use
+`production-release`; secrets are referenced only by the isolated signing step.
+Never treat Actions artifacts as private pre-release key or APK storage. The
+signed APK is reverified before it is uploaded and again before creating a tag,
+draft release and final published release. Only the publication job gets content
+write permission. No Gradle/build code runs in the signing job, and no production
+key is provided to build, setup, artifact download or publication steps.
+
+## Gate setup approval and current blocker
+
+The owner approved this exact gate: sole reviewer `JayMandava`,
+`prevent_self_review=false` (the sole owner can approve their own dispatch),
+`can_admins_bypass=false`, and selected deployment policy allowing only `main` of
+type `branch`, with no tag or wildcard policy. Preserve other unrelated settings.
+The first official GitHub CLI GET of Nano's environment returned `Forbidden`, so
+its state is unverified and no mutation was attempted. Do not retry through a
+different credential or route.
+
+Minimal manual action: repository **Settings > Environments > production-release**
+(create only if absent); require `JayMandava`, leave **Prevent self-review** off,
+disable admin bypass, and under selected deployment branches/tags allow only
+branch `main`. Save and verify the configuration. Do not add secrets in this step.
+The workflow checks this policy before scheduling an environment job so a missing
+environment cannot silently be created as an unprotected signing gate.
+
+## Separate approval required for the existing key
+
+The earlier instruction against transferring keys stays in force until the owner
+explicitly approves this GitHub destination as an exception. Gate setup approval
+and Android SDK license approval do not authorize key transfer. No Personal Vault,
+new debug key or private signer repository is part of this production route.
+
+After that separate approval, the owner manually provisions the **existing Nano
+production** key into GitHub **Nano repository > production-release environment
+secrets**, never repository-wide/organization-wide secrets or source files:
+
+| Environment secret | Existing local source |
+| --- | --- |
+| `NANO_RELEASE_KEYSTORE_BASE64` | Base64 of the existing `storeFile` keystore |
+| `NANO_RELEASE_STORE_PASSWORD` | Existing `storePassword` |
+| `NANO_RELEASE_KEY_ALIAS` | Existing `keyAlias`; actual alias is not public |
+| `NANO_RELEASE_KEY_PASSWORD` | Existing `keyPassword` |
+
+The owner resolves these locally from `NANO_KEYSTORE_PROPERTIES` or the existing
+`~/.nano-search-keystore/keystore.properties`. They must verify the alias is the
+approved existing private-key entry and has certificate SHA-256
+`1f08d7d9aa073e5d7c4f2c9fd8caca761fc42f108c05e7a5ac88ea9dbc5332ce`.
+Do not generate or rotate a key, guess an alias, paste values into chat, or copy
+private fonts/personal overlays. If the container includes unrelated keys, stop
+for a separate scoped transfer plan. Base64 is encoding, not encryption.
+
+Review secret-name metadata to ensure all four exist only in this environment and
+that same-named broader secrets cannot act as GitHub's fallback. The workflow
+cannot infer a secret's storage scope from its injected value. Only after owner
+review should the workflow be pushed/merged and a specific release dispatched.
+Signing credentials are task-readable in the approved signing step; this is a
+cloud copy of the production identity, not hardware-backed signing. Compromise
+could allow malicious updates; deleting a secret cannot revoke an already copied
+key. Temporary files/diagnostics are removed on exit and by an always-run cleanup,
+but no claim of forensic secure erasure is made.
+
+Nano's pending RM review bundle remains unimported because supported Library
+materialization failed. This workflow draft and baseline checks do not claim that
+reviewed artwork is included or that application UI/phone QA has been performed.

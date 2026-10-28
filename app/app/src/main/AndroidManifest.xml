@@ -1,12 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <!-- Device-search launcher: app discovery, icon packs and labels/icons for arbitrary
+         notification packages need broad visibility. Reassess before Play distribution. -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
     <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
     <!-- Read the Wi-Fi radio state for the Settings Active Frame; never changes networking. -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <!-- Only takes effect when installed as a privileged app; harmless otherwise. Lets widgets be added without the consent dialog. -->
-    <uses-permission android:name="android.permission.BIND_APPWIDGET" />
+    <!-- Retained for explicitly provisioned privileged/system launcher builds.
+         Normal installs use HomeWidgets' ACTION_APPWIDGET_BIND consent fallback. -->
+    <uses-permission android:name="android.permission.BIND_APPWIDGET"
+        tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
     <uses-permission android:name="android.permission.SET_WALLPAPER_HINTS" />
@@ -26,6 +32,8 @@
     <!-- Optional: only to pick the weather's city from the phone's approximate location, when the user switches that on. -->
 
     <uses-feature android:name="android.software.live_wallpaper" android:required="false" />
+    <!-- SMS/call search is optional; the launcher also works without telephony. -->
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
     <queries>
         <intent><action android:name="android.speech.RecognitionService" /></intent>
