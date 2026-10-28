@@ -131,7 +131,9 @@ internal fun ModelCard(entry: ModelEntry, selected: Boolean, version: Int, total
     val installed = ModelStore.installed(entry)
     val active = ModelStore.active(entry)
     val tooBig = entry.ramBytes > totalRam * 0.75
-    val failure = entry.parts.firstNotNullOfOrNull { ModelStore.status[it.file] as? Transfer.Failed }
+    val failure = entry.parts.firstNotNullOfOrNull { part ->
+        if (ModelStore.partInstalled(entry, part)) null else ModelStore.status[part.file] as? Transfer.Failed
+    }
     val chosen = selected && (installed || active)
     Card(modifier = Modifier.fillMaxWidth().testTag("model-${entry.id}")
         .selectable(selected = chosen, enabled = installed, role = Role.RadioButton,

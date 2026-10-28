@@ -3,11 +3,20 @@ package ai.nanosearch.launcher
 import android.app.DownloadManager
 import android.content.Context
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.runtime.mutableStateMapOf
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.FileNotFoundException
+import java.io.IOException
+import java.io.InterruptedIOException
 import java.security.MessageDigest
+import java.util.UUID
+import java.util.concurrent.Executor
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** What a file being fetched is doing right now. A file that is not in [ModelStore.status] is idle. */
 sealed interface Transfer {
@@ -60,7 +69,7 @@ object ModelStore {
     fun file(part: Part) = File(dir, part.file)
 
     fun installed(entry: ModelEntry) = entry.parts.all { partInstalled(entry, it) }
-    private fun partInstalled(entry: ModelEntry, part: Part) = file(part).let { it.exists() && (entry.custom || it.length() == part.bytes) }
+    internal fun partInstalled(entry: ModelEntry, part: Part) = file(part).let { it.exists() && (entry.custom || it.length() == part.bytes) }
 
     /** Another job still uses this file, so it must not be deleted. */
     fun inUseBy(entry: ModelEntry): Slot? = Slot.entries.firstOrNull { s ->
@@ -116,9 +125,25 @@ object ModelStore {
     // ---- downloading
 
     private val manager get() = app.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+    private val main = Handler(Looper.getMainLooper())
+    private val verifier = Executors.newSingleThreadExecutor { task ->
+        Thread(task, "model-verification").apply { isDaemon = true }
+    }
     private fun downloadId(part: Part) = prefs.getLong("dl_${part.file}", -1L)
-    private fun stagingFile(part: Part) = File(app.getExternalFilesDir("downloads"), part.file + ".part")
-
+    private fun attemptToken(part: Part) = prefs.getString("dl_attempt_${part.file}", null)
+    private fun stagingFile(part: Part, token: String?): File {
+        val directory = app.getExternalFilesDir("downloads") ?: throw IOException("External storage unavailable")
+        if (!directory.isDirectory && !directory.mkdirs()) throw IOException("Download directory unavailable")
+        return File(directory, part.file + (token?.let { ".$it" } ?: "") + ".part")
+    }
+    private data class Verification(
+        val part: Part, val id: Long, val token: String?, val stage: File, val temporary: File,
+        val cancelled: AtomicBoolean = AtomicBoolean(false),
+    )
+    // Main-thread ownership lasts through cleanup, not just hashing/copying. UI state
+    // is never published from the worker. A canceled/retried generation cannot publish.
+    private val verifying = HashMap<String, Verification>()
+    private val retiring = HashSet<String>()
     private val idleSince = HashMap<String, Long>()
 
     fun active(entry: ModelEntry) = entry.parts.any { status[it.file] is Transfer.Downloading || status[it.file] == Transfer.Verifying }
@@ -126,93 +151,163 @@ object ModelStore {
     fun download(entry: ModelEntry, wifiOnly: Boolean) {
         val missing = entry.parts.filter { !partInstalled(entry, it) }
         if (dir.usableSpace < missing.sumOf { it.bytes } * 21 / 10) {
-            missing.forEach { status[it.file] = Transfer.Failed("Not enough free space.") }
+            missing.filter { downloadId(it) == -1L }.forEach { status[it.file] = Transfer.Failed("Not enough free space.") }
             return
         }
         for (p in missing) {
-            if (downloadId(p) != -1L) continue
-            status.remove(p.file)
-            stagingFile(p).delete()
-            val req = DownloadManager.Request(Uri.parse(p.url))
-                .setTitle("Nano Search: ${entry.name}")
-                .setDestinationInExternalFilesDir(app, "downloads", p.file + ".part")
-                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                .setAllowedNetworkTypes(if (wifiOnly) DownloadManager.Request.NETWORK_WIFI else DownloadManager.Request.NETWORK_WIFI or DownloadManager.Request.NETWORK_MOBILE)
-            prefs.edit().putLong("dl_${p.file}", manager.enqueue(req)).apply()
-            status[p.file] = Transfer.Downloading(0, p.bytes)
+            if (p.file in retiring || p.file in verifying) continue
+            if (downloadId(p) != -1L) {
+                if (status[p.file] !is Transfer.Failed || !cancelPart(p)) continue
+            }
+            val token = UUID.randomUUID().toString()
+            var stage: File? = null
+            try {
+                stage = stagingFile(p, token)
+                val req = DownloadManager.Request(Uri.parse(p.url))
+                    .setTitle("Nano Search: ${entry.name}")
+                    .setDestinationInExternalFilesDir(app, "downloads", stage.name)
+                    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                    .setAllowedNetworkTypes(if (wifiOnly) DownloadManager.Request.NETWORK_WIFI else DownloadManager.Request.NETWORK_WIFI or DownloadManager.Request.NETWORK_MOBILE)
+                val id = manager.enqueue(req)
+                prefs.edit().putLong("dl_${p.file}", id).putString("dl_attempt_${p.file}", token).apply()
+                idleSince.remove(p.file)
+                status[p.file] = Transfer.Downloading(0, p.bytes)
+            } catch (_: RuntimeException) {
+                runCatching { stage?.delete() }
+                status[p.file] = Transfer.Failed("Could not start the download. Check storage availability and retry.")
+            } catch (_: IOException) {
+                runCatching { stage?.delete() }
+                status[p.file] = Transfer.Failed("Download storage is unavailable. Check storage and retry.")
+            }
         }
-        // Download is an explicit choice for this job, not whichever fallback is installed.
-        // Other jobs may share the file, but keep their independent preferred IDs.
         if (active(entry)) select(entry)
     }
 
-    fun cancel(entry: ModelEntry) {
-        entry.parts.forEach { p ->
-            downloadId(p).takeIf { it != -1L }?.let { manager.remove(it) }
-            prefs.edit().remove("dl_${p.file}").apply()
-            stagingFile(p).delete()
-            status.remove(p.file)
+    fun cancel(entry: ModelEntry) { entry.parts.forEach { cancelPart(it) } }
+
+    private fun cancelPart(part: Part): Boolean {
+        verifying.remove(part.file)?.cancelled?.set(true)
+        val id = downloadId(part)
+        val token = attemptToken(part)
+        retiring += part.file
+        try {
+            if (id != -1L) manager.remove(id)
+        } catch (_: RuntimeException) {
+            // Keep the ID so an explicit retry can retire it before enqueuing a replacement.
+            status[part.file] = Transfer.Failed("Could not cancel the download. Retry to stop it and start again.")
+            return false
+        } finally { retiring -= part.file }
+        clearDownload(part, id, token)
+        runCatching { stagingFile(part, token).delete() }
+        idleSince.remove(part.file)
+        status.remove(part.file)
+        return true
+    }
+
+    private fun clearDownload(part: Part, id: Long, token: String?) {
+        if (downloadId(part) == id && attemptToken(part) == token) {
+            prefs.edit().remove("dl_${part.file}").remove("dl_attempt_${part.file}").apply()
         }
     }
 
-    /** Looks at every download in flight and finishes the ones that have arrived. Call it every second or so while a screen shows progress. */
-    fun poll() {
-        for (entry in ModelCatalog.all) for (p in entry.parts) {
+    private fun retireCompleted(part: Part, id: Long, token: String?, stage: File?) {
+        // Retire the ID before touching DownloadManager's destination. Reentrant polling
+        // cannot schedule a second verification of an already committed installation.
+        clearDownload(part, id, token)
+        runCatching { manager.remove(id) }
+        runCatching { stage?.delete() }
+        idleSince.remove(part.file)
+    }
+
+    /** Poll on the main thread. Shared Qwen files are queried/verified once, not once per role. */
+    fun poll() = poll(ModelCatalog.all)
+
+    /** The same production path with tiny fixture entries and a controllable worker in tests. */
+    internal fun poll(entries: List<ModelEntry>, executor: Executor = verifier) {
+        val seen = HashSet<String>()
+        for (entry in entries) for (p in entry.parts) {
+            if (!seen.add(p.file) || p.file in verifying || p.file in retiring) continue
             val id = downloadId(p)
-            if (id == -1L || status[p.file] == Transfer.Verifying) continue
-            manager.query(DownloadManager.Query().setFilterById(id))?.use { c ->
-                if (!c.moveToFirst()) { prefs.edit().remove("dl_${p.file}").apply(); status.remove(p.file); return@use } // cancelled from the system UI
-                val state = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
-                when (state) {
-                    DownloadManager.STATUS_SUCCESSFUL -> finish(entry, p, id)
-                    DownloadManager.STATUS_FAILED -> {
-                        val reason = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))
-                        manager.remove(id); prefs.edit().remove("dl_${p.file}").apply()
-                        status[p.file] = Transfer.Failed(if (reason == DownloadManager.ERROR_INSUFFICIENT_SPACE) "Not enough free space." else "Download failed. Check the connection and try again.")
+            val token = attemptToken(p)
+            if (partInstalled(entry, p)) {
+                if (id != -1L) retireCompleted(p, id, token, runCatching { stagingFile(p, token) }.getOrNull())
+                status.remove(p.file) // Also reconcile stale in-memory errors from an older build.
+                continue
+            }
+            if (id == -1L || status[p.file] is Transfer.Failed) continue
+            try {
+                manager.query(DownloadManager.Query().setFilterById(id))?.use { c ->
+                    if (!c.moveToFirst()) {
+                        clearDownload(p, id, token)
+                        runCatching { stagingFile(p, token).delete() }
+                        idleSince.remove(p.file); status.remove(p.file)
+                        return@use
                     }
-                    else -> {
-                        val done = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
-                        // Nothing arriving for 20 seconds usually means no connection, or Android is blocking this app's network.
-                        val since = if (done > 0) null else idleSince.getOrPut(p.file) { System.currentTimeMillis() }
-                        if (done > 0) idleSince.remove(p.file)
-                        status[p.file] = Transfer.Downloading(done, p.bytes, since != null && System.currentTimeMillis() - since > 20_000)
+                    when (c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))) {
+                        DownloadManager.STATUS_SUCCESSFUL -> finish(p, id, token, executor)
+                        DownloadManager.STATUS_FAILED -> {
+                            val reason = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))
+                            retireCompleted(p, id, token, runCatching { stagingFile(p, token) }.getOrNull())
+                            status[p.file] = Transfer.Failed(if (reason == DownloadManager.ERROR_INSUFFICIENT_SPACE) "Not enough free space." else "Download failed. Check the connection and retry.")
+                        }
+                        else -> {
+                            val done = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
+                            val since = if (done > 0) null else idleSince.getOrPut(p.file) { System.currentTimeMillis() }
+                            if (done > 0) idleSince.remove(p.file)
+                            status[p.file] = Transfer.Downloading(done, p.bytes, since != null && System.currentTimeMillis() - since > 20_000)
+                        }
                     }
                 }
+            } catch (_: RuntimeException) {
+                status[p.file] = Transfer.Failed("Could not check the download. Retry when storage is available.")
             }
         }
     }
 
-    /** Copies the download into private storage while hashing it, and keeps it only if the hash is right. */
-    private fun finish(entry: ModelEntry, part: Part, id: Long) {
+    private fun finish(part: Part, id: Long, token: String?, executor: Executor) {
+        val stage = try { stagingFile(part, token) } catch (_: IOException) {
+            retireCompleted(part, id, token, null)
+            status[part.file] = Transfer.Failed("Download storage is unavailable. Check storage and retry.")
+            return
+        }
+        val job = Verification(part, id, token, stage, File(dir, part.file + "." + (token ?: "legacy-$id") + ".tmp"))
+        verifying[part.file] = job
         status[part.file] = Transfer.Verifying
-        Thread {
-            val tmp = File(dir, part.file + ".tmp")
+        executor.execute {
+            var failure: String? = null
             try {
+                if (job.cancelled.get()) throw InterruptedIOException()
                 val digest = MessageDigest.getInstance("SHA-256")
-                stagingFile(part).inputStream().use { input ->
-                    tmp.outputStream().use { out ->
-                        val buf = ByteArray(1 shl 20)
-                        while (true) { val n = input.read(buf); if (n < 0) break; digest.update(buf, 0, n); out.write(buf, 0, n) }
+                stage.inputStream().use { input -> job.temporary.outputStream().use { out ->
+                    val buffer = ByteArray(1 shl 20)
+                    while (true) {
+                        if (job.cancelled.get()) throw InterruptedIOException()
+                        val n = input.read(buffer)
+                        if (n < 0) break
+                        digest.update(buffer, 0, n); out.write(buffer, 0, n)
                     }
+                } }
+                val hash = digest.digest().joinToString("") { "%02x".format(it) }
+                if (hash != part.sha256 || job.temporary.length() != part.bytes) {
+                    failure = "The file did not match its checksum and was discarded. Retry the download."
                 }
-                val hex = digest.digest().joinToString("") { "%02x".format(it) }
-                if (hex == part.sha256 && tmp.length() == part.bytes) {
-                    tmp.renameTo(file(part))
-                    status.remove(part.file)
-                    if (installed(entry) && !installed(selected(entry.slot))) select(entry)
-                } else {
-                    tmp.delete()
-                    status[part.file] = Transfer.Failed("The file did not match its checksum and was discarded. Try again.")
-                }
-            } catch (e: Exception) {
-                tmp.delete()
-                status[part.file] = Transfer.Failed("Could not save the model: ${e.message}")
-            } finally {
-                manager.remove(id)
-                prefs.edit().remove("dl_${part.file}").apply()
-                stagingFile(part).delete()
+            } catch (_: FileNotFoundException) {
+                failure = "The downloaded file is no longer available. Retry the download."
+            } catch (_: Exception) {
+                failure = "Could not save the model. Check storage and retry."
             }
-        }.start()
+            main.post {
+                val owns = verifying[part.file] === job && downloadId(part) == id && attemptToken(part) == token
+                if (!owns || job.cancelled.get()) { runCatching { job.temporary.delete() }; return@post }
+                if (failure == null && !runCatching { job.temporary.renameTo(file(part)) }.getOrDefault(false)) {
+                    failure = "Could not finish saving the model. Check storage and retry."
+                }
+                retireCompleted(part, id, token, stage)
+                runCatching { job.temporary.delete() }
+                verifying.remove(part.file)
+                if (failure == null) status.remove(part.file) else status[part.file] = Transfer.Failed(requireNotNull(failure))
+            }
+        }
     }
 
     // ---- first run after the update

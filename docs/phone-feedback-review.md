@@ -32,11 +32,36 @@ fallback again. Inference continues using installed weights during download.
 Cards have stable per-model semantics and installed rows are selectable. The
 Models screen stops its progress polling when its lifecycle is stopped.
 
+## Rapid-download ENOENT and stale errors
+
+The old completion path removed its Verifying state before removing the completed
+DownloadManager ID and staging file. A poll in that cleanup window scheduled a
+second verification. The first installation remained usable, but the second worker
+opened a deleted `.part` file and published Failed. A deterministic tiny-file test
+reproduced that exact installed-plus-ENOENT state against the old code before the
+fix. This explains the reported Delete button and stale error without assuming a
+permission or RAM failure.
+
+Verification now has one owner per shared file through final cleanup. Completed
+IDs retire before staging deletion; a single background verifier bounds copying
+and hashing, while all status and install commits return to the main thread.
+Each download/retry owns separate persisted staging and temporary paths. Cancelled
+or superseded workers cannot install, delete a newer attempt, or publish errors.
+Polling deduplicates shared Qwen files, recreates missing staging directories, and
+reconciles errors for installed files. Cards display errors only for their own
+missing parts. Legacy in-flight downloads without attempt tokens still finish.
+
+Eight tiny-file regression tests cover rapid repeated taps across all models,
+cleanup reentry, queued verification, cancellation/retry before and after copying,
+per-model failure isolation, retry success, missing staging, directory recreation,
+stale installed errors and legacy paths. An additional Compose test checks stale
+Gemma errors and independent Qwen failure ownership. No heavyweight downloads run.
+
 ## Verification
 
-- Debug and release JVM suites: 177 tests each, zero failures/errors; one deliberate
+- Debug and release JVM suites: 186 tests each, zero failures/errors; one deliberate
   opt-in PNG-export skip per suite.
-- Seven actual Compose UI tests per variant, using Robolectric/API 35/native
+- Eight actual Compose UI tests per variant, using Robolectric/API 35/native
   graphics: notice width/label alignment at normal and doubled font scale, 48dp
   Dismiss target, accessibility-adjusted/repeated/indefinite timing, manual
   dismissal, navigation cancellation, pause/resume, pending-choice cancellation,

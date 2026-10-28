@@ -157,6 +157,26 @@ class PhoneFeedbackUiTest {
         assertEquals(qwen.id, ModelStore.selected(Slot.ANSWER).id)
     }
 
+    @Test fun installedModelHidesStaleErrorAndOtherModelsKeepTheirOwnFailure() {
+        val gemma = ModelCatalog.all.single { it.id == "answer-gemma4-e2b" }
+        val qwen = ModelCatalog.all.single { it.id == "answer-qwen35-2b" }
+        RandomAccessFile(ModelStore.file(gemma.parts.single()), "rw").use { it.setLength(gemma.bytes) }
+        ModelStore.status[gemma.file] = Transfer.Failed("Stale Gemma failure")
+        ModelStore.status[qwen.file] = Transfer.Failed("Qwen connection failure")
+        content {
+            androidx.compose.foundation.layout.Column {
+                for (entry in listOf(gemma, qwen)) key(entry.id) {
+                    ModelCard(entry, entry.id == gemma.id, 0, Long.MAX_VALUE, true) {}
+                }
+            }
+        }
+        compose.onNodeWithText("Stale Gemma failure").assertDoesNotExist()
+        compose.onNodeWithText("Qwen connection failure").assertExists()
+        compose.onNodeWithText("Delete").assertExists()
+        compose.onNodeWithTag("model-${gemma.id}").assertIsSelected()
+        compose.onNodeWithTag("model-${qwen.id}").assertIsNotSelected()
+    }
+
     @Test fun realModelsScreenKeepsSelectionAttachedToIdsAcrossLazyScrolling() {
         val entries = ModelCatalog.forSlot(Slot.ANSWER).take(2)
         entries.forEach { entry ->
