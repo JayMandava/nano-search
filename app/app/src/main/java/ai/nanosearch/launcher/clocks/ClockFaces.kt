@@ -10,6 +10,7 @@ import kotlin.math.min
 interface ClockFaceRenderer {
     val id: String
     fun draw(canvas: Canvas, bounds: RectF, epochMillis: Long, motion: Boolean)
+    fun onBatteryChanged(percent: Int?) = Unit
     fun onTimeChanged()
     fun release()
 }
@@ -40,7 +41,7 @@ object ClockFaces {
         ClockFaceRegistry.ensure(context)
         if (isPackId(id)) ClockFaceRegistry.installed(context, requireNotNull(id))?.let { return DataClockFaceRenderer(context.applicationContext, it) }
         return when (id) {
-            CARBON_ID -> CarbonClockFaceRenderer()
+            CARBON_ID -> CarbonClockFaceRenderer().apply { onBatteryChanged(PhoneBattery.read(context)) }
             else -> SteelClockFaceRenderer(context)
         }
     }
@@ -63,11 +64,13 @@ object ClockFaces {
 class CarbonClockFaceRenderer : ClockFaceRenderer {
     override val id = ClockFaces.CARBON_ID
     private val art = CarbonDialArt()
+    private var battery: BatteryBand? = null
+    override fun onBatteryChanged(percent: Int?) { battery = PhoneBattery.band(percent) }
     override fun draw(canvas: Canvas, bounds: RectF, epochMillis: Long, motion: Boolean) {
-        art.draw(canvas, bounds, ClockFaces.renderEpochMillis(epochMillis, motion), motion = motion)
+        art.draw(canvas, bounds, ClockFaces.renderEpochMillis(epochMillis, motion), motion = motion, batteryBand = battery)
     }
     fun drawChronograph(canvas: Canvas, bounds: RectF, epochMillis: Long, motion: Boolean, elapsedMillis: Long, running: Boolean, lumeAlpha: Float = 0f) {
-        art.draw(canvas, bounds, ClockFaces.renderEpochMillis(epochMillis, motion), elapsedMillis, running, motion, lumeAlpha = lumeAlpha)
+        art.draw(canvas, bounds, ClockFaces.renderEpochMillis(epochMillis, motion), elapsedMillis, running, motion, lumeAlpha = lumeAlpha, batteryBand = battery)
     }
     override fun onTimeChanged() = art.onTimeChanged()
     override fun release() = art.release()

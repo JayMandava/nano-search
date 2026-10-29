@@ -24,6 +24,8 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], manifest = Config.NONE, application = android.app.Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
+// Historical revision proof against the hash-checked frozen v0.8.3 renderer.
+// Current production refinement and its allowed changes are checked by CarbonRefinement084Test.
 class CarbonBridgeNativeCaptureTest {
     private val epoch = Instant.parse("2026-10-15T10:10:30Z").toEpochMilli()
     private data class State(val name: String, val elapsed: Long, val running: Boolean, val motion: Boolean, val lume: Float)
@@ -64,7 +66,7 @@ class CarbonBridgeNativeCaptureTest {
         val directory = File(destination)
         check(directory.mkdirs()) { "Use a new output directory; never overwrite render evidence: $directory" }
         val before = BaselineApprovedCarbonDialArt()
-        val after = CarbonDialArt()
+        val after = Baseline083CarbonDialArt()
         val comparisons = JSONArray()
         var supportDetail: JSONObject? = null
         var rearDetail: JSONObject? = null
@@ -104,7 +106,7 @@ class CarbonBridgeNativeCaptureTest {
                 .put("renderer", "Robolectric 4.17 / API 35 / native Skia graphics; not an Android emulator or device")
                 .put("fixedUtc", "2026-10-15T10:10:30Z").put("epochMillis", epoch)
                 .put("baselineRevision", "4058d215b5c08b68b072547e8ff3d544e013aa83")
-                .put("sourceRevision", System.getenv("CARBON_REVIEW_REVISION") ?: "working tree; not committed")
+                .put("sourceRevision", "6c722e3a9cf731354efa29cc24dbe1a3181c0225; frozen historical target")
                 .put("baselineTransform", "Identifier-only renames, protected by exact SHA-256 provenance test")
                 .put("comparisons", comparisons)
                 .put("supportDetail", supportDetail ?: JSONObject.NULL)
@@ -156,7 +158,7 @@ class CarbonBridgeNativeCaptureTest {
                 clipPath(CarbonPusherGeometry.innerDialPath())
             }
             BaselineApprovedCarbonBridgeArt().draw(canvas(before))
-            CarbonBridgeArt().draw(canvas(after))
+            Baseline083CarbonBridgeArt().draw(canvas(after))
             val oldFile=File(directory,"support-only-before-720px.png")
             val newFile=File(directory,"support-only-after-720px.png")
             val comparison=File(directory,"comparison-support-only-720px.png")
@@ -170,7 +172,7 @@ class CarbonBridgeNativeCaptureTest {
     }
     /** Actual cached-base entry points, including former broad plates and their shadows. */
     private fun exportRearDetail(directory:File):JSONObject {
-        val previous=BaselineApprovedCarbonDialArt();val current=CarbonDialArt()
+        val previous=BaselineApprovedCarbonDialArt();val current=Baseline083CarbonDialArt()
         val before=bitmap(720);val after=bitmap(720)
         try {
             fun draw(art:Any,target:Bitmap) {

@@ -29,6 +29,13 @@ open class ClockFaceView @JvmOverloads constructor(context: Context, faceId: Str
         private set
     private var rendererIdentity = ClockFaceRegistry.identity(context, this.faceId)
     private var registrySubscription: AutoCloseable? = null
+    private val battery = PhoneBatteryObserver(context) { percent ->
+        renderer.onBatteryChanged(percent); lastDescription = Long.MIN_VALUE; invalidate()
+    }
+    private fun updateBatteryObservation() {
+        if (isAttachedToWindow && aggregateVisible && screenActive && windowVisibility == VISIBLE && faceId == ClockFaces.CARBON_ID) battery.start()
+        else battery.stop()
+    }
     private val bounds = RectF()
     private val visibleRect = Rect()
     private var aggregateVisible = false
@@ -55,6 +62,7 @@ open class ClockFaceView @JvmOverloads constructor(context: Context, faceId: Str
                 Intent.ACTION_SCREEN_OFF -> { screenActive = false; onScreenInteractiveChanged(false) }
                 Intent.ACTION_SCREEN_ON, Intent.ACTION_USER_PRESENT -> { screenActive = true; onScreenInteractiveChanged(true) }
             }
+            updateBatteryObservation()
             renderer.onTimeChanged()
             formatter = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.MEDIUM)
             lastDescription = Long.MIN_VALUE
@@ -91,6 +99,7 @@ open class ClockFaceView @JvmOverloads constructor(context: Context, faceId: Str
             receiving = true
         }
         screenActive = context.getSystemService(PowerManager::class.java)?.isInteractive != false
+        updateBatteryObservation()
         renderer.onTimeChanged()
         motionPolicy.attach()
         viewTreeObserver.addOnScrollChangedListener(scrollChanged)
@@ -98,6 +107,7 @@ open class ClockFaceView @JvmOverloads constructor(context: Context, faceId: Str
     }
 
     override fun onDetachedFromWindow() {
+        battery.stop()
         registrySubscription?.close(); registrySubscription = null
         cancelFrame()
         viewTreeObserver.removeOnScrollChangedListener(scrollChanged)
@@ -110,12 +120,14 @@ open class ClockFaceView @JvmOverloads constructor(context: Context, faceId: Str
     override fun onVisibilityAggregated(isVisible: Boolean) {
         super.onVisibilityAggregated(isVisible)
         aggregateVisible = isVisible
+        updateBatteryObservation()
         cancelFrame()
         if (isVisible && isAttachedToWindow) { renderer.onTimeChanged(); motionPolicy.refresh(); invalidate() }
     }
 
     override fun onWindowVisibilityChanged(visibility: Int) {
         super.onWindowVisibilityChanged(visibility)
+        updateBatteryObservation()
         cancelFrame()
         if (visibility == VISIBLE && isAttachedToWindow) { renderer.onTimeChanged(); motionPolicy.refresh(); invalidate() }
     }
@@ -146,7 +158,10 @@ open class ClockFaceView @JvmOverloads constructor(context: Context, faceId: Str
     protected open fun onScreenInteractiveChanged(interactive: Boolean) = Unit
 
     protected open fun accessibilityDescription(epochMillis: Long): String =
-        "${ClockFaces.labelFor(faceId)}, ${formatter.format(Date(epochMillis))}"
+        "${ClockFaces.labelFor(faceId)}, ${formatter.format(Date(epochMillis))}" + if (faceId == ClockFaces.CARBON_ID) ". ${batteryDescription()}" else ""
+
+    protected fun batteryDescription(): String = battery.percent?.let { "Phone battery $it percent, ${PhoneBattery.band(it)?.name?.lowercase()}." }
+        ?: "Phone battery unavailable."
 
     private fun refreshRenderer() {
         val identity = ClockFaceRegistry.identity(context, faceId)
@@ -154,6 +169,8 @@ open class ClockFaceView @JvmOverloads constructor(context: Context, faceId: Str
         renderer.release()
         renderer = ClockFaces.renderer(context, faceId)
         rendererIdentity = identity
+        updateBatteryObservation()
+        if (faceId == ClockFaces.CARBON_ID) renderer.onBatteryChanged(battery.percent)
         lastDescription = Long.MIN_VALUE
         invalidate()
     }

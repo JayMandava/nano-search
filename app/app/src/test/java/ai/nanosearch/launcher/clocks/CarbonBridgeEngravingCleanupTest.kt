@@ -15,18 +15,20 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk=[35],manifest=Config.NONE,application=android.app.Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
+// Historical revision proof against the hash-checked frozen v0.8.3 renderer.
+// Current production refinement and its allowed changes are checked by CarbonRefinement084Test.
 class CarbonBridgeEngravingCleanupTest {
-    @Test fun entireApprovedFrontOverlayAndBothSupportSourcesRemainExact() {
+    @Test fun entireApprovedFrontOverlayAndBothHistoricalSupportSourcesRemainExact() {
         val hashes=mapOf(
             "CarbonBridgeArt" to "bef33fa0f10c4e195bd270339ed9dad4d80d39d2e5f16aea28cfc07e656cf46e",
             "CarbonRearSupportArt" to "a72ea5b0dc1023c7752bc0161bb5b96740485ec0860be9a1add44173f4d4445d",
         )
         for((name,expected) in hashes) {
-            val bytes=File("src/main/java/ai/nanosearch/launcher/clocks/$name.kt").readBytes()
+            val bytes=File("src/test/java/ai/nanosearch/launcher/clocks/Baseline083$name.kt").readText().replace("Baseline083", "").toByteArray(Charsets.UTF_8)
             assertEquals("Approved$name is outside cleanup scope",expected,
                 MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") {"%02x".format(it)})
         }
-        val previous=BaselineApprovedCarbonDialArt();val current=CarbonDialArt()
+        val previous=BaselineApprovedCarbonDialArt();val current=Baseline083CarbonDialArt()
         try {
             for(side in listOf(240,256,360,720,1000)) {
                 val a=drawLayer(previous,"upper",side);val b=drawLayer(current,"upper",side)
@@ -37,7 +39,7 @@ class CarbonBridgeEngravingCleanupTest {
     }
 
     @Test fun realUpperEngravedStrokesDisappearWhileAllLowerEngravingRemainsExact() {
-        val previous=BaselineApprovedCarbonDialArt();val current=CarbonDialArt()
+        val previous=BaselineApprovedCarbonDialArt();val current=Baseline083CarbonDialArt()
         try {
             for(side in listOf(720,1000)) {
                 val a=drawLayer(previous,"underlay",side);val b=drawLayer(current,"underlay",side)

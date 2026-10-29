@@ -1,86 +1,47 @@
-# Carbon bridge: localized 12-o'clock cleanup review
+# Carbon 0.8.4 refinement review
 
-The current comparison uses actual Carbon Canvas code against the approved
-candidate `4058d215b5c08b68b072547e8ff3d544e013aa83`. Its dial/front/rear fixtures
-are identifier-only source copies with exact SHA-256 provenance. Earlier a44,
-ed1 and public Nano 0.8.1 fixtures remain for historical regression checks.
+This revision compares the production renderer with identifier-only frozen v0.8.3
+sources at `6c722e3a9cf731354efa29cc24dbe1a3181c0225`. Frozen dial, bridge and rear
+sources recover their exact original SHA-256 in `CarbonRefinement084Test`.
+Historical 0.8.1/a44/4058 review tests now use these frozen fixtures as their final
+historical target; their original assertions remain. Current production geometry,
+painting and source wiring checks still apply directly to production sources.
 
-This is Robolectric4.17 with API35 framework classes and **native Skia on the
-JVM**. It is not an Android emulator/device screenshot, full app build, R8, lint,
-instrumentation pass, or permission to publish/install.
+The upper spars and lower feet receive mirrored curved/flared joins. No front
+screws, six-o'clock neck, removed jewels or upper engraving return. The rear plates,
+case envelope, counters, date and main hands remain unchanged. Exact full-dial
+pixel comparisons protect everything outside fixed four-spar envelopes, a narrow
+frozen-prior-material bevel envelope and the battery detail. Counter/date interior
+pixels are checked independently even inside those envelopes. Path union may
+retessellate the pre-existing bevel's antialiasing; no numeric color tolerance is
+used. Existing native geometry tests retain exactly two substantial components,
+clear apertures and a transparent centre-to-six gap at phone and design sizes.
 
-## The only new change
+Battery L/M/H thresholds and invalid/unknown cases are tested independently, then
+actual renderer images verify immediate band changes and exact preservation of
+all other pixels. Unknown readings draw no pointer. Event observers are tested for
+sticky initialization, duplicate start, updates, stop/restart, View/window/screen
+lifecycle and wallpaper hide/show/destroy. A test protects M-label readability.
 
-The zoom reference identifies faint parallel engraved strokes next to the orange
-12 and across the upper rear upright. Only the eleven-oval engraving loop is
-clipped above design y390. That boundary falls behind opaque counter interiors;
-it does not introduce a visible cut edge. The prior explicit BUTT cap is retained.
-The lower engraving, matching rear frames, front bridge, hands, date, counters,
-case and every other approved element are unchanged.
-
-In particular, the centre bridge still connects three and nine, not six; the lower
-counter keeps its independent collar. Front bridge screws remain absent. The two
-previously circled side jewels remain removed; the top/counter jewels and unrelated
-case/rear/counter screws remain. No layout, pusher, state or font handling changes.
-
-## Reproduction
-
-From the normal Android `app/` Gradle root with dependencies installed:
+To export actual new before/after evidence into a new, nonexistent directory:
 
 ```sh
-./gradlew -PunsignedRelease=true -PincludePersonalOverlay=false \
-  :app:testDebugUnitTest :app:testReleaseUnitTest
+CARBON_084_OUTPUT=/absolute/new-directory ./gradlew \
+  -PunsignedRelease=true -PincludePersonalOverlay=false \
+  :app:testDebugUnitTest --tests '*CarbonRefinement084Test'
 ```
 
-For PNG export, select a **new, nonexistent absolute directory**:
+Exports include 240/360/720px light/dark-background comparisons, low/medium/high/
+unknown battery examples and lume. Labels are composed by native Android Canvas.
+The face itself retains its dark material; “light/dark” refers to its surrounding
+background, not invented alternate artwork. Results use native Skia on the JVM,
+not an emulator/device or performance profiler.
 
-```sh
-CARBON_REVIEW_OUTPUT=/absolute/path/to/new-review-directory \
-CARBON_REVIEW_REVISION="$(git rev-parse HEAD) plus reviewed working tree" \
-./gradlew -PunsignedRelease=true -PincludePersonalOverlay=false \
-  :app:cleanTestDebugUnitTest :app:testDebugUnitTest \
-  --tests 'ai.nanosearch.launcher.clocks.CarbonBridge*'
-```
+Original references found in Library were `IMG_8117.jpeg`, `IMG_8118.webp` and
+`IMG_8119.jpeg`; supported consumer-local materialization failed with a network
+error. No original reference pixels were available for this revision. Review
+therefore uses actual before/after render pixels and preserves that limitation.
 
-Standalone native-harness results must be identified separately from these full
-Android commands. Export skips deliberately when its environment variable is absent.
-
-## Actual capture evidence
-
-Full-dial images cover parked, running and illuminated states at240/360/720px,
-fixed to 2026-10-15 10:10:30 UTC. A labelled close-up is cropped from the actual
-complete720px render at source rectangle `(297,164,173,110)` and enlarged exactly
-4× with nearest-neighbour pixels—no smoothing, repainting or simulated marks.
-It includes the orange12, upper upright and adjacent wheel. Metadata records
-all source identities, states, changed-pixel counts, crop geometry and PNG hashes.
-
-The front-only diagnostic is pixel-identical. The base-layer comparison shows
-only the engraving cleanup, omitting moving wheels and the front overlay. These
-diagnostics are not whole-watch screenshots; full-dial captures remain in evidence.
-
-## Strict guardrails
-
-- Approved4058 fixtures recover exact source hashes after identifier renames.
-- Front and rear support sources remain hash-identical. Every pixel of the whole
-  isolated front overlay is exact, including type, jewels, date and counters.
-- Full-dial pixel changes are allowed only on the independently reconstructed
-  eleven-oval upper cap, clipped at y390, with a fixed5-design-unit dilation for
-  antialiasing/cache resampling. The mask is not derived from observed changes.
-  Over95% of every complete bitmap must remain outside that mask and match exactly.
-- Actual old upper engraved pixels must become bare dial, not merely change colour.
-  Every visible lower base/engraving pixel remains exact, with substantial lower
-  engraving still present. Clip-induced raw-buffer seam differences are allowed
-  only behind an exactly unchanged, fully opaque overlay in the same assembly/cache
-  coordinates (36 one-channel-level pixels at720px in the first diagnostic). This
-  is an occlusion proof, not a colour tolerance or wider visible-change mask.
-- Exact case/date/counter masks, hands, seconds and host geometry remain checked
-  at240/360/720/1000px. The inherited date-content mask uses the frozen overlay's
-  actual opacity, while whole-overlay pixels are compared independently and exactly.
-- Existing two-component front topology, clear apertures/neck gap, lower collar,
-  front-screw removal, mirrored rear-frame normal web width/chamfers, retained
-  unmarked jewels, deterministic painting and Canvas-state checks remain in force.
-
-Android instrumentation source is not execution evidence. No current renderer
-check validates widget/live-wallpaper hosts, pusher launches, screen-off lifecycle,
-OEM behaviour, frame timing or the private font. Prior release/device results must
-not be attributed to this local review draft.
+No secrets/private fonts/model downloads, workflow dispatch or approval bypass
+is part of this review. Device host behavior, OEM insets, physical accessibility
+services and frame timing remain unverified here.

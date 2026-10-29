@@ -33,6 +33,9 @@ class ClockWallpaperService : WallpaperService() {
         private val dialBounds = RectF()
         private val power = getSystemService(PowerManager::class.java)
         private var faceRenderer: ClockFaceRenderer? = null
+        private val battery = PhoneBatteryObserver(this@ClockWallpaperService) { percent ->
+            faceRenderer?.onBatteryChanged(percent); requestFrame()
+        }
         private var rendererIdentity = ""
         private var registrySubscription: AutoCloseable? = null
         private var w = 0
@@ -50,7 +53,7 @@ class ClockWallpaperService : WallpaperService() {
         private val clockChanged = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 when (intent.action) {
-                    Intent.ACTION_SCREEN_OFF -> { screenActive = false; handler.removeCallbacks(frame) }
+                    Intent.ACTION_SCREEN_OFF -> { screenActive = false; battery.stop(); handler.removeCallbacks(frame) }
                     Intent.ACTION_SCREEN_ON, Intent.ACTION_USER_PRESENT -> screenActive = true
                 }
                 faceRenderer?.onTimeChanged()
@@ -120,6 +123,7 @@ class ClockWallpaperService : WallpaperService() {
         }
 
         private fun stopObservers() {
+            battery.stop()
             motion.detach()
             if (receivingTime) { unregisterReceiver(clockChanged); receivingTime = false }
         }
@@ -166,6 +170,9 @@ class ClockWallpaperService : WallpaperService() {
                 faceRenderer = ClockFaces.renderer(this@ClockWallpaperService, faceId)
                 rendererIdentity = identity
             }
+            if (faceId == ClockFaces.CARBON_ID) {
+                battery.start(); faceRenderer?.onBatteryChanged(battery.percent)
+            } else battery.stop()
             val cy = h * when (prefs.getString("lockclock_pos", "middle")) { "top" -> 0.28f; "low" -> 0.72f; else -> 0.5f }
             val side = (min(w, h) * 0.82f).toInt()
             dialBounds.set((w - side) / 2f, cy - side / 2f, (w + side) / 2f, cy + side / 2f)

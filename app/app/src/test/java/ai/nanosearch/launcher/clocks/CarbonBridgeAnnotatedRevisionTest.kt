@@ -15,11 +15,13 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], manifest = Config.NONE, application = android.app.Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
+// Historical revision proof against the hash-checked frozen v0.8.3 renderer.
+// Current production refinement and its allowed changes are checked by CarbonRefinement084Test.
 class CarbonBridgeAnnotatedRevisionTest {
     private val removed = listOf(275f to 621f, 737f to 586f)
 
     @Test fun approvedFrontBridgeSourceAndNativeRasterRemainExactlyA44fc7f() {
-        val bytes=File("src/main/java/ai/nanosearch/launcher/clocks/CarbonBridgeArt.kt").readBytes()
+        val bytes=File("src/test/java/ai/nanosearch/launcher/clocks/Baseline083CarbonBridgeArt.kt").readText().replace("Baseline083", "").toByteArray(Charsets.UTF_8)
         val hash=MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
         assertEquals("The annotated rear-only request must not edit approved front support source",
             "bef33fa0f10c4e195bd270339ed9dad4d80d39d2e5f16aea28cfc07e656cf46e",hash)
@@ -27,14 +29,14 @@ class CarbonBridgeAnnotatedRevisionTest {
             val a=bitmap(side);val b=bitmap(side)
             try {
                 BaselineAlignedCarbonBridgeArt().draw(canvas(a))
-                CarbonBridgeArt().draw(canvas(b))
+                Baseline083CarbonBridgeArt().draw(canvas(b))
                 assertTrue("Every front support pixel, gap, bevel and shadow remains exact at $side px",a.sameAs(b))
             } finally {a.recycle();b.recycle()}
         }
     }
 
     @Test fun onlyTheTwoCircledJewelsDisappearFromAnOtherwiseExactFrontOverlay() {
-        val previous=BaselineAlignedCarbonDialArt();val current=CarbonDialArt()
+        val previous=BaselineAlignedCarbonDialArt();val current=Baseline083CarbonDialArt()
         try {
             for(side in listOf(240,256,360,720,1000)) {
                 val a=bitmap(side);val b=bitmap(side)
@@ -70,7 +72,7 @@ class CarbonBridgeAnnotatedRevisionTest {
     }
 
     @Test fun unmarkedTopAndAllThreeCounterJewelsRemainVisibleAndExact() {
-        val previous=BaselineAlignedCarbonDialArt();val current=CarbonDialArt()
+        val previous=BaselineAlignedCarbonDialArt();val current=Baseline083CarbonDialArt()
         val a=bitmap(1000);val b=bitmap(1000)
         try {
             drawUpper(previous,canvas(a));drawUpper(current,canvas(b))

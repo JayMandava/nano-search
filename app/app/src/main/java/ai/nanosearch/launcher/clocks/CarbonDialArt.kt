@@ -61,6 +61,7 @@ class CarbonDialArt {
         showDate: Boolean = true,
         showRunningSeconds: Boolean = true,
         lumeAlpha: Float = 0f,
+        batteryBand: BatteryBand? = null,
     ) {
         val size = min(bounds.width(), bounds.height())
         if (size <= 0f) return
@@ -86,6 +87,7 @@ class CarbonDialArt {
         canvas.scale(CarbonDialGeometry.ASSEMBLY_SCALE,CarbonDialGeometry.ASSEMBLY_SCALE,500f,500f)
         calendar.timeInMillis = epochMillis
         if (showDate) date(canvas, calendar.get(Calendar.DAY_OF_MONTH))
+        batteryBand?.let { subHand(canvas,675f,712f,it.angle,30f,white) }
         val angles = CarbonTimeModel.angles(epochMillis, calendar.timeZone)
         if (hands) {
             subHand(canvas, 350f, 465f, (elapsedMillis.coerceAtLeast(0L) % 43200000L) / 43200000f * 360, 58f, orange)
@@ -290,11 +292,10 @@ class CarbonDialArt {
         // Applied orange twelve, outlined with a narrow silver chamfer.
         text(c,"12",500f,317f,77f,0xfff1f1e8.toInt(),true,4f)
         text(c,"12",500f,317f,77f,orange,true)
-        // Unbranded selector detail: function letters, no real winding claims.
+        // Phone battery bands. The moving pointer is drawn separately from this cached layer.
         text(c,"H",695f,668f,20f,yellow,true)
-        text(c,"D",666f,700f,18f,white,true)
-        text(c,"W",640f,733f,18f,cyan,true)
-        subHand(c,675f,712f,-30f,30f,white)
+        text(c,"M",641f,692f,18f,white,true)
+        text(c,"L",640f,733f,18f,cyan,true)
         // Crystal edge and its subtle reflection.
         stroke(c, faceRim(1.09f,1.09f), 1.2f, 0x887d939d.toInt())
         val glint=Path().apply { moveTo(320f,216f); quadTo(500f,194f,680f,216f) }

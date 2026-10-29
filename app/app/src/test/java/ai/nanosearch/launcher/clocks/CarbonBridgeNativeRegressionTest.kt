@@ -19,6 +19,8 @@ import org.junit.runner.RunWith
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], manifest = Config.NONE, application = android.app.Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
+// Historical revision proof against the hash-checked frozen v0.8.3 renderer.
+// Current production refinement and its allowed changes are checked by CarbonRefinement084Test.
 class CarbonBridgeNativeRegressionTest {
     private val epoch = Instant.parse("2026-10-15T10:10:30Z").toEpochMilli()
     private data class State(val name: String, val elapsed: Long, val running: Boolean, val motion: Boolean, val lume: Float)
@@ -26,7 +28,7 @@ class CarbonBridgeNativeRegressionTest {
     @Test fun engravingCleanupPreservesEveryPixelOutsideItsFixedUpperCap() {
         val zone = TimeZone.getDefault()
         val baseline = BaselineApprovedCarbonDialArt()
-        val refined = CarbonDialArt()
+        val refined = Baseline083CarbonDialArt()
         try {
             TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
             baseline.onTimeChanged(); refined.onTimeChanged()
@@ -55,7 +57,7 @@ class CarbonBridgeNativeRegressionTest {
 
     @Test fun everyIsolatedHandAndRunningSecondsRasterMatchesTheFrozenBaseline() {
         val baseline = BaselineApprovedCarbonDialArt()
-        val refined = CarbonDialArt()
+        val refined = Baseline083CarbonDialArt()
         try {
             for (side in listOf(240, 720)) for (kind in 0..2) for (angle in listOf(0f, 90f, 180f, 315.25f)) {
                 val expected = Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888)
@@ -81,7 +83,7 @@ class CarbonBridgeNativeRegressionTest {
     }
 
     @Test fun oldFrontScrewLocationsAreNowExactBareBridgePixelsInTheCompleteDial() {
-        val previous=BaselineReviewCarbonDialArt(); val current=CarbonDialArt()
+        val previous=BaselineReviewCarbonDialArt(); val current=Baseline083CarbonDialArt()
         val zone=TimeZone.getDefault()
         try {
             TimeZone.setDefault(TimeZone.getTimeZone("UTC")); previous.onTimeChanged(); current.onTimeChanged()
@@ -93,7 +95,7 @@ class CarbonBridgeNativeRegressionTest {
                 try {
                     val c=Canvas(expected);c.scale(side/1000f,side/1000f)
                     c.scale(CarbonDialGeometry.ASSEMBLY_SCALE,CarbonDialGeometry.ASSEMBLY_SCALE,500f,500f)
-                    CarbonBridgeArt().draw(c)
+                    Baseline083CarbonBridgeArt().draw(c)
                     val bounds=RectF(0f,0f,side.toFloat(),side.toFloat())
                     current.draw(Canvas(actual),bounds,epoch,motion=false)
                     previous.draw(Canvas(old),bounds,epoch,motion=false)

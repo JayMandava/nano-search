@@ -21,10 +21,19 @@ internal object CarbonBridgeGeometry {
 
         // The reference's upper spars spread OUT toward the counter shoulders. They do not
         // fold into the old rounded Y at the centre. Narrow faces leave the upper cell open.
-        branch(426f, 235f, 442f, 237f, 415f, 352f, 403f, 376f,
-            383f, 379f, 398f, 348f)
-        branch(558f, 237f, 574f, 235f, 602f, 348f, 617f, 379f,
-            597f, 376f, 585f, 352f)
+        // Flare into the bezel, then ease into the existing straight spars. Mirroring
+        // the complete contour keeps both shoulders on the same curved datum.
+        val upper = Path().apply {
+            moveTo(413f, 224f)
+            cubicTo(425f, 226f, 440f, 228f, 451f, 229f)
+            quadTo(438f, 246f, 433f, 272f)
+            lineTo(415f, 352f); lineTo(403f, 376f)
+            quadTo(393f, 379f, 383f, 379f)
+            lineTo(398f, 348f); lineTo(415f, 268f)
+            quadTo(422f, 240f, 413f, 224f); close()
+        }
+        join(upper)
+        join(Path(upper).apply { transform(Matrix().apply { setScale(-1f, 1f, 500f, 500f) }) })
 
         join(circle(350f, 465f, 110f))
         join(circle(650f, 465f, 110f))
@@ -50,8 +59,14 @@ internal object CarbonBridgeGeometry {
         join(circle(500f, 500f, 20f))
 
         // Long, almost straight lower spars replace the old broad hooked/S-shaped feet.
-        branch(311f, 559f, 329f, 560f, 421f, 778f, 404f, 781f)
-        branch(671f, 560f, 689f, 559f, 596f, 781f, 579f, 778f)
+        val lower = Path().apply {
+            moveTo(311f, 559f); lineTo(329f, 560f); lineTo(410f, 751f)
+            quadTo(415f, 765f, 432f, 784f)
+            lineTo(394f, 785f)
+            quadTo(403f, 772f, 395f, 750f); close()
+        }
+        join(lower)
+        join(Path(lower).apply { transform(Matrix().apply { setScale(-1f, 1f, 500f, 500f) }) })
         // The central octagon connects only the side registers. The six-o'clock register
         // retains its own surround, with a real open gap above it rather than a centre neck.
 

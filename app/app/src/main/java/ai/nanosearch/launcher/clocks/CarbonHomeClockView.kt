@@ -103,7 +103,7 @@ class CarbonHomeClockView @JvmOverloads constructor(
     }
 
     // Stable between commands: elapsed/status belongs to the virtual nodes, not frame announcements.
-    override fun accessibilityDescription(epochMillis: Long): String = "Carbon 01 chronograph. Explore controls."
+    override fun accessibilityDescription(epochMillis: Long): String = "Carbon 01 chronograph. ${batteryDescription()} Explore controls."
 
     override fun onAttachedToWindow() {
         store?.let { chronographState = it.load(elapsedRealtime(), bootCount) }
