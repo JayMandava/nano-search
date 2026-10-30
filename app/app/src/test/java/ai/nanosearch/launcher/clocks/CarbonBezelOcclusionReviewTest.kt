@@ -14,6 +14,8 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk=[35],manifest=Config.NONE,application=android.app.Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
+// Exact historical proof of the accepted six-o-clock revision at 2705e272.
+// The subsequent side polish is protected by CarbonSideBezelJoinReviewTest.
 class CarbonBezelOcclusionReviewTest {
     private val epoch=Instant.parse("2026-10-15T10:10:30Z").toEpochMilli()
     private fun bitmap(side:Int)=Bitmap.createBitmap(side,side,Bitmap.Config.ARGB_8888)
@@ -21,7 +23,7 @@ class CarbonBezelOcclusionReviewTest {
     private fun point(x:Int,y:Int,side:Int)=Pair(500f+((x+.5f)*1000/side-500f)/1.05f,500f+((y+.5f)*1000/side-500f)/1.05f)
     private data class Foreground(val image:Bitmap,val opaque:BooleanArray,val cachePixels:IntArray,val cacheSide:Int)
     private fun foregroundOnly(side:Int,lume:Float):Foreground {
-        val art=CarbonDialArt();val cache=bitmap(side.coerceIn(256,1536));val clipMask=bitmap(cache.width);val out=bitmap(side)
+        val art=BaselineAcceptedSixCarbonDialArt();val cache=bitmap(side.coerceIn(256,1536));val clipMask=bitmap(cache.width);val out=bitmap(side)
         try {
             val c=Canvas(cache);c.scale(cache.width/1000f,cache.height/1000f);c.scale(1.05f,1.05f,500f,500f)
             // The foreground plane is the bezel's footprint, including only
@@ -53,7 +55,7 @@ class CarbonBezelOcclusionReviewTest {
         }finally{cache.recycle();clipMask.recycle();art.release()}
     }
     @Test fun foregroundBezelAndExistingMarkersOccludeMetalAtAllThreeJoins() {
-        val art=CarbonDialArt();val sideControl=BaselineBeforeBezelOcclusionCarbonDialArt()
+        val art=BaselineAcceptedSixCarbonDialArt();val sideControl=BaselineBeforeBezelOcclusionCarbonDialArt()
         try {
             for(side in listOf(240,360,720,1000)) {
                 val expectedStates=listOf(foregroundOnly(side,0f),foregroundOnly(side,1f))
@@ -105,7 +107,7 @@ class CarbonBezelOcclusionReviewTest {
         }finally{art.release();sideControl.release()}
     }
     @Test fun unrelatedPixelsAndCounterFacesStayExactAcrossAllStates() {
-        val old=BaselineBeforeBezelOcclusionCarbonDialArt();val art=CarbonDialArt()
+        val old=BaselineBeforeBezelOcclusionCarbonDialArt();val art=BaselineAcceptedSixCarbonDialArt()
         try {
             for(side in listOf(240,360,720,1000))for(band in listOf(null,*BatteryBand.entries.toTypedArray()))for(lume in listOf(0f,1f)) {
                 val a=bitmap(side);val b=bitmap(side)
@@ -157,7 +159,7 @@ class CarbonBezelOcclusionReviewTest {
     }
     @Test fun exportActualLowerAndSideOcclusionComparisons() {
         val output=System.getenv("CARBON_BEZEL_OCCLUSION_OUTPUT").orEmpty();assumeTrue(output.isNotEmpty())
-        val dir=File(output);check(dir.mkdirs());val old=BaselineBeforeBezelOcclusionCarbonDialArt();val art=CarbonDialArt()
+        val dir=File(output);check(dir.mkdirs());val old=BaselineBeforeBezelOcclusionCarbonDialArt();val art=BaselineAcceptedSixCarbonDialArt()
         val sheets=mutableListOf<Bitmap>()
         fun write(name:String,b:Bitmap)=File(dir,name).outputStream().use {check(b.compress(Bitmap.CompressFormat.PNG,100,it))}
         fun pair(a:Bitmap,b:Bitmap,title:String)=bitmapPair(a,b,title)

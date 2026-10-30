@@ -184,7 +184,40 @@ class CarbonDialArt {
                 paint.shader=null;paint.color=Color.WHITE;paint.style=Paint.Style.FILL
                 c.drawBitmap(foreground,0f,0f,paint)
             }finally{foreground.recycle()}
+            // Keep the accepted six plane entirely separate. The two side
+            // bezels and their existing applied markers get the same foreground
+            // priority, with a protected aperture around each counter face.
+            val sideForeground=Bitmap.createBitmap(size,size,Bitmap.Config.ARGB_8888)
+            try {
+                val f=Canvas(sideForeground);f.scale(size/1000f,size/1000f)
+                f.scale(CarbonDialGeometry.ASSEMBLY_SCALE,CarbonDialGeometry.ASSEMBLY_SCALE,500f,500f)
+                f.clipPath(sideBezelForegroundMask())
+                track(f)
+                paint.shader=null;paint.color=Color.WHITE;paint.style=Paint.Style.FILL
+                c.drawBitmap(sideForeground,0f,0f,paint)
+            }finally{sideForeground.recycle()}
         }
+    }
+
+    private fun sideBezelForegroundMask():Path {
+        val mask=Path(bezelFootprint)
+        for((x,angle) in listOf(240f to 270f,760f to 90f)) {
+            // Identical applied-marker polygon and 5-unit border from track().
+            val marker=Path().apply {
+                moveTo(-9f,-7f);lineTo(9f,-7f);lineTo(5f,15f);quadTo(0f,25f,-5f,15f);close()
+                transform(Matrix().apply {setRotate(angle);postTranslate(x,500f)})
+            }
+            val border=Path()
+            Paint().apply {style=Paint.Style.FILL_AND_STROKE;strokeWidth=5f;strokeJoin=Paint.Join.ROUND;strokeCap=Paint.Cap.ROUND}.getFillPath(marker,border)
+            check(mask.op(border,Path.Op.UNION))
+        }
+        val joins=Path().apply {addRect(228f,375f,277f,575f,Path.Direction.CW);addRect(723f,375f,772f,575f,Path.Direction.CW)}
+        check(mask.op(joins,Path.Op.INTERSECT))
+        // Original face radius is 91. This six-unit buffer also protects its
+        // antialiasing at the smallest 256->240 cached rendering size.
+        val faces=Path().apply {addCircle(350f,465f,97f,Path.Direction.CW);addCircle(650f,465f,97f,Path.Direction.CW)}
+        check(mask.op(faces,Path.Op.DIFFERENCE))
+        return mask
     }
 
     private fun tonneau(inset: Float = 0f): Path = Path().apply {
