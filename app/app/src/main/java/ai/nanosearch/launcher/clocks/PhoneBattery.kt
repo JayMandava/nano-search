@@ -6,7 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.BatteryManager
 
-enum class BatteryBand(val angle: Float) { LOW(-122f), MEDIUM(-50f), HIGH(24f) }
+enum class BatteryBand(val angle: Float) { LOW(-105f), MEDIUM(-65f), HIGH(-30f) }
 
 object PhoneBattery {
     fun percent(level: Int, scale: Int, present: Boolean = true): Int? =

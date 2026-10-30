@@ -16,7 +16,7 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [35], manifest = Config.NONE, application = android.app.Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 // Historical revision proof against the hash-checked frozen v0.8.3 renderer.
-// Current production refinement and its allowed changes are checked by CarbonRefinement084Test.
+// Current production refinement and its allowed changes are checked by ReferenceReviewCandidateTest.
 class CarbonBridgeAnnotatedRevisionTest {
     private val removed = listOf(275f to 621f, 737f to 586f)
 

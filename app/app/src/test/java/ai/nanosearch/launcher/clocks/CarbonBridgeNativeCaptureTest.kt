@@ -25,7 +25,7 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [35], manifest = Config.NONE, application = android.app.Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 // Historical revision proof against the hash-checked frozen v0.8.3 renderer.
-// Current production refinement and its allowed changes are checked by CarbonRefinement084Test.
+// Current production refinement and its allowed changes are checked by ReferenceReviewCandidateTest.
 class CarbonBridgeNativeCaptureTest {
     private val epoch = Instant.parse("2026-10-15T10:10:30Z").toEpochMilli()
     private data class State(val name: String, val elapsed: Long, val running: Boolean, val motion: Boolean, val lume: Float)

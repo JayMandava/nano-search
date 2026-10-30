@@ -46,6 +46,7 @@ class CarbonDialArt {
     private val gearPath = gearShape()
     private val motionClip = inner()
     private val bridgeArt = CarbonBridgeArt()
+    private val batteryArt = CarbonBatteryArt()
     private val gearColors = intArrayOf(0xff292e30.toInt(),0xff343a3b.toInt(),0xff292f32.toInt(),0xff393e3f.toInt(),0xff575b58.toInt())
     private val gearArt = arrayOfNulls<Bitmap>(5)
     private val hubFinish = SweepGradient(0f,0f,intArrayOf(0xff707b7c.toInt(),0xffe2e7de.toInt(),0xff555f61.toInt(),0xffc0c9c4.toInt(),0xff707b7c.toInt()),null)
@@ -87,7 +88,7 @@ class CarbonDialArt {
         canvas.scale(CarbonDialGeometry.ASSEMBLY_SCALE,CarbonDialGeometry.ASSEMBLY_SCALE,500f,500f)
         calendar.timeInMillis = epochMillis
         if (showDate) date(canvas, calendar.get(Calendar.DAY_OF_MONTH))
-        batteryBand?.let { subHand(canvas,675f,712f,it.angle,30f,white) }
+        batteryBand?.let { batteryArt.drawPointer(canvas,it) }
         val angles = CarbonTimeModel.angles(epochMillis, calendar.timeZone)
         if (hands) {
             subHand(canvas, 350f, 465f, (elapsedMillis.coerceAtLeast(0L) % 43200000L) / 43200000f * 360, 58f, orange)
@@ -166,22 +167,41 @@ class CarbonDialArt {
         }
     }
 
-    private fun tonneau(inset: Float = 0f): Path {
-        val l = 125f + inset
-        val r = 875f - inset
-        val t = 48f + inset
-        val b = 952f - inset
-        val bow = 59f * (1 - inset / 500)
-        return Path().apply {
-            moveTo(l + 90, t + 13)
-            cubicTo(350f, t - 15, 650f, t - 15, r - 90, t + 13)
-            cubicTo(r - 24, t + 34, r + bow, 340f, r + bow - 10, 500f)
-            cubicTo(r + bow, 660f, r - 24, b - 34, r - 90, b - 13)
-            cubicTo(650f, b + 15, 350f, b + 15, l + 90, b - 13)
-            cubicTo(l + 24, b - 34, l - bow, 660f, l - bow + 10, 500f)
-            cubicTo(l - bow, 340f, l + 24, t + 34, l + 90, t + 13)
-            close()
-        }
+    private fun tonneau(inset: Float = 0f): Path = Path().apply {
+        moveTo(235f,52f)
+        cubicTo(365f,45f,635f,45f,765f,52f)
+        quadTo(796f,56f,814f,92f);lineTo(865f,191f)
+        cubicTo(885f,232f,891f,263f,883f,298f)
+        cubicTo(878f,322f,897f,357f,913f,397f)
+        cubicTo(927f,447f,927f,553f,913f,603f)
+        cubicTo(897f,643f,878f,678f,883f,702f)
+        cubicTo(891f,737f,885f,768f,865f,809f)
+        lineTo(814f,908f);quadTo(796f,944f,765f,948f)
+        cubicTo(635f,955f,365f,955f,235f,948f)
+        quadTo(204f,944f,186f,908f);lineTo(135f,809f)
+        cubicTo(115f,768f,109f,737f,117f,702f)
+        cubicTo(122f,678f,103f,643f,87f,603f)
+        cubicTo(73f,553f,73f,447f,87f,397f)
+        cubicTo(103f,357f,122f,322f,117f,298f)
+        cubicTo(109f,263f,115f,232f,135f,191f)
+        lineTo(186f,92f);quadTo(204f,56f,235f,52f);close()
+        if(inset!=0f) transform(Matrix().apply {setScale(1f-inset/500f,1f-inset/500f,500f,500f)})
+    }
+
+    private fun pusherGuard(c: Canvas, lower: Boolean) {
+        fun mirror(path: Path)=path.apply {if(lower) transform(Matrix().apply {setScale(1f,-1f,500f,500f)})}
+        val body=mirror(Path().apply {
+            moveTo(885f,310f);lineTo(913f,307f);quadTo(917f,307f,919f,313f)
+            lineTo(929f,349f);quadTo(931f,355f,925f,358f)
+            lineTo(901f,367f);quadTo(896f,369f,894f,363f);close()
+        })
+        fill(c,body,0xff252e31.toInt());stroke(c,body,1f,0xff465357.toInt())
+        val shoulder=mirror(Path().apply {
+            moveTo(882f,306f);lineTo(888f,306f)
+            cubicTo(887f,326f,897f,352f,902f,366f)
+            lineTo(895f,368f);cubicTo(889f,349f,880f,324f,882f,306f);close()
+        })
+        gradient(c,shoulder,882f,306f,902f,368f,intArrayOf(0xff465457.toInt(),0xff879391.toInt(),0xff526163.toInt()))
     }
 
     private fun inner(): Path = CarbonPusherGeometry.innerDialPath()
@@ -192,13 +212,19 @@ class CarbonDialArt {
 
     private fun underlay(c: Canvas) {
         // Pusher guards and crown are part of the drawing, not touch targets.
-        round(c, 855f, 296f, 946f, 382f, 18f, 0xff363a3b.toInt())
-        round(c, 862f, 625f, 948f, 711f, 18f, 0xff363a3b.toInt())
+        pusherGuard(c,false);pusherGuard(c,true)
         round(c, 875f, 420f, 970f, 580f, 29f, orange)
         for (i in 0..9) line(c, 880f + i * 8, 433f, 880f + i * 8, 568f, 3f, 0xffa34914.toInt())
         oval(c, 923f, 436f, 985f, 564f, 0xffb5bbbc.toInt())
         oval(c, 936f, 448f, 982f, 550f, 0xff555b5d.toInt())
-        round(c, 57f, 635f, 113f, 748f, 13f, orange)
+        val splitGuard=Path().apply {
+            moveTo(116f,643f);lineTo(93f,648f);quadTo(88f,649f,87f,655f)
+            lineTo(78f,716f);quadTo(77f,722f,83f,727f)
+            lineTo(113f,739f);lineTo(128f,746f);close()
+        }
+        fill(c,splitGuard,0xff39474a.toInt());stroke(c,splitGuard,1f,0xff758582.toInt())
+        val splitPad=polygon(floatArrayOf(84f,660f,103f,653f,110f,660f,104f,725f,86f,718f,79f,711f))
+        fill(c,splitPad,orange);stroke(c,splitPad,1f,0xffa34914.toInt())
         val case = tonneau()
         gradient(c, case, 80f, 150f, 940f, 820f, intArrayOf(0xfff1f3ef.toInt(), 0xff646c70.toInt(), 0xffcbd0cf.toInt(), 0xff373c40.toInt(), 0xffe6e8e3.toInt()))
         stroke(c, case, 2f, 0xffe1e5e4.toInt())
@@ -239,7 +265,7 @@ class CarbonDialArt {
         stroke(c,tonneau(3f),1.3f,0xffeef1e9.toInt())
         stroke(c,tonneau(7f),2f,0xff626e72.toInt())
         stroke(c,tonneau(11f),1.1f,0xffc8cfca.toInt())
-        val sideReflection=Path().apply{moveTo(839f,220f);cubicTo(903f,398f,912f,573f,843f,780f)}
+        val sideReflection=Path().apply{moveTo(861f,213f);cubicTo(890f,265f,868f,300f,885f,343f);cubicTo(924f,442f,924f,558f,885f,657f);cubicTo(868f,700f,890f,735f,861f,787f)}
         stroke(c,sideReflection,2.3f,0x997c898d.toInt())
         val faceSave=c.save()
         c.scale(CarbonDialGeometry.ASSEMBLY_SCALE,CarbonDialGeometry.ASSEMBLY_SCALE,500f,500f)
@@ -292,10 +318,8 @@ class CarbonDialArt {
         // Applied orange twelve, outlined with a narrow silver chamfer.
         text(c,"12",500f,317f,77f,0xfff1f1e8.toInt(),true,4f)
         text(c,"12",500f,317f,77f,orange,true)
-        // Phone battery bands. The moving pointer is drawn separately from this cached layer.
-        text(c,"H",695f,668f,20f,yellow,true)
-        text(c,"M",641f,692f,18f,white,true)
-        text(c,"L",640f,733f,18f,cyan,true)
+        // All scale marks and labels share the dedicated indicator geometry.
+        batteryArt.drawScale(c)
         // Crystal edge and its subtle reflection.
         stroke(c, faceRim(1.09f,1.09f), 1.2f, 0x887d939d.toInt())
         val glint=Path().apply { moveTo(320f,216f); quadTo(500f,194f,680f,216f) }

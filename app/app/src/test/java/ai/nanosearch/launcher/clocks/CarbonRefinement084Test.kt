@@ -16,6 +16,8 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], manifest = Config.NONE, application = android.app.Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
+// Historical bridge/battery revision proof against frozen 11166bf sources.
+// The accepted case/sector revision is checked directly by ReferenceReviewCandidateTest.
 class CarbonRefinement084Test {
     private val epoch = Instant.parse("2026-10-15T10:10:30Z").toEpochMilli()
     private fun bitmap(side: Int) = Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888)
@@ -37,7 +39,7 @@ class CarbonRefinement084Test {
         (x in 617f..717f && y in 647f..753f)
 
     @Test fun changesStayInsideFourSparContoursAndBatteryDetailAtAllSizes() {
-        val old = Baseline083CarbonDialArt(); val current = CarbonDialArt()
+        val old = Baseline083CarbonDialArt(); val current = Baseline084CarbonDialArt()
         try {
             for(side in listOf(240,360,720,1000)) for(lume in listOf(0f,1f)) {
                 val a=bitmap(side); val b=bitmap(side)
@@ -61,7 +63,7 @@ class CarbonRefinement084Test {
     }
 
     @Test fun completeBaseLayerIncludingRearPlatesAndEngravingRemainsExact() {
-        val old=Baseline083CarbonDialArt();val current=CarbonDialArt()
+        val old=Baseline083CarbonDialArt();val current=Baseline084CarbonDialArt()
         try {
             for(side in listOf(240,720,1000)) {
                 val a=bitmap(side);val b=bitmap(side)
@@ -77,7 +79,7 @@ class CarbonRefinement084Test {
     }
 
     @Test fun batteryChangesRenderImmediatelyWithoutChangingOtherDialPixels() {
-        val renderer=CarbonClockFaceRenderer()
+        val renderer=Baseline084CarbonClockFaceRenderer()
         val images=mutableListOf<Bitmap>()
         try {
             for(level in listOf<Int?>(null,0,20,21,70,71,100,-1,101)) {
@@ -151,7 +153,7 @@ class CarbonRefinement084Test {
     @Test fun exportActualBeforeAfterAndBatteryBands() {
         val output=System.getenv("CARBON_084_OUTPUT").orEmpty();assumeTrue(output.isNotEmpty())
         val dir=File(output);check(dir.mkdirs())
-        val old=Baseline083CarbonDialArt();val current=CarbonDialArt()
+        val old=Baseline083CarbonDialArt();val current=Baseline084CarbonDialArt()
         fun write(name:String,b:Bitmap) {File(dir,name).outputStream().use {check(b.compress(Bitmap.CompressFormat.PNG,100,it))}}
         try {
             for(side in listOf(240,360,720)) for(background in listOf("light","dark")) {
@@ -161,7 +163,7 @@ class CarbonRefinement084Test {
                     val color=if(background=="light") Color.rgb(235,235,235) else Color.rgb(12,15,18)
                     ca.drawColor(color);cb.drawColor(color)
                     old.draw(ca,bounds(side),epoch,motion=false)
-                    current.draw(cb,bounds(side),epoch,motion=false,batteryBand=BatteryBand.MEDIUM)
+                    current.draw(cb,bounds(side),epoch,motion=false,batteryBand=Baseline084BatteryBand.MEDIUM)
                     write("before-$background-$side.png",a);write("after-$background-$side.png",b)
                     if(side==720) {
                         val sheet=Bitmap.createBitmap(1480,800,Bitmap.Config.ARGB_8888)
@@ -175,12 +177,12 @@ class CarbonRefinement084Test {
                     }
                 } finally {a.recycle();b.recycle()}
             }
-            for(band in listOf(null,BatteryBand.LOW,BatteryBand.MEDIUM,BatteryBand.HIGH)) {
+            for(band in listOf(null,Baseline084BatteryBand.LOW,Baseline084BatteryBand.MEDIUM,Baseline084BatteryBand.HIGH)) {
                 val b=bitmap(720)
                 try {current.draw(Canvas(b),bounds(720),epoch,motion=false,batteryBand=band);write("battery-${band?.name ?: "UNKNOWN"}-720.png",b)} finally {b.recycle()}
             }
             val lume=bitmap(720)
-            try {current.draw(Canvas(lume),bounds(720),epoch,motion=false,lumeAlpha=1f,batteryBand=BatteryBand.MEDIUM);write("after-lume-720.png",lume)} finally {lume.recycle()}
+            try {current.draw(Canvas(lume),bounds(720),epoch,motion=false,lumeAlpha=1f,batteryBand=Baseline084BatteryBand.MEDIUM);write("after-lume-720.png",lume)} finally {lume.recycle()}
             File(dir,"meaning.txt").writeText("Actual Robolectric API35/native-Skia Canvas renders at 2026-10-15T10:10:30Z. Before source 6c722e3a9cf731354efa29cc24dbe1a3181c0225. Not device screenshots or performance evidence. Light/dark names describe surrounding backgrounds; the RM face material remains dark. Original Library references could not be materialized due network failure.")
         } finally {old.release();current.release()}
     }

@@ -1,47 +1,57 @@
-# Carbon 0.8.4 refinement review
+# Carbon 0.8.4 case and battery review
 
-This revision compares the production renderer with identifier-only frozen v0.8.3
-sources at `6c722e3a9cf731354efa29cc24dbe1a3181c0225`. Frozen dial, bridge and rear
-sources recover their exact original SHA-256 in `CarbonRefinement084Test`.
-Historical 0.8.1/a44/4058 review tests now use these frozen fixtures as their final
-historical target; their original assertions remain. Current production geometry,
-painting and source wiring checks still apply directly to production sources.
+The final case/scale compares production pixels with frozen candidate
+`11166bf4ba6e8e955a8f03febff57179f4a2baa8`. `ReferenceReviewCandidateTest` recovers
+the exact prior dial hash after identifier-only renames and hash-checks the
+unchanged approved bridge and pusher geometry source. The earlier bridge/battery
+revision tests use the frozen prior candidate; their original narrow masks and
+assertions remain. Current regression coverage is independent of those historical
+proofs.
 
-The upper spars and lower feet receive mirrored curved/flared joins. No front
-screws, six-o'clock neck, removed jewels or upper engraving return. The rear plates,
-case envelope, counters, date and main hands remain unchanged. Exact full-dial
-pixel comparisons protect everything outside fixed four-spar envelopes, a narrow
-frozen-prior-material bevel envelope and the battery detail. Counter/date interior
-pixels are checked independently even inside those envelopes. Path union may
-retessellate the pre-existing bevel's antialiasing; no numeric color tolerance is
-used. Existing native geometry tests retain exactly two substantial components,
-clear apertures and a transparent centre-to-six gap at phone and design sizes.
+The only new permitted regions are the outer case/pusher area and the fixed
+assembly-coordinate battery rectangle `(615,625)–(725,752)`. The protected inner
+face comes from literal approved dial coordinates, scaled 1.10 x 1.07 to include
+the blue bezel. Every included pixel outside that battery rectangle must match the
+prior candidate exactly at 240/360/720/1000px in Low/Medium/High/Unknown states.
+No mask is built from changed pixels or revised case geometry; no color tolerance
+is used. Counter/date geometry, the main bridge and its independent lower collar,
+rear plates, removed jewels and engraving are preserved.
 
-Battery L/M/H thresholds and invalid/unknown cases are tested independently, then
-actual renderer images verify immediate band changes and exact preservation of
-all other pixels. Unknown readings draw no pointer. Event observers are tested for
-sticky initialization, duplicate start, updates, stop/restart, View/window/screen
-lifecycle and wallpaper hide/show/destroy. A test protects M-label readability.
+The new case has shallow side waists and flatter angled shoulders. Dark pusher
+blocks have slim satin lips rather than polished hollow guards. Every original
+fastener retains a complete 20-unit seat inside the new case. Existing pusher
+hit-region source remains hash-identical; controls keep their established centers
+and target extents, including the pre-existing constrained crown band on the
+smallest raster size.
 
-To export actual new before/after evidence into a new, nonexistent directory:
+The dedicated battery renderer shares pivot `(704,712)`, radius 50 scale, radius 65
+labels, and clockwise-from-up angles Low -105, Medium -65, High -30 degrees.
+Pointer and sector geometry use that same datum. Short colored arcs have end ticks
+only. A consistent limited tangent adjustment keeps labels within +/-14 degrees.
+The pointer stops inside the scale; its tail is short and its orange cue sits
+near the arrowhead. Unknown retains the scale without a moving pointer. Functional
+thresholds remain Low 0–20, Medium 21–70, High 71–100; invalid readings are unknown.
+
+The coordinating executor materialized and inspected original close-up Library
+`libfile_52df795118f081918b33a9a0cef47479` version 0 and supplied measured design
+constraints. This implementation executor's two supported transfer attempts failed
+with generic download errors; no policy denial or alternate route was inferred.
+The coordinator independently compared actual candidate images with the original
+and accepted Library `libfile_117f3d24fb408191b30f1157622d86dd` version 1. Its SHA-256
+is `f2165afc95591f73d880d1c8e706ee7459894995267f03a71353787ce5f644bc`.
+No pixel changes followed acceptance.
+
+Actual render export (new nonexistent output directory required):
 
 ```sh
-CARBON_084_OUTPUT=/absolute/new-directory ./gradlew \
+CARBON_REFERENCE_CANDIDATE_OUTPUT=/absolute/new-directory ./gradlew \
   -PunsignedRelease=true -PincludePersonalOverlay=false \
-  :app:testDebugUnitTest --tests '*CarbonRefinement084Test'
+  :app:testDebugUnitTest --tests '*ReferenceReviewCandidateTest'
 ```
 
-Exports include 240/360/720px light/dark-background comparisons, low/medium/high/
-unknown battery examples and lume. Labels are composed by native Android Canvas.
-The face itself retains its dark material; “light/dark” refers to its surrounding
-background, not invented alternate artwork. Results use native Skia on the JVM,
-not an emulator/device or performance profiler.
-
-Original references found in Library were `IMG_8117.jpeg`, `IMG_8118.webp` and
-`IMG_8119.jpeg`; supported consumer-local materialization failed with a network
-error. No original reference pixels were available for this revision. Review
-therefore uses actual before/after render pixels and preserves that limitation.
-
-No secrets/private fonts/model downloads, workflow dispatch or approval bypass
-is part of this review. Device host behavior, OEM insets, physical accessibility
-services and frame timing remain unverified here.
+Full faces at 240/360/720px, every band/unknown, native side-by-side comparisons and
+3x nearest-neighbour battery/pusher crops are exported without retouching. They
+use Robolectric/API35/native Skia, not a device/emulator or performance profiler.
+No secret/private-font/model downloads, dispatch retry or owner-gate bypass is
+part of this work. Physical phone host behavior, TalkBack, OEM behavior and frame
+timing remain separate device QA.
