@@ -14,6 +14,8 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk=[35],manifest=Config.NONE,application=android.app.Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
+// Historical proof of the rejected over-bezel attempt at b4a7b613.
+// Current foreground occlusion is guarded by CarbonBezelOcclusionReviewTest.
 class CarbonLowerMetalCollarReviewTest {
     private val epoch=Instant.parse("2026-10-15T10:10:30Z").toEpochMilli()
     private fun bitmap(side:Int)=Bitmap.createBitmap(side,side,Bitmap.Config.ARGB_8888)
@@ -24,7 +26,7 @@ class CarbonLowerMetalCollarReviewTest {
         return Region().apply {setPath(p,Region(0,0,side,side))}
     }
     @Test fun onlyLowerCollarSectorChangesAtAllSizesBatteryBandsAndLume() {
-        val old=BaselineBeforeMetalCollarCarbonDialArt();val current=CarbonDialArt()
+        val old=BaselineBeforeMetalCollarCarbonDialArt();val current=BaselineBeforeBezelOcclusionCarbonDialArt()
         try {
             for(side in listOf(240,360,720,1000))for(band in listOf(null,*BatteryBand.entries.toTypedArray()))for(lume in listOf(0f,1f)) {
                 val a=bitmap(side);val b=bitmap(side)
@@ -44,8 +46,8 @@ class CarbonLowerMetalCollarReviewTest {
         }finally{old.release();current.release()}
     }
     @Test fun lowerContourHasNoCutEndsAndKeepsAnOpenCentreGap() {
-        val frame=CarbonLowerMetalCollarGeometry.frame()
-        val seatBounds=RectF().also {CarbonLowerMetalCollarGeometry.replacement().computeBounds(it,true)}
+        val frame=BaselineOverBezelLowerMetalCollarGeometry.frame()
+        val seatBounds=RectF().also {BaselineOverBezelLowerMetalCollarGeometry.replacement().computeBounds(it,true)}
         assertTrue("Metal plus its shadow must remain inside the blue track's 785.5 outer edge",seatBounds.bottom+2.5f<785.5f)
         val native=Region().apply {setPath(frame,Region(0,0,1000,1000))}
         for(x in 438..562)assertTrue("Missing lower metal at design column $x",(750..781).any {y->native.contains(x,y)})
@@ -54,7 +56,7 @@ class CarbonLowerMetalCollarReviewTest {
         assertTrue(kotlin.math.abs(bottom(460)-bottom(540))<=1)
         for((x,y) in listOf(448 to 770,500 to 779,552 to 770))assertTrue("Former cut end or bottom seat is missing",native.contains(x,y))
         for(side in listOf(240,360,720,1000)) {
-            val actual=raster(CarbonLowerMetalCollarGeometry.composedFrame(),side)
+            val actual=raster(BaselineOverBezelLowerMetalCollarGeometry.composedFrame(),side)
             val gap=raster(Path().apply {addRect(484f,563f,516f,595f,Path.Direction.CW)},side)
             assertTrue("Centre must remain disconnected from six",Region(actual).apply {op(gap,Region.Op.INTERSECT)}.isEmpty)
             val lowerClear=raster(Path().apply {addCircle(500f,693f,82f,Path.Direction.CW)},side)
@@ -74,7 +76,7 @@ class CarbonLowerMetalCollarReviewTest {
         }
     }
     @Test fun restoredMaterialIsMetalAndOriginalFrontSilverRimsStayExact() {
-        val old=BaselineBeforeMetalCollarCarbonDialArt();val current=CarbonDialArt()
+        val old=BaselineBeforeMetalCollarCarbonDialArt();val current=BaselineBeforeBezelOcclusionCarbonDialArt()
         val a=bitmap(1000);val b=bitmap(1000)
         try {
             old.draw(Canvas(a),bounds(1000),epoch,motion=false,batteryBand=BatteryBand.MEDIUM)
@@ -92,7 +94,7 @@ class CarbonLowerMetalCollarReviewTest {
     }
     @Test fun exportNativeMetalCollarComparison() {
         val output=System.getenv("CARBON_METAL_COLLAR_OUTPUT").orEmpty();assumeTrue(output.isNotEmpty())
-        val dir=File(output);check(dir.mkdirs());val old=BaselineBeforeMetalCollarCarbonDialArt();val current=CarbonDialArt()
+        val dir=File(output);check(dir.mkdirs());val old=BaselineBeforeMetalCollarCarbonDialArt();val current=BaselineBeforeBezelOcclusionCarbonDialArt()
         fun write(name:String,b:Bitmap)=File(dir,name).outputStream().use {check(b.compress(Bitmap.CompressFormat.PNG,100,it))}
         fun compare(a:Bitmap,b:Bitmap,title:String)=Bitmap.createBitmap(a.width+b.width+30,maxOf(a.height,b.height)+80,Bitmap.Config.ARGB_8888).also {
             val c=Canvas(it);c.drawColor(0xff161b20.toInt());val p=Paint(Paint.ANTI_ALIAS_FLAG).apply {color=Color.WHITE;textSize=20f}

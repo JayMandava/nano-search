@@ -4,20 +4,14 @@ import android.graphics.*
 
 /** Local replacement for the relieved bottom of the independent six-o'clock collar. */
 internal object CarbonLowerMetalCollarGeometry {
-    // Original circular shoulders and tangents remain unchanged. The lower
-    // quadrant eases into a shallow curved seat, never a flat rectangular foot.
+    // The complete circular ring continues behind the foreground bezel. Its
+    // visible boundary comes from case-aligned occlusion, never a flat cut.
     fun frame():Path {
         val outer=Path().apply {
-            arcTo(RectF(403f,596f,597f,790f),135f,270f,true)
-            cubicTo(550.089f,780.089f,523f,780.6f,500f,780.6f)
-            cubicTo(477f,780.6f,449.911f,780.089f,431.411f,761.589f)
-            close()
+            addCircle(500f,693f,97f,Path.Direction.CW)
         }
         val inner=Path().apply {
-            arcTo(RectF(411f,604f,589f,782f),135f,270f,true)
-            cubicTo(548.083f,770.783f,522f,776.8f,500f,776.8f)
-            cubicTo(478f,776.8f,451.917f,770.783f,437.067f,755.933f)
-            close()
+            addCircle(500f,693f,89f,Path.Direction.CW)
         }
         check(outer.op(inner,Path.Op.DIFFERENCE))
         return outer
@@ -29,7 +23,8 @@ internal object CarbonLowerMetalCollarGeometry {
     }
 
     fun replacement():Path=frame().apply {
-        check(op(Path().apply {addRect(400f,750f,600f,786f,Path.Direction.CW)},Path.Op.INTERSECT))
+        check(op(Path().apply {addRect(400f,750f,600f,800f,Path.Direction.CW)},Path.Op.INTERSECT))
+        check(op(CarbonPusherGeometry.innerDialPath(),Path.Op.INTERSECT))
     }
 
     /** Exact front-material composition used to check connection and clearance. */
@@ -53,9 +48,9 @@ internal class CarbonLowerMetalCollarArt {
 
     fun draw(canvas:Canvas) {
         val local=canvas.save()
-        // Four units overlap the unchanged upper arc so the join cannot expose
-        // a clipping seam. The new bottom stays inside the blue track's edge.
-        canvas.clipRect(400f,750f,600f,786f)
+        // Called inside the dial clip, before the bezel and counters. The
+        // complete lower circle is hidden wherever it passes behind the case.
+        canvas.clipRect(400f,750f,600f,800f)
         val shadow=canvas.save();canvas.translate(1.5f,2.5f)
         paint.color=0xb8000000.toInt();paint.shader=null;paint.style=Paint.Style.FILL
         canvas.drawPath(frame,paint);canvas.restoreToCount(shadow)

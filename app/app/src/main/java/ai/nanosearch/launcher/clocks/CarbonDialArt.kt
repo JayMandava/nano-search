@@ -45,6 +45,11 @@ class CarbonDialArt {
     private val silver = Color.rgb(168, 175, 177)
     private val gearPath = gearShape()
     private val motionClip = inner()
+    private val bezelFootprint=Path().also { path ->
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style=Paint.Style.STROKE;strokeWidth=11f;strokeJoin=Paint.Join.ROUND;strokeCap=Paint.Cap.ROUND
+        }.getFillPath(inner(),path)
+    }
     private val bridgeArt = CarbonBridgeArt()
     private val lowerMetalCollar = CarbonLowerMetalCollarArt()
     private val batteryArt = CarbonBatteryArt()
@@ -162,9 +167,23 @@ class CarbonDialArt {
         }
         overlay = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).also {
             val c = Canvas(it)
+            val root=c.save()
             c.scale(size / 1000f, size / 1000f)
             c.scale(CarbonDialGeometry.ASSEMBLY_SCALE,CarbonDialGeometry.ASSEMBLY_SCALE,500f,500f)
             upper(c)
+            c.restoreToCount(root)
+            // Bake the foreground plane separately so its blue/tick AA is
+            // independent of the counter material underneath it. This is a
+            // temporary cache-build image, never an allocation per frame.
+            val foreground=Bitmap.createBitmap(size,size,Bitmap.Config.ARGB_8888)
+            try {
+                val f=Canvas(foreground);f.scale(size/1000f,size/1000f)
+                f.scale(CarbonDialGeometry.ASSEMBLY_SCALE,CarbonDialGeometry.ASSEMBLY_SCALE,500f,500f)
+                f.clipRect(460f,768f,540f,794f);f.clipPath(bezelFootprint)
+                track(f)
+                paint.shader=null;paint.color=Color.WHITE;paint.style=Paint.Style.FILL
+                c.drawBitmap(foreground,0f,0f,paint)
+            }finally{foreground.recycle()}
         }
     }
 
@@ -329,6 +348,7 @@ class CarbonDialArt {
         lowerMetalCollar.clipOldLowerArc(c)
         bridgeArt.draw(c)
         c.restoreToCount(oldCollar)
+        lowerMetalCollar.draw(c)
         for ((x,y) in arrayOf(594f to 234f)) {
             oval(c,x-7,y-9,x+7,y+9,0xff381347.toInt())
             ovalStroke(c,x-7,y-9,x+7,y+9,1.7f,0xffa062a8.toInt())
@@ -337,7 +357,9 @@ class CarbonDialArt {
         track(c)
         subDial(c,350f,465f,95f,orange,12)
         subDial(c,650f,465f,95f,orange,30)
-        subDial(c,500f,693f,82f,yellow,60,lowerCollar=true)
+        subDial(c,500f,693f,82f,yellow,60)
+        // The side registers clear the blue band. Its lower intersection with
+        // six is composited as a foreground plane by ensureArt(), after upper.
         dateAperture(c)
         // Applied orange twelve, outlined with a narrow silver chamfer.
         text(c,"12",500f,317f,77f,0xfff1f1e8.toInt(),true,4f)
@@ -374,11 +396,8 @@ class CarbonDialArt {
         for ((str,x,y) in arrayOf(Triple("65",307f,219f),Triple("70",253f,317f),Triple("80",214f,440f),Triple("90",214f,597f),Triple("105",287f,773f),Triple("120",500f,820f),Triple("180",713f,773f),Triple("240",786f,597f),Triple("360",786f,440f),Triple("720",693f,219f))) text(c,str,x,y,12f,white)
     }
 
-    private fun subDial(c:Canvas,x:Float,y:Float,r:Float,color:Int,units:Int,lowerCollar:Boolean=false) {
+    private fun subDial(c:Canvas,x:Float,y:Float,r:Float,color:Int,units:Int) {
         oval(c,x-r-5,y-r-5,x+r+5,y+r+5,0xff050708.toInt())
-        // Seat the new metal above the clearance/track but below the original
-        // silver circle. Counter centres, radii and all interior drawing stay exact.
-        if(lowerCollar)lowerMetalCollar.draw(c)
         paint.color=Color.WHITE
         paint.shader=SweepGradient(x,y,intArrayOf(0xff939a9b.toInt(),0xffe9ece6.toInt(),0xff555e61.toInt(),0xffc5ceca.toInt(),0xff697478.toInt(),0xffe6e9df.toInt(),0xff939a9b.toInt()),null)
         paint.style=Paint.Style.FILL;c.drawCircle(x,y,r+3,paint);paint.shader=null
