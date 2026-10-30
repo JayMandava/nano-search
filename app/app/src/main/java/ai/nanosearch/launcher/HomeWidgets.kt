@@ -549,12 +549,14 @@ class HomeWidgets(
         else BuiltinWidgets.find(token.split(':').getOrNull(1) ?: return) ?: return
         val view = b.create(activity, token)
         val saved = savedSize(token)
-        val heightPx = saved?.second?.takeIf { it > 0 }?.let { dp(it) } ?: dp(b.defaultHeightDp)
-        val widthPx = saved?.first?.takeIf { it > 0 }?.let { dp(it) } ?: maxWidthPx
+        val carbon = b.id == ai.nanosearch.launcher.clocks.ClockFaces.CARBON_ID
+        val minimum = if(carbon) dp(240) else 0
+        val heightPx = (saved?.second?.takeIf { it > 0 }?.let { dp(it) } ?: dp(b.defaultHeightDp)).coerceAtLeast(minimum)
+        val widthPx = (saved?.first?.takeIf { it > 0 }?.let { dp(it) } ?: maxWidthPx).coerceAtLeast(minimum)
         val frame = LongPressFrame(activity).apply { addView(view, FrameLayout.LayoutParams(-1, -1)) }
         frame.onLongPress = {
             overlays.popupFor(frame, listOf(listOf(
-                MenuItem(R.drawable.ic_menu_resize, "Move or resize") { startEdit(token, token, dp(180), dp(90), frame) { _, _ -> } },
+                MenuItem(R.drawable.ic_menu_resize, "Move or resize") { startEdit(token, token, dp(if(carbon) 240 else 180), dp(if(carbon) 240 else 90), frame) { _, _ -> } },
                 MenuItem(R.drawable.ic_menu_remove, "Remove widget", destructive = true) { remove(token, frame) },
             )))
         }

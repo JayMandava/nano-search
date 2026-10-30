@@ -96,7 +96,8 @@ class ReferenceReviewCandidateTest {
         fun sha(bytes:ByteArray)=MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") {"%02x".format(it)}
         assertEquals("0c6c45e3eebb14916cdaf0aa1a1bf85a3d94722aff34a65948bae12c0fe22556",sha(fixture.toByteArray(Charsets.UTF_8)))
         assertEquals("0286c6b3ea818f6b0b41eb3aab7c4d01415c5ee17dcf372973660f33b64411a0",sha(File("src/main/java/ai/nanosearch/launcher/clocks/CarbonBridgeArt.kt").readBytes()))
-        assertEquals("1079d8adcd097aef726dc6cedc2c06134f2af92a76070ccccd29027b041a6f44",sha(File("src/main/java/ai/nanosearch/launcher/clocks/CarbonPusherGeometry.kt").readBytes()))
+        // Historical source proof: new fourth-pusher hit geometry is checked by FourthPusherReviewTest.
+        assertEquals("1079d8adcd097aef726dc6cedc2c06134f2af92a76070ccccd29027b041a6f44",sha(File("src/test/resources/clock_history/CarbonPusherGeometry-5449ca3.kt.txt").readBytes()))
     }
 
     @Test fun caseFastenersHaveMaterialAndExistingPusherTargetsRemainCoherent() {

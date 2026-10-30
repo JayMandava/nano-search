@@ -18,6 +18,8 @@ import android.os.Looper
 import android.os.PowerManager
 import android.service.wallpaper.WallpaperService
 import android.view.SurfaceHolder
+import android.view.MotionEvent
+import android.view.ViewConfiguration
 import java.io.File
 import kotlin.math.min
 
@@ -33,6 +35,10 @@ class ClockWallpaperService : WallpaperService() {
         private val dialBounds = RectF()
         private val power = getSystemService(PowerManager::class.java)
         private var faceRenderer: ClockFaceRenderer? = null
+        private var revSound: CarbonRevSound? = null
+        private val revTap=CarbonRevTap(ViewConfiguration.get(this@ClockWallpaperService).scaledTouchSlop.toFloat())
+        private var pusherLayout:CarbonPusherLayout?=null
+        private var pusherSide=0
         private val battery = PhoneBatteryObserver(this@ClockWallpaperService) { percent ->
             faceRenderer?.onBatteryChanged(percent); requestFrame()
         }
@@ -53,7 +59,7 @@ class ClockWallpaperService : WallpaperService() {
         private val clockChanged = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 when (intent.action) {
-                    Intent.ACTION_SCREEN_OFF -> { screenActive = false; battery.stop(); handler.removeCallbacks(frame) }
+                    Intent.ACTION_SCREEN_OFF -> { screenActive = false; battery.stop(); revSound?.setActive(false);revTap.cancel();handler.removeCallbacks(frame) }
                     Intent.ACTION_SCREEN_ON, Intent.ACTION_USER_PRESENT -> screenActive = true
                 }
                 faceRenderer?.onTimeChanged()
@@ -63,6 +69,7 @@ class ClockWallpaperService : WallpaperService() {
 
         override fun onCreate(holder: SurfaceHolder) {
             super.onCreate(holder)
+            setTouchEventsEnabled(true)
             registrySubscription = ClockFaceRegistry.observe(this@ClockWallpaperService) { requestFrame() }
             prefs.registerOnSharedPreferenceChangeListener(preferenceChanged)
             observingPreferences = true
@@ -123,6 +130,7 @@ class ClockWallpaperService : WallpaperService() {
         }
 
         private fun stopObservers() {
+            revSound?.setActive(false);revTap.cancel()
             battery.stop()
             motion.detach()
             if (receivingTime) { unregisterReceiver(clockChanged); receivingTime = false }
@@ -173,11 +181,26 @@ class ClockWallpaperService : WallpaperService() {
             if (faceId == ClockFaces.CARBON_ID) {
                 battery.start(); faceRenderer?.onBatteryChanged(battery.percent)
             } else battery.stop()
+            if(faceId!=ClockFaces.CARBON_ID) {revSound?.setActive(false);revTap.cancel()}
             val cy = h * when (prefs.getString("lockclock_pos", "middle")) { "top" -> 0.28f; "low" -> 0.72f; else -> 0.5f }
             val side = (min(w, h) * 0.82f).toInt()
             dialBounds.set((w - side) / 2f, cy - side / 2f, (w + side) / 2f, cy + side / 2f)
+            if(side!=pusherSide) {
+                revSound?.setActive(false);revTap.cancel()
+                pusherSide=side;pusherLayout=CarbonPusherGeometry.layout(side.toFloat(),side.toFloat(),resources.displayMetrics.density)
+            }
             // This is the same complete renderer used by the home View, including hand order.
             faceRenderer?.draw(c, dialBounds, now, motion.smooth)
+        }
+
+        override fun onTouchEvent(event:MotionEvent) {
+            super.onTouchEvent(event)
+            val layout=pusherLayout ?: return
+            val enabled=visible && screenActive && !destroyed && faceRenderer?.id==ClockFaces.CARBON_ID
+            if(revTap.touch(event,layout,dialBounds.left,dialBounds.top,enabled)) {
+                val sound=revSound ?: CarbonRevSound({AndroidRevAudioBackend(this@ClockWallpaperService)}).also {revSound=it}
+                sound.setActive(true);sound.play()
+            }
         }
 
         /** The photo scaled to fill the screen and cropped to its middle, as before. */

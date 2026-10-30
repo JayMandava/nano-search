@@ -3,8 +3,8 @@ package ai.nanosearch.launcher.clocks
 import android.content.Context
 import android.util.Base64
 
-/** Controls belong to a Carbon home-widget instance; wallpaper and Steel remain display-only. */
-enum class CarbonPusherAction { START_PAUSE, SPLIT_RELEASE, RESET, OPEN_CLOCK, LUME }
+/** Controls belong to a Carbon home-widget instance; wallpaper has a separate rev-only action and Steel remains display-only. */
+enum class CarbonPusherAction { START_PAUSE, SPLIT_RELEASE, RESET, OPEN_CLOCK, LUME, REV }
 
 data class CarbonChronographState(
     val accumulatedMillis: Long = 0L,
@@ -34,7 +34,7 @@ data class CarbonChronographState(
             } else copy(startedAtMillis = nowElapsed.coerceAtLeast(0L), splitMillis = null)
             CarbonPusherAction.SPLIT_RELEASE -> copy(splitMillis = if (splitMillis == null) elapsed(nowElapsed) else null)
             CarbonPusherAction.RESET -> CarbonChronographState()
-            CarbonPusherAction.OPEN_CLOCK, CarbonPusherAction.LUME -> this
+            CarbonPusherAction.OPEN_CLOCK, CarbonPusherAction.LUME, CarbonPusherAction.REV -> this
         }
     }
 }

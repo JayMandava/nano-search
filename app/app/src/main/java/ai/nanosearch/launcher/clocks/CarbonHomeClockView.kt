@@ -19,7 +19,7 @@ import android.view.accessibility.AccessibilityNodeProvider
 import java.util.Locale
 import kotlin.math.hypot
 
-/** Stateful only in the keyed home factory; wallpaper and generic previews remain display-only. */
+/** Stateful only in the keyed home factory; wallpaper has its own rev-only tap handler; generic previews remain silent. */
 class CarbonHomeClockView @JvmOverloads constructor(
     context: Context,
     val instanceKey: String = UNPLACED_KEY_PREFIX + java.util.UUID.randomUUID(),
@@ -48,6 +48,7 @@ class CarbonHomeClockView @JvmOverloads constructor(
     private val accessibility = context.getSystemService(AccessibilityManager::class.java)
     private val focusPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; color = 0xb3c5e8dc.toInt(); strokeWidth = resources.displayMetrics.density * 2f }
     private val provider = ControlNodeProvider()
+    private var revSound: CarbonRevSound? = null
     private var lumeState = CarbonLumeState()
     var isLumeCallbackScheduled = false
         private set
@@ -74,6 +75,12 @@ class CarbonHomeClockView @JvmOverloads constructor(
     fun performPusherAction(action: CarbonPusherAction): Boolean {
         if (!chronographState.enabled(action)) return false
         if (action == CarbonPusherAction.OPEN_CLOCK) return ClockFaceClockIntent.launch(context)
+        if (action == CarbonPusherAction.REV) {
+            if (!isRenderingVisible) return false
+            val sound=revSound ?: CarbonRevSound({AndroidRevAudioBackend(context)}).also {revSound=it}
+            sound.setActive(true)
+            return sound.play()
+        }
         if (action == CarbonPusherAction.LUME) {
             if (!isRenderingVisible) return false
             lumeState = lumeState.trigger(elapsedRealtime())
@@ -112,23 +119,23 @@ class CarbonHomeClockView @JvmOverloads constructor(
     }
 
     override fun onDetachedFromWindow() {
-        checkpoint(elapsedRealtime()); cancelGesture(); clearLume()
+        checkpoint(elapsedRealtime()); cancelGesture(); clearLume(); revSound?.setActive(false)
         clearVirtualFocus()
         super.onDetachedFromWindow()
     }
 
     override fun onVisibilityAggregated(isVisible: Boolean) {
-        if (lifecycleReady && !isVisible) { cancelGesture(); clearLume(); clearVirtualFocus(); checkpoint(elapsedRealtime()) }
+        if (lifecycleReady && !isVisible) { cancelGesture(); clearLume(); revSound?.setActive(false); clearVirtualFocus(); checkpoint(elapsedRealtime()) }
         super.onVisibilityAggregated(isVisible)
     }
 
     override fun onWindowVisibilityChanged(visibility: Int) {
-        if (lifecycleReady && visibility != VISIBLE) { cancelGesture(); clearLume(); clearVirtualFocus(); checkpoint(elapsedRealtime()) }
+        if (lifecycleReady && visibility != VISIBLE) { cancelGesture(); clearLume(); revSound?.setActive(false); clearVirtualFocus(); checkpoint(elapsedRealtime()) }
         super.onWindowVisibilityChanged(visibility)
     }
 
     override fun onScreenInteractiveChanged(interactive: Boolean) {
-        if (lifecycleReady && !interactive) { cancelGesture(); clearLume(); clearVirtualFocus(); checkpoint(elapsedRealtime()) }
+        if (lifecycleReady && !interactive) { cancelGesture(); clearLume(); revSound?.setActive(false); clearVirtualFocus(); checkpoint(elapsedRealtime()) }
     }
 
     override fun onFocusChanged(gainFocus: Boolean, direction: Int, previouslyFocusedRect: Rect?) {
@@ -138,7 +145,7 @@ class CarbonHomeClockView @JvmOverloads constructor(
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         if (lifecycleReady) {
-            cancelGesture(); clearLume()
+            cancelGesture(); clearLume(); revSound?.setActive(false)
             targetLayout = CarbonPusherGeometry.layout(w.toFloat(), h.toFloat(), resources.displayMetrics.density)
             hovered = NO_VIRTUAL_ID
         }
@@ -200,6 +207,7 @@ class CarbonHomeClockView @JvmOverloads constructor(
         CarbonPusherAction.RESET -> "Reset chronograph"
         CarbonPusherAction.OPEN_CLOCK -> "Open system Clock"
         CarbonPusherAction.LUME -> "Illuminate hands and markers"
+        CarbonPusherAction.REV -> "Play original supercar rev"
     }
 
     private fun queriedTimeLabel(): String = super.accessibilityDescription(System.currentTimeMillis())

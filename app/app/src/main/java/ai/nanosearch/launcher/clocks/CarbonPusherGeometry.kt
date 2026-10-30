@@ -33,16 +33,17 @@ object CarbonPusherGeometry {
             return RectF(left, top, left + tw, top + th)
         }
         // Controls stay inside the square, outside the dial envelope, in disjoint vertical bands.
-        val start = target(x + side * .905f, y + side * .339f, RectF(x + side * .785f, y, x + side, y + side * .420f))
-        val reset = target(x + side * .905f, y + side * .668f, RectF(x + side * .785f, y + side * .580f, x + side, y + side))
-        val split = target(x + side * .085f, y + side * .6915f, RectF(x, y, x + side * .215f, y + side))
-        val crown = target(x + side * .950f, y + side * .500f, RectF(x + side * .785f, y + side * .420f, x + side, y + side * .580f))
+        val start = target(x + side * .905f, y + side * .339f, RectF(x + side * .785f, y, x + side, y + side * .400f))
+        val reset = target(x + side * .905f, y + side * .668f, RectF(x + side * .785f, y + side * .600f, x + side, y + side))
+        val split = target(x + side * .085f, y + side * .6915f, RectF(x, y + side * .600f, x + side * .215f, y + side))
+        val rev = target(x + side * .085f, y + side * .339f, RectF(x, y, x + side * .215f, y + side * .400f))
+        val crown = target(x + side * .950f, y + side * .500f, RectF(x + side * .785f, y + side * .400f, x + side, y + side * .600f))
         val path = innerDialPath()
         path.transform(Matrix().apply { setScale(CarbonDialGeometry.ASSEMBLY_SCALE, CarbonDialGeometry.ASSEMBLY_SCALE, 500f, 500f) })
         path.transform(Matrix().apply { setScale(side / 1000f, side / 1000f); postTranslate(x, y) })
         val dialBounds = RectF().also { path.computeBounds(it, true) }
         val region = Region().apply { setPath(path, Region(0, 0, w.toInt(), h.toInt())) }
-        return CarbonPusherLayout(square, dialBounds, start, split, reset, crown, region)
+        return CarbonPusherLayout(square, dialBounds, start, split, reset, crown, rev, region)
     }
 }
 
@@ -53,6 +54,7 @@ class CarbonPusherLayout internal constructor(
     private val split: RectF,
     private val reset: RectF,
     private val crown: RectF,
+    private val rev: RectF,
     private val dial: Region,
 ) {
     fun boundsFor(action: CarbonPusherAction): RectF = RectF(when (action) {
@@ -61,12 +63,14 @@ class CarbonPusherLayout internal constructor(
         CarbonPusherAction.RESET -> reset
         CarbonPusherAction.OPEN_CLOCK -> dialBounds
         CarbonPusherAction.LUME -> crown
+        CarbonPusherAction.REV -> rev
     })
     fun hitTest(x: Float, y: Float): CarbonPusherAction? = when {
         start.contains(x, y) -> CarbonPusherAction.START_PAUSE
         split.contains(x, y) -> CarbonPusherAction.SPLIT_RELEASE
         reset.contains(x, y) -> CarbonPusherAction.RESET
         crown.contains(x, y) -> CarbonPusherAction.LUME
+        rev.contains(x, y) -> CarbonPusherAction.REV
         dial.contains(x.toInt(), y.toInt()) -> CarbonPusherAction.OPEN_CLOCK
         else -> null
     }
