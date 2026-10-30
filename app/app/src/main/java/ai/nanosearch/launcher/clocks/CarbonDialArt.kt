@@ -190,22 +190,29 @@ class CarbonDialArt {
 
     private fun pusherGuard(c: Canvas, lower: Boolean, left: Boolean = false) {
         fun mirror(path: Path)=path.apply {
-            transform(Matrix().apply {setScale(1.23f,1.12f,889f,338f)})
             if(lower) transform(Matrix().apply {setScale(1f,-1f,500f,500f)})
             if(left) transform(Matrix().apply {setScale(-1f,1f,500f,500f)})
         }
+        // Long slanted paddles follow the case shoulders. Their 184-unit length
+        // is about one fifth of the 900-unit case, as in the owner's close-up.
         val body=mirror(Path().apply {
-            moveTo(885f,310f);lineTo(913f,307f);quadTo(917f,307f,919f,313f)
-            lineTo(929f,349f);quadTo(931f,355f,925f,358f)
-            lineTo(901f,367f);quadTo(896f,369f,894f,363f);close()
+            moveTo(865f,196f);lineTo(914f,191f);quadTo(922f,191f,925f,201f)
+            lineTo(965f,340f);quadTo(969f,351f,958f,359f)
+            lineTo(916f,375f);quadTo(908f,378f,904f,365f);close()
         })
-        fill(c,body,0xff252e31.toInt());stroke(c,body,1f,0xff465357.toInt())
+        val orangePaddle=lower && left
+        if(orangePaddle) {
+            fill(c,body,orange);stroke(c,body,1.5f,0xffa34914.toInt())
+        } else {
+            gradient(c,body,865f,196f,965f,359f,intArrayOf(0xff354044.toInt(),0xff20292c.toInt(),0xff303b3e.toInt()))
+            stroke(c,body,1.5f,0xff536063.toInt())
+        }
         val shoulder=mirror(Path().apply {
-            moveTo(882f,306f);lineTo(888f,306f)
-            cubicTo(887f,326f,897f,352f,902f,366f)
-            lineTo(895f,368f);cubicTo(889f,349f,880f,324f,882f,306f);close()
+            moveTo(865f,196f);lineTo(875f,194f)
+            cubicTo(884f,246f,899f,314f,916f,374f)
+            lineTo(904f,377f);cubicTo(886f,316f,872f,249f,865f,196f);close()
         })
-        gradient(c,shoulder,882f,306f,902f,368f,intArrayOf(0xff465457.toInt(),0xff879391.toInt(),0xff526163.toInt()))
+        gradient(c,shoulder,865f,196f,916f,377f,intArrayOf(0xff7e8d8f.toInt(),0xffe1e6e3.toInt(),0xff69797d.toInt()))
     }
 
     private fun inner(): Path = CarbonPusherGeometry.innerDialPath()
@@ -216,21 +223,11 @@ class CarbonDialArt {
 
     private fun underlay(c: Canvas) {
         // Pusher guards and crown are part of the drawing, not touch targets.
-        pusherGuard(c,false);pusherGuard(c,true);pusherGuard(c,false,left=true)
+        pusherGuard(c,false);pusherGuard(c,true);pusherGuard(c,false,left=true);pusherGuard(c,true,left=true)
         round(c, 875f, 420f, 970f, 580f, 29f, orange)
         for (i in 0..9) line(c, 880f + i * 8, 433f, 880f + i * 8, 568f, 3f, 0xffa34914.toInt())
         oval(c, 923f, 436f, 985f, 564f, 0xffb5bbbc.toInt())
         oval(c, 936f, 448f, 982f, 550f, 0xff555b5d.toInt())
-        val splitGuard=Path().apply {
-            moveTo(116f,643f);lineTo(93f,648f);quadTo(88f,649f,87f,655f)
-            lineTo(78f,716f);quadTo(77f,722f,83f,727f)
-            lineTo(113f,739f);lineTo(128f,746f);close()
-        }
-        splitGuard.transform(Matrix().apply {setScale(1.24f,1.12f,117f,691f)})
-        fill(c,splitGuard,0xff39474a.toInt());stroke(c,splitGuard,1f,0xff758582.toInt())
-        val splitPad=polygon(floatArrayOf(84f,660f,103f,653f,110f,660f,104f,725f,86f,718f,79f,711f))
-        splitPad.transform(Matrix().apply {setScale(1.35f,1.15f,111f,691f)})
-        fill(c,splitPad,orange);stroke(c,splitPad,1f,0xffa34914.toInt())
         val case = tonneau()
         gradient(c, case, 80f, 150f, 940f, 820f, intArrayOf(0xfff1f3ef.toInt(), 0xff646c70.toInt(), 0xffcbd0cf.toInt(), 0xff373c40.toInt(), 0xffe6e8e3.toInt()))
         stroke(c, case, 2f, 0xffe1e5e4.toInt())

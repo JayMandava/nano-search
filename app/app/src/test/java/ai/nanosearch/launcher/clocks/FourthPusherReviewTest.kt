@@ -20,8 +20,26 @@ class FourthPusherReviewTest {
     private val epoch=Instant.parse("2026-10-15T10:10:30Z").toEpochMilli()
     private fun bitmap(side:Int)=Bitmap.createBitmap(side,side,Bitmap.Config.ARGB_8888)
     private fun bounds(side:Int)=RectF(0f,0f,side.toFloat(),side.toFloat())
-    private fun allowed(x:Float,y:Float)=((x in 42f..150f || x in 870f..955f) && y in 285f..390f) ||
-        ((x in 48f..145f || x in 870f..955f) && y in 605f..755f)
+    private fun allowed(x:Float,y:Float)=((x in 25f..155f || x in 845f..975f) && y in 180f..390f) ||
+        ((x in 25f..155f || x in 845f..975f) && y in 610f..820f)
+    @Test fun referenceScalePaddlesStayLongAndLowerLeftIsBroadOrange() {
+        val old=BaselineSmallPusherCarbonDialArt();val current=CarbonDialArt()
+        val a=bitmap(1000);val b=bitmap(1000)
+        try {
+            old.draw(Canvas(a),bounds(1000),epoch,motion=false,batteryBand=BatteryBand.MEDIUM)
+            current.draw(Canvas(b),bounds(1000),epoch,motion=false,batteryBand=BatteryBand.MEDIUM)
+            for(xs in listOf(25..155,845..975))for(ys in listOf(180..390,610..820)) {
+                val rows=ys.count { y -> xs.any {x -> a.getPixel(x,y)!=b.getPixel(x,y)} }
+                assertTrue("Each external paddle needs at least 155 visible longitudinal rows: $rows",rows>=155)
+            }
+            var orangePixels=0
+            for(y in 610..820)for(x in 25..120) {
+                val color=b.getPixel(x,y)
+                if(Color.red(color)>210 && Color.green(color) in 65..155 && Color.blue(color)<65)orangePixels++
+            }
+            assertTrue("Lower-left must show a broad orange paddle, not a small tip: $orangePixels",orangePixels>3000)
+        }finally {old.release();current.release();a.recycle();b.recycle()}
+    }
     @Test fun pixelsOutsideFourExplicitButtonRegionsStayExactIncludingBatteryAndDial() {
         val before=BaselineCaseCarbonDialArt();val after=CarbonDialArt()
         try {
@@ -143,11 +161,11 @@ class FourthPusherReviewTest {
 
     @Test fun exportOriginalNativeBeforeAfterFullFaceAndButtons() {
         val output=System.getenv("CARBON_FOURTH_PUSHER_OUTPUT").orEmpty();assumeTrue(output.isNotEmpty())
-        val dir=File(output);check(dir.mkdirs());val old=BaselineCaseCarbonDialArt();val current=CarbonDialArt()
+        val dir=File(output);check(dir.mkdirs());val old=BaselineSmallPusherCarbonDialArt();val current=CarbonDialArt()
         fun write(name:String,b:Bitmap){File(dir,name).outputStream().use {check(b.compress(Bitmap.CompressFormat.PNG,100,it))}}
         fun compare(a:Bitmap,b:Bitmap,title:String):Bitmap=Bitmap.createBitmap(a.width+b.width+30,a.height+80,Bitmap.Config.ARGB_8888).also {
             val c=Canvas(it);c.drawColor(0xff161b20.toInt());val p=Paint(Paint.ANTI_ALIAS_FLAG).apply {color=Color.WHITE;textSize=20f}
-            c.drawText("BEFORE · 5449ca3",10f,28f,p);c.drawText(title,a.width+20f,28f,p)
+            c.drawText("BEFORE · SMALL PUSHERS",10f,28f,p);c.drawText(title,a.width+20f,28f,p)
             c.drawBitmap(a,10f,44f,null);c.drawBitmap(b,a.width+20f,44f,null)
         }
         try {
@@ -163,7 +181,7 @@ class FourthPusherReviewTest {
                         val details=mutableListOf<Bitmap>()
                         try {
                             write("comparison-full.png",full)
-                            for((name,r) in listOf("left" to Rect(30,180,120,550),"right" to Rect(610,180,700,550))) {
+                            for((name,r) in listOf("left" to Rect(10,115,125,610),"right" to Rect(595,115,710,610))) {
                                 fun crop(source:Bitmap)=Bitmap.createBitmap(r.width()*3,r.height()*3,Bitmap.Config.ARGB_8888).also {Canvas(it).drawBitmap(source,r,Rect(0,0,it.width,it.height),Paint().apply {isFilterBitmap=false})}
                                 val ca=crop(a);val cb=crop(b)
                                 try {details+=compare(ca,cb,name.uppercase()+" · 3× NATIVE PIXELS")}finally{ca.recycle();cb.recycle()}
