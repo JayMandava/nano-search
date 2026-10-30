@@ -42,7 +42,9 @@ class FourthPusherReviewTest {
         }finally {old.release();current.release();a.recycle();b.recycle()}
     }
     @Test fun pixelsOutsideFourExplicitButtonRegionsStayExactIncludingBatteryAndDial() {
-        val before=BaselineCaseCarbonDialArt();val after=CarbonDialArt()
+        // Keep the reviewed outer-control revision's exact historical proof.
+        // CarbonSixCounterSeatReviewTest separately guards the live full face.
+        val before=BaselineCaseCarbonDialArt();val after=BaselineBeforeSixSeatCarbonDialArt()
         try {
             for(side in listOf(240,360,720,1000)) for(band in listOf(null,*BatteryBand.entries.toTypedArray())) {
                 val a=bitmap(side);val b=bitmap(side)

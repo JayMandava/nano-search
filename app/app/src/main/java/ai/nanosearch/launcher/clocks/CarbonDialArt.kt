@@ -334,6 +334,7 @@ class CarbonDialArt {
         subDial(c,350f,465f,95f,orange,12)
         subDial(c,650f,465f,95f,orange,30)
         subDial(c,500f,693f,82f,yellow,60)
+        lowerCounterBezelSeat(c)
         dateAperture(c)
         // Applied orange twelve, outlined with a narrow silver chamfer.
         text(c,"12",500f,317f,77f,0xfff1f1e8.toInt(),true,4f)
@@ -344,6 +345,18 @@ class CarbonDialArt {
         stroke(c, faceRim(1.09f,1.09f), 1.2f, 0x887d939d.toInt())
         val glint=Path().apply { moveTo(320f,216f); quadTo(500f,194f,680f,216f) }
         stroke(c,glint,2f,0x99dee9ed.toInt())
+    }
+
+    private fun lowerCounterBezelSeat(c:Canvas) {
+        // Unlike the side registers, the six-o'clock black clearance reaches
+        // the blue track's tangent. Restore only the track outside its silver
+        // rim after the counter, so the clearance cannot cut a notch in it.
+        // The independent collar and the open centre-to-six gap are untouched.
+        val seat=c.save()
+        c.clipRect(440f,770f,560f,792f)
+        c.clipOutPath(Path().apply {addCircle(500f,693f,85.75f,Path.Direction.CW)})
+        track(c)
+        c.restoreToCount(seat)
     }
 
     private fun track(c: Canvas) {

@@ -24,7 +24,9 @@ class ReferenceReviewCandidateTest {
     private fun point(x:Int,y:Int,side:Int)=Pair(500f+((x+.5f)*1000f/side-500f)/1.05f,500f+((y+.5f)*1000f/side-500f)/1.05f)
 
     @Test fun allApprovedInnerFacePixelsStayExactOutsideBatteryForEveryBandAndSize() {
-        val old=Baseline084CarbonDialArt();val current=CarbonDialArt()
+        // Historical case/battery acceptance proof. The subsequent six-o'clock
+        // tangent change is bounded against this snapshot by its own pixel test.
+        val old=Baseline084CarbonDialArt();val current=BaselineBeforeSixSeatCarbonDialArt()
         val protectedPath=Path().apply {
             // Fixed approved dial envelope, never inferred from revised case or pixels.
             moveTo(327f,240f);quadTo(500f,220f,673f,240f)

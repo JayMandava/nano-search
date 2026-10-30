@@ -19,7 +19,9 @@ class CarbonPaddleJointCrownReviewTest {
         return joint || (x in 910f..1000f && y in 398f..602f)
     }
     @Test fun approvedPaddleBodiesAndEntireFaceStayExactOutsideJointsAndCrown() {
-        val old=BaselineApprovedPaddleCarbonDialArt();val current=CarbonDialArt()
+        // Preserve this approved joint/crown proof before the later lower-track
+        // tangent relief; its own full-face test guards the current renderer.
+        val old=BaselineApprovedPaddleCarbonDialArt();val current=BaselineBeforeSixSeatCarbonDialArt()
         try {
             for(side in listOf(240,360,720,1000))for(band in listOf(null,*BatteryBand.entries.toTypedArray())) {
                 val a=Bitmap.createBitmap(side,side,Bitmap.Config.ARGB_8888)
@@ -31,7 +33,7 @@ class CarbonPaddleJointCrownReviewTest {
                     // Protect the carbon face inside the existing silver guard.
                     // The guard's AA edge belongs to the intentionally changed
                     // joint, including the min-256 cache's resampling footprint.
-                    val interior=CarbonDialArt::class.java.getDeclaredMethod("tonneau",java.lang.Float.TYPE).apply {isAccessible=true}.invoke(current,16f) as Path
+                    val interior=current.javaClass.getDeclaredMethod("tonneau",java.lang.Float.TYPE).apply {isAccessible=true}.invoke(current,16f) as Path
                     interior.transform(Matrix().apply {setScale(side/1000f,side/1000f)})
                     val face=Region().apply {setPath(interior,Region(0,0,side,side))}
                     var protected=0;var changed=0
