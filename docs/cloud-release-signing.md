@@ -1,6 +1,6 @@
 # Cloud release build and private signing handoff
 
-Nano 0.8.4 uses versionCode 19. Build the official package's **unsigned release input** in the cloud without accessing private signing configuration:
+Nano 0.8.5 uses versionCode 20. Build the official package's **unsigned release input** in the cloud without accessing private signing configuration:
 
 ```sh
 cd app
@@ -11,7 +11,7 @@ cd app
 
 This remains the non-debuggable release variant with R8 and resource shrinking. It uses the official `ai.nanosearch.launcher` application ID, not the optional debug QA identity. Private `src/personal` overlays remain excluded from release regardless of the overlay flag; passing `false` also makes the cloud intent explicit. The isolated `-PclockQaBuild=true` debug profile is unchanged. The `minified` testing variant remains debug-signed and is not the publication artifact.
 
-Before handoff, record the source commit and APK SHA-256; inspect the manifest for versionName `0.8.4`, versionCode `19`, official package ID and non-debuggable status. Verify public asset provenance and inspect the actual artifact for excluded private assets. Confirm the unsigned APK has no signer; it is not yet installable as a production update.
+Before handoff, record the source commit and APK SHA-256; inspect the manifest for versionName `0.8.5`, versionCode `20`, official package ID and non-debuggable status. Verify public asset provenance and inspect the actual artifact for excluded private assets. Confirm the unsigned APK has no signer; it is not yet installable as a production update.
 
 The separately authorized signing step must use the existing release identity where its private key already resides. Do not transfer signing keys, passwords, private fonts or personal overlays into the cloud. Align the APK before signing if alignment is needed; modifying it after signing invalidates the signature. After signing, verify the signer against the established release certificate, the APK signature and alignment, and record the signed artifact's separate SHA-256 before publishing. See the official [apksigner reference](https://developer.android.com/tools/apksigner).
 
@@ -137,3 +137,24 @@ is included with all four original commit objects and metadata preserved. Each
 source-text patch and resulting Git tree was independently hash-verified before
 integration. Native renderer/JVM checks are separate from Android device, host
 lifecycle or phone QA; no new phone execution is claimed.
+
+## Fixed built-in clock audio input (0.8.5)
+
+The proposed noncredential `NANO_RM_AUDIO_OGG_BASE64` secret belongs only in the
+existing `production-release` environment, after explicit owner confirmation.
+It is not a signing secret and must never reuse the signing-key fields. The
+repository contains only its public size/hash/format/provenance manifest, not
+the audio or its encoded payload. See `tools/audio/RELEASE.md`.
+
+The gated unsigned-build job decodes and validates this one input after its
+existing owner approval. Gradle receives only the verified file path; it stages
+one release-only generated raw resource and fails closed if it is unavailable.
+Personal overlays remain excluded. The new input is not referenced by the signing
+job. Both existing owner gates, certificate pin and independent v2 verification
+remain unchanged.
+
+Ungated `validate` runs the public debug/minified fixture suites, lint, a
+debug-signed minified fixture build and instrumentation compilation. It cannot
+validate or produce the official release APK without the protected input.
+`publish` retains full debug/release tests, lint, unsigned R8 and strict APK
+inspection against the pinned Ogg. No production fallback is permitted.

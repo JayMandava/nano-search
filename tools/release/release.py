@@ -2,6 +2,7 @@
 """Fail-closed release checks. No signing credentials are consumed by this module."""
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -20,6 +21,9 @@ REPO = 'JayMandava/nano-search'
 ENVIRONMENT = 'production-release'
 CERT = '1f08d7d9aa073e5d7c4f2c9fd8caca761fc42f108c05e7a5ac88ea9dbc5332ce'
 API = 'https://api.github.com'
+audio_spec = importlib.util.spec_from_file_location('nano_release_audio', Path(__file__).resolve().parents[1] / 'audio/release_audio.py')
+release_audio = importlib.util.module_from_spec(audio_spec)
+audio_spec.loader.exec_module(release_audio)
 # Reviewed public asset provenance; never derive this policy from the incoming APK.
 PUBLIC_ASSETS = {
     'Barlow-SemiBold.ttf': '86577cb32f8abe3673db53ca0f4221e6856751a4f6730c867e00f720f8bb1fc5',
@@ -199,6 +203,9 @@ def verify_apk(path, version, code, signed):
         require({name.split('/')[1] for name in archive.namelist() if name.startswith('lib/') and name.endswith('.so')} == {'arm64-v8a'}, 'Unexpected native library ABI')
         verify_assets(archive)
         verify_native(archive, sdk)
+        if version_tuple(version) >= (0, 8, 5):
+            resources = run(str(build_tools / 'aapt2'), 'dump', 'resources', str(path))
+            release_audio.verify_packaged(archive, resources)
         if not signed:
             require(not any(re.match(r'META-INF/.*\.(RSA|DSA|EC|SF)$', name, re.I) for name in archive.namelist()), 'Unsigned candidate contains a JAR signature')
     if signed:

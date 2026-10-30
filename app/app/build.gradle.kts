@@ -1,4 +1,5 @@
 import java.util.Properties
+import java.io.File
 
 plugins {
     id("com.android.application")
@@ -14,8 +15,8 @@ android {
         applicationId = "ai.nanosearch.launcher"
         minSdk = 33
         targetSdk = 35
-        versionCode = 19
-        versionName = "0.8.4"
+        versionCode = 20
+        versionName = "0.8.5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["nanoAppLabel"] = "Nano Search"
         manifestPlaceholders["nanoHomeCategory"] = "android.intent.category.HOME"
@@ -111,6 +112,9 @@ android {
         }
     }
 
+    // Ogg must remain ZIP_STORED for openRawResourceFd/MediaPlayer playback.
+    androidResources { noCompress += "ogg" }
+
     buildFeatures { compose = true }
 
     compileOptions {
@@ -121,6 +125,23 @@ android {
         jvmTarget = "17"
     }
 }
+
+// One generated release-only resource. Never attach personal resources to release.
+// This Exec task intentionally declares no cacheable outputs and runs on every
+// release pre-build. Missing/invalid private input is fatal, including bundles.
+val releaseAudioRes = layout.buildDirectory.dir("generated/nanoReleaseAudio/res")
+android.sourceSets.getByName("release").res.srcDir(releaseAudioRes)
+val stageReleaseAudio = tasks.register<Exec>("stageReleaseAudio") {
+    workingDir(rootProject.projectDir.parentFile)
+    doFirst {
+        val input = providers.gradleProperty("nanoReleaseAudioFile").orNull
+            ?: throw GradleException("Verified private release audio required: -PnanoReleaseAudioFile=<absolute file>")
+        if (!File(input).isAbsolute) throw GradleException("Release audio input must be absolute")
+        commandLine("python3", "tools/audio/release_audio.py", "stage", "--input", input,
+            "--res-dir", releaseAudioRes.get().asFile.absolutePath)
+    }
+}
+tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(stageReleaseAudio) }
 
 // The optional GPU build of the language model layer (Vulkan). It is a second, separate native library so that the GPU driver is never
 // loaded unless the user turns the GPU on. AGP builds one CMake project per module, so this one is built here and packaged as a jniLib.

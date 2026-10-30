@@ -1,0 +1,11 @@
+Nano clock sound notice
+
+The official release sound is an edit of Monza track side by wandererscapes
+(Freesound), published by freesound_community via Pixabay, July 21, 2022.
+https://pixabay.com/sound-effects/film-special-effects-monza-track-side-69992/
+Pixabay Content License: https://pixabay.com/service/terms/
+
+This third-party recording is not licensed under Nano's Apache-2.0 source license.
+No authentic McLaren identity or endorsement is claimed. Do not redistribute the
+recording separately. Ordinary developer/debug builds use Nano's original
+synthetic fixture instead.

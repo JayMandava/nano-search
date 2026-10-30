@@ -1,4 +1,11 @@
-# Original supercar-style rev
+# Clock audio profiles
+
+Official 0.8.5 release builds require the separately licensed, privately provisioned
+Monza recording. See [release provisioning](RELEASE.md). The recording is not
+covered by this repository's Apache-2.0 license. No stock binary is stored here.
+Ordinary debug/minified builds retain the public synthetic fixture below.
+
+## Original developer-fixture rev
 
 `nano_supercar_rev.wav` is an original deterministic synthesis for Nano's explicit
 upper-left Carbon pusher. No sampled recording, downloaded audio or model is used.

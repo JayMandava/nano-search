@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "resource": "nano_supercar_rev",
+  "file_name": "nano_supercar_rev.ogg",
+  "secret_name": "NANO_RM_AUDIO_OGG_BASE64",
+  "environment": "production-release",
+  "bytes": 32632,
+  "base64_characters": 43512,
+  "sha256": "4fffd803c5a8a7f6fa40a5ea3dca493b75b191c4a2d0ffa6516b37cc07c77c6e",
+  "container": "Ogg",
+  "codec": "Opus",
+  "channels": 1,
+  "sample_rate": 48000,
+  "samples": 192000,
+  "bitrate": 64000,
+  "source": {
+    "title": "Monza track side",
+    "creator": "wandererscapes (Freesound)",
+    "publisher": "freesound_community",
+    "published": "2022-07-21",
+    "url": "https://pixabay.com/sound-effects/film-special-effects-monza-track-side-69992/",
+    "license": "Pixabay Content License",
+    "license_url": "https://pixabay.com/service/terms/",
+    "sha256": "1ee75789384cef25b108165a722aea5dd19b054d01ac96176cb597bc2a945833",
+    "start_seconds": 0.65,
+    "duration_seconds": 4.0,
+    "gain": 0.65,
+    "fade_in_seconds": 0.08,
+    "fade_out_seconds": 0.35
+  }
+}

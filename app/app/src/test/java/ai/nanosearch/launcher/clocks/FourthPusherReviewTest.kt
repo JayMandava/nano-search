@@ -130,7 +130,7 @@ class FourthPusherReviewTest {
             assertTrue("Visible home clock accepts explicit rev",view.performPusherAction(CarbonPusherAction.REV))
             assertFalse(view.performPusherAction(CarbonPusherAction.REV));assertEquals(1,fake.starts)
             val node=view.accessibilityNodeProvider.createAccessibilityNodeInfo(CarbonPusherAction.REV.ordinal+1)
-            assertTrue(requireNotNull(node).contentDescription.toString().contains("Play original supercar rev"))
+            assertTrue(requireNotNull(node).contentDescription.toString().contains("Play race-car sound"))
             view.onVisibilityAggregated(false);assertEquals(1,fake.releases);assertFalse(sound.playing)
             time+=3000;view.onVisibilityAggregated(true);assertTrue(view.performPusherAction(CarbonPusherAction.REV))
             host.pause().stop().destroy();assertEquals(2,fake.releases);assertFalse(sound.playing)

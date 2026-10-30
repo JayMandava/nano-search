@@ -207,7 +207,7 @@ class CarbonHomeClockView @JvmOverloads constructor(
         CarbonPusherAction.RESET -> "Reset chronograph"
         CarbonPusherAction.OPEN_CLOCK -> "Open system Clock"
         CarbonPusherAction.LUME -> "Illuminate hands and markers"
-        CarbonPusherAction.REV -> "Play original supercar rev"
+        CarbonPusherAction.REV -> "Play race-car sound"
     }
 
     private fun queriedTimeLabel(): String = super.accessibilityDescription(System.currentTimeMillis())

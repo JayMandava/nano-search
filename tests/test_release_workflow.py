@@ -187,6 +187,39 @@ class ArtifactTests(unittest.TestCase):
                     release.metadata(path, '0.8.2', 'a'*40, 17, False, '0'*64)
                 tools.assert_not_called()
 
+    def test_085_fixture_wav_is_rejected_before_signature_verification(self):
+        # Exercise the real version-gated audio check, not a mocked validator.
+        # Public synthetic bytes only; no licensed recording is available here.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'fixture.apk'
+            with zipfile.ZipFile(path, 'w') as out:
+                out.writestr('lib/arm64-v8a/libnanollm.so', b'fixture')
+                out.writestr('res/fixture.wav', b'public synthetic fixture')
+            calls = []
+            def command(*args):
+                calls.append(args)
+                if args[0].endswith('/aapt'):
+                    return "package: name='ai.nanosearch.launcher' versionCode='20' versionName='0.8.5'\nsdkVersion:'33'\ntargetSdkVersion:'35'\nnative-code: 'arm64-v8a'"
+                if args[0].endswith('/apkanalyzer'):
+                    return 'false'
+                if args[0].endswith('/aapt2'):
+                    return 'resource 0x7f090000 raw/nano_supercar_rev\n  () (file) res/fixture.wav\n'
+                return ''
+            with patch.dict(os.environ, {'ANDROID_HOME': tmp}), patch.object(release, 'run', side_effect=command), \
+                    patch.object(release, 'verify_assets'), patch.object(release, 'verify_native'):
+                with self.assertRaisesRegex(ValueError, 'synthetic fallback forbidden'):
+                    release.verify_apk(path, '0.8.5', 20, True)
+            self.assertFalse(any(c[0].endswith('/apksigner') for c in calls))
+
+    def test_standalone_audio_cannot_enter_artifact_handoff(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for name in ('unsigned.apk', 'candidate.json', 'release-notes.md', 'audio.ogg'):
+                (root / name).write_bytes(b'public fixture')
+            with patch.object(release, 'verify_apk') as verify, self.assertRaisesRegex(ValueError, 'Unexpected handoff'):
+                release.metadata(root, '0.8.5', 'a' * 40, 20, False, None)
+            verify.assert_not_called()
+
     def test_symlink_handoff_rejected_before_reading_target(self):
         with tempfile.TemporaryDirectory() as tmp:
             path=Path(tmp); (path/'candidate.json').symlink_to('/definitely-not-a-real-secret')
@@ -225,18 +258,32 @@ class ArtifactTests(unittest.TestCase):
         self.assertEqual(text.count('contents: write'),1)
         jobs=text.split('\n  sign:\n',1)
         self.assertEqual(len(jobs),2)
-        self.assertNotIn('${{ secrets.',jobs[0])
+        import re
+        self.assertEqual(re.findall(r'secrets\.([A-Z0-9_]+)',jobs[0]), ['NANO_RM_AUDIO_OGG_BASE64'])
+        self.assertNotIn('secrets.NANO_RELEASE_', jobs[0])
         sign=jobs[1].split('\n  publish:\n',1)[0]
         self.assertNotIn('gradlew',sign)
+        self.assertNotIn('NANO_RM_AUDIO_OGG_BASE64',sign)
         self.assertIn('environment: production-release',sign)
         self.assertIn('--debuggable-apk-permitted false',sign)
         self.assertIn(release.CERT,sign)
         validate=text.split('\n  validate:\n',1)[1].split('\n  build_unsigned:\n',1)[0]
         self.assertNotIn('upload-artifact',validate)
         self.assertNotIn('environment:',validate)
+        self.assertNotIn('secrets.',validate)
+        self.assertIn(':app:assembleMinified',validate)
+        self.assertNotIn(':app:assembleRelease',validate)
         build=text.split('\n  build_unsigned:\n',1)[1].split('\n  sign:\n',1)[0]
         self.assertIn('environment: production-release',build)
         self.assertIn('-PunsignedRelease=true -PincludePersonalOverlay=false',build)
+        self.assertIn('--no-build-cache --no-configuration-cache',build)
+        self.assertIn('release_audio.py prepare',build)
+        self.assertIn('-PnanoReleaseAudioFile=',build)
+        self.assertIn('if: always()',build)
+        self.assertIn('rm -rf -- app/app/build',build)
+        self.assertLess(build.index('release_audio.py prepare'),build.index('Test, lint and build'))
+        self.assertLess(build.index('Remove private audio input'),build.index('uses: actions/upload-artifact'))
+        self.assertEqual(text.count('environment: production-release'),2)
         import re
         actions=re.findall(r'uses: ([^\s]+)',text)
         self.assertTrue(actions and all(re.fullmatch(r'actions/[a-z-]+@[0-9a-f]{40}',a) for a in actions))
