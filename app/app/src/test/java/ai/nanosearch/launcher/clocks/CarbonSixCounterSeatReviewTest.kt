@@ -14,13 +14,15 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk=[35],manifest=Config.NONE,application=android.app.Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
+// Historical evidence for the rejected blue-only attempt at 1cbbcf7.
+// The live metal contour is protected by CarbonLowerMetalCollarReviewTest.
 class CarbonSixCounterSeatReviewTest {
     private val epoch=Instant.parse("2026-10-15T10:10:30Z").toEpochMilli()
     private fun bitmap(side:Int)=Bitmap.createBitmap(side,side,Bitmap.Config.ARGB_8888)
     private fun bounds(side:Int)=RectF(0f,0f,side.toFloat(),side.toFloat())
     private fun point(x:Int,y:Int,side:Int)=Pair(500f+((x+.5f)*1000/side-500f)/1.05f,500f+((y+.5f)*1000/side-500f)/1.05f)
     @Test fun onlyLowerTrackTangentChangesAcrossSizesBatteryBandsAndLume() {
-        val old=BaselineBeforeSixSeatCarbonDialArt();val current=CarbonDialArt()
+        val old=BaselineBeforeSixSeatCarbonDialArt();val current=BaselineBeforeMetalCollarCarbonDialArt()
         try {
             for(side in listOf(240,360,720,1000))for(band in listOf(null,*BatteryBand.entries.toTypedArray()))for(lume in listOf(0f,1f)) {
                 val a=bitmap(side);val b=bitmap(side)
@@ -45,7 +47,7 @@ class CarbonSixCounterSeatReviewTest {
         }finally{old.release();current.release()}
     }
     @Test fun noNewCentreBridgeAndAllCounterInteriorsRemainExact() {
-        val old=BaselineBeforeSixSeatCarbonDialArt();val current=CarbonDialArt()
+        val old=BaselineBeforeSixSeatCarbonDialArt();val current=BaselineBeforeMetalCollarCarbonDialArt()
         val a=bitmap(1000);val b=bitmap(1000)
         try {
             old.draw(Canvas(a),bounds(1000),epoch,motion=false,batteryBand=BatteryBand.MEDIUM)
@@ -61,7 +63,7 @@ class CarbonSixCounterSeatReviewTest {
         }finally{a.recycle();b.recycle();old.release();current.release()}
     }
     @Test fun lowerTrackNoLongerHasTheBlackClearanceNotch() {
-        val old=BaselineBeforeSixSeatCarbonDialArt();val current=CarbonDialArt()
+        val old=BaselineBeforeSixSeatCarbonDialArt();val current=BaselineBeforeMetalCollarCarbonDialArt()
         val a=bitmap(1000);val b=bitmap(1000)
         try {
             old.draw(Canvas(a),bounds(1000),epoch,motion=false)
@@ -78,7 +80,7 @@ class CarbonSixCounterSeatReviewTest {
     @Test fun exportNativeSixCounterComparison() {
         val output=System.getenv("CARBON_SIX_SEAT_OUTPUT").orEmpty();assumeTrue(output.isNotEmpty())
         val dir=File(output);check(dir.mkdirs())
-        val old=BaselineBeforeSixSeatCarbonDialArt();val current=CarbonDialArt()
+        val old=BaselineBeforeSixSeatCarbonDialArt();val current=BaselineBeforeMetalCollarCarbonDialArt()
         fun write(name:String,b:Bitmap)=File(dir,name).outputStream().use {check(b.compress(Bitmap.CompressFormat.PNG,100,it))}
         fun compare(a:Bitmap,b:Bitmap,title:String)=Bitmap.createBitmap(a.width+b.width+30,maxOf(a.height,b.height)+80,Bitmap.Config.ARGB_8888).also {
             val c=Canvas(it);c.drawColor(0xff161b20.toInt());val p=Paint(Paint.ANTI_ALIAS_FLAG).apply {color=Color.WHITE;textSize=20f}

@@ -46,6 +46,7 @@ class CarbonDialArt {
     private val gearPath = gearShape()
     private val motionClip = inner()
     private val bridgeArt = CarbonBridgeArt()
+    private val lowerMetalCollar = CarbonLowerMetalCollarArt()
     private val batteryArt = CarbonBatteryArt()
     private val gearColors = intArrayOf(0xff292e30.toInt(),0xff343a3b.toInt(),0xff292f32.toInt(),0xff393e3f.toInt(),0xff575b58.toInt())
     private val gearArt = arrayOfNulls<Bitmap>(5)
@@ -324,7 +325,10 @@ class CarbonDialArt {
         val save = c.save()
         c.clipPath(inner())
         // The side-register framework and separate lower collar sit below counters/hands.
+        val oldCollar=c.save()
+        lowerMetalCollar.clipOldLowerArc(c)
         bridgeArt.draw(c)
+        c.restoreToCount(oldCollar)
         for ((x,y) in arrayOf(594f to 234f)) {
             oval(c,x-7,y-9,x+7,y+9,0xff381347.toInt())
             ovalStroke(c,x-7,y-9,x+7,y+9,1.7f,0xffa062a8.toInt())
@@ -333,8 +337,7 @@ class CarbonDialArt {
         track(c)
         subDial(c,350f,465f,95f,orange,12)
         subDial(c,650f,465f,95f,orange,30)
-        subDial(c,500f,693f,82f,yellow,60)
-        lowerCounterBezelSeat(c)
+        subDial(c,500f,693f,82f,yellow,60,lowerCollar=true)
         dateAperture(c)
         // Applied orange twelve, outlined with a narrow silver chamfer.
         text(c,"12",500f,317f,77f,0xfff1f1e8.toInt(),true,4f)
@@ -345,18 +348,6 @@ class CarbonDialArt {
         stroke(c, faceRim(1.09f,1.09f), 1.2f, 0x887d939d.toInt())
         val glint=Path().apply { moveTo(320f,216f); quadTo(500f,194f,680f,216f) }
         stroke(c,glint,2f,0x99dee9ed.toInt())
-    }
-
-    private fun lowerCounterBezelSeat(c:Canvas) {
-        // Unlike the side registers, the six-o'clock black clearance reaches
-        // the blue track's tangent. Restore only the track outside its silver
-        // rim after the counter, so the clearance cannot cut a notch in it.
-        // The independent collar and the open centre-to-six gap are untouched.
-        val seat=c.save()
-        c.clipRect(440f,770f,560f,792f)
-        c.clipOutPath(Path().apply {addCircle(500f,693f,85.75f,Path.Direction.CW)})
-        track(c)
-        c.restoreToCount(seat)
     }
 
     private fun track(c: Canvas) {
@@ -383,8 +374,11 @@ class CarbonDialArt {
         for ((str,x,y) in arrayOf(Triple("65",307f,219f),Triple("70",253f,317f),Triple("80",214f,440f),Triple("90",214f,597f),Triple("105",287f,773f),Triple("120",500f,820f),Triple("180",713f,773f),Triple("240",786f,597f),Triple("360",786f,440f),Triple("720",693f,219f))) text(c,str,x,y,12f,white)
     }
 
-    private fun subDial(c:Canvas,x:Float,y:Float,r:Float,color:Int,units:Int) {
+    private fun subDial(c:Canvas,x:Float,y:Float,r:Float,color:Int,units:Int,lowerCollar:Boolean=false) {
         oval(c,x-r-5,y-r-5,x+r+5,y+r+5,0xff050708.toInt())
+        // Seat the new metal above the clearance/track but below the original
+        // silver circle. Counter centres, radii and all interior drawing stay exact.
+        if(lowerCollar)lowerMetalCollar.draw(c)
         paint.color=Color.WHITE
         paint.shader=SweepGradient(x,y,intArrayOf(0xff939a9b.toInt(),0xffe9ece6.toInt(),0xff555e61.toInt(),0xffc5ceca.toInt(),0xff697478.toInt(),0xffe6e9df.toInt(),0xff939a9b.toInt()),null)
         paint.style=Paint.Style.FILL;c.drawCircle(x,y,r+3,paint);paint.shader=null
