@@ -21,6 +21,9 @@ import kotlin.math.sin
 /** One shared assembly transform keeps rendered and host-driven clock layers registered. */
 object CarbonDialGeometry {
     const val ASSEMBLY_SCALE = 1.05f
+    const val SIDE_COUNTER_OUTSET = 10f
+    const val LEFT_COUNTER_X = 350f - SIDE_COUNTER_OUTSET
+    const val RIGHT_COUNTER_X = 650f + SIDE_COUNTER_OUTSET
     const val SECONDS_CENTER_Y = 702.65f
     const val SECONDS_DIAMETER = 172.2f
     const val DATE_LEFT = 328.85f
@@ -50,7 +53,7 @@ class CarbonDialArt {
             style=Paint.Style.STROKE;strokeWidth=11f;strokeJoin=Paint.Join.ROUND;strokeCap=Paint.Cap.ROUND
         }.getFillPath(inner(),path)
     }
-    private val bridgeArt = CarbonBridgeArt()
+    private val bridgeArt = CarbonBridgeArt(CarbonDialGeometry.SIDE_COUNTER_OUTSET)
     private val lowerMetalCollar = CarbonLowerMetalCollarArt()
     private val batteryArt = CarbonBatteryArt()
     private val gearColors = intArrayOf(0xff292e30.toInt(),0xff343a3b.toInt(),0xff292f32.toInt(),0xff393e3f.toInt(),0xff575b58.toInt())
@@ -97,8 +100,8 @@ class CarbonDialArt {
         batteryBand?.let { batteryArt.drawPointer(canvas,it) }
         val angles = CarbonTimeModel.angles(epochMillis, calendar.timeZone)
         if (hands) {
-            subHand(canvas, 350f, 465f, (elapsedMillis.coerceAtLeast(0L) % 43200000L) / 43200000f * 360, 58f, orange)
-            subHand(canvas, 650f, 465f, (elapsedMillis.coerceAtLeast(0L) % 1800000L) / 1800000f * 360, 59f, orange)
+            subHand(canvas, CarbonDialGeometry.LEFT_COUNTER_X, 465f, (elapsedMillis.coerceAtLeast(0L) % 43200000L) / 43200000f * 360, 58f, orange)
+            subHand(canvas, CarbonDialGeometry.RIGHT_COUNTER_X, 465f, (elapsedMillis.coerceAtLeast(0L) % 1800000L) / 1800000f * 360, 59f, orange)
             if (showRunningSeconds) subHand(canvas, 500f, 693f, angles.second, 57f, yellow)
             // Seconds and the parked central chronograph pointer sit beneath local-time hands.
             hand(canvas, 2, if (running || elapsedMillis > 0) (elapsedMillis.coerceAtLeast(0L) % 60000L) / 60000f * 360 else 0f)
@@ -107,8 +110,8 @@ class CarbonDialArt {
             if (lumeAlpha > 0f) drawLume(canvas, angles.hour, angles.minute, lumeAlpha)
             hub(canvas, 500f, 500f, 18f)
         } else {
-            subHand(canvas, 350f, 465f, 0f, 58f, orange)
-            subHand(canvas, 650f, 465f, 0f, 59f, orange)
+            subHand(canvas, CarbonDialGeometry.LEFT_COUNTER_X, 465f, 0f, 58f, orange)
+            subHand(canvas, CarbonDialGeometry.RIGHT_COUNTER_X, 465f, 0f, 59f, orange)
             if (showRunningSeconds) subHand(canvas, 500f, 693f, 0f, 57f, yellow)
             hand(canvas, 2, 0f)
         }
@@ -186,13 +189,12 @@ class CarbonDialArt {
             }finally{foreground.recycle()}
             // Keep the accepted six plane entirely separate. The two side
             // bezels and their existing applied markers get the same foreground
-            // priority, with a protected aperture around each counter face.
+            // priority across the actual silver-rim overlap.
             val sideForeground=Bitmap.createBitmap(size,size,Bitmap.Config.ARGB_8888)
             try {
                 val f=Canvas(sideForeground);f.scale(size/1000f,size/1000f)
                 f.scale(CarbonDialGeometry.ASSEMBLY_SCALE,CarbonDialGeometry.ASSEMBLY_SCALE,500f,500f)
                 f.clipPath(sideBezelForegroundMask())
-                fill(f,sideBezelForegroundMask(),0xff1b2024.toInt())
                 track(f)
                 paint.shader=null;paint.color=Color.WHITE;paint.style=Paint.Style.FILL
                 c.drawBitmap(sideForeground,0f,0f,paint)
@@ -201,10 +203,9 @@ class CarbonDialArt {
     }
 
     private fun sideBezelForegroundMask():Path {
-        // The full existing dark bezel lip is foreground, not just its cyan stripe.
-        val mask=Path().also { Paint().apply {style=Paint.Style.STROKE;strokeWidth=18f}.getFillPath(inner(),it) }
-        val contact=CarbonSideBezelSeat.geometry()
-        check(mask.op(contact,Path.Op.UNION))
+        // Same existing cyan foreground plane as six. The translated silver rims
+        // genuinely intersect it; no wider dark lip or local occluder is needed.
+        val mask=Path(bezelFootprint)
         for((x,angle) in listOf(240f to 270f,760f to 90f)) {
             // Identical applied-marker polygon and 5-unit border from track().
             val marker=Path().apply {
@@ -215,11 +216,8 @@ class CarbonDialArt {
             Paint().apply {style=Paint.Style.FILL_AND_STROKE;strokeWidth=5f;strokeJoin=Paint.Join.ROUND;strokeCap=Paint.Cap.ROUND}.getFillPath(marker,border)
             check(mask.op(border,Path.Op.UNION))
         }
-        val joins=Path().apply {addRect(220f,375f,300f,560f,Path.Direction.CW);addRect(700f,375f,780f,560f,Path.Direction.CW)}
+        val joins=Path().apply {addRect(228f,375f,277f,575f,Path.Direction.CW);addRect(723f,375f,772f,575f,Path.Direction.CW)}
         check(mask.op(joins,Path.Op.INTERSECT))
-        // Protect the complete front register including its black seat (radius100).
-        val faces=Path().apply {addCircle(350f,465f,100.5f,Path.Direction.CW);addCircle(650f,465f,100.5f,Path.Direction.CW)}
-        check(mask.op(faces,Path.Op.DIFFERENCE))
         return mask
     }
 
@@ -391,8 +389,8 @@ class CarbonDialArt {
         }
         c.restoreToCount(save)
         track(c)
-        subDial(c,350f,465f,95f,orange,12)
-        subDial(c,650f,465f,95f,orange,30)
+        subDial(c,CarbonDialGeometry.LEFT_COUNTER_X,465f,95f,orange,12)
+        subDial(c,CarbonDialGeometry.RIGHT_COUNTER_X,465f,95f,orange,30)
         subDial(c,500f,693f,82f,yellow,60)
         // The side registers clear the blue band. Its lower intersection with
         // six is composited as a foreground plane by ensureArt(), after upper.

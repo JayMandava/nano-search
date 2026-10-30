@@ -17,7 +17,7 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class CarbonSideSeatScaleReviewTest {
     private val epoch=Instant.parse("2026-10-15T10:10:30Z").toEpochMilli()
-    private val current=CarbonDialArt()
+    private val current=BaselineSeatedScaleCarbonDialArt()
     private val previous=BaselineSidePolishCarbonDialArt()
     @After fun release(){current.release();previous.release()}
     private fun render(side:Int,old:Boolean=false,band:BatteryBand?=BatteryBand.MEDIUM,lume:Float=0f):Bitmap {

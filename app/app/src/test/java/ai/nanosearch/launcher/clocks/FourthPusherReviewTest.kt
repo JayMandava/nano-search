@@ -63,10 +63,14 @@ class FourthPusherReviewTest {
             }
         }finally{before.release();after.release()}
     }
-    @Test fun acceptedBatteryBridgeAndInnerDialStayFrozenWithExactBaselineProvenance() {
+    @Test fun acceptedBatteryDialAndHistoricalBridgeKeepExactBaselineProvenance() {
         fun sha(bytes:ByteArray)=MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") {"%02x".format(it)}
-        val expected=mapOf("CarbonBatteryArt" to "0679cd1f958c98981d8022b5b65c4610a30dae38b8df89f6cf75239e6c06a713", "CarbonBridgeArt" to "0286c6b3ea818f6b0b41eb3aab7c4d01415c5ee17dcf372973660f33b64411a0", "PhoneBattery" to "597b049a05b8127be4b7d7eb795af819e8841b6e1e4d49db82b630afe632cd4c")
+        val expected=mapOf("CarbonBatteryArt" to "0679cd1f958c98981d8022b5b65c4610a30dae38b8df89f6cf75239e6c06a713", "PhoneBattery" to "597b049a05b8127be4b7d7eb795af819e8841b6e1e4d49db82b630afe632cd4c")
         for((name,hash) in expected)assertEquals("Accepted $name changed",hash,sha(File("src/main/java/ai/nanosearch/launcher/clocks/$name.kt").readBytes()))
+        // The owner-authorized side-register translation changes the live bridge.
+        // Retain the exact earlier source proof; live placement and occlusion
+        // are independently checked by CarbonSideCounterOverlapReviewTest.
+        assertEquals("0286c6b3ea818f6b0b41eb3aab7c4d01415c5ee17dcf372973660f33b64411a0",sha(File("src/test/resources/clock_history/CarbonBridgeArt-1e3bfdf.kt.txt").readBytes()))
         val geometry=File("src/main/java/ai/nanosearch/launcher/clocks/CarbonPusherGeometry.kt").readText()
         val dial=geometry.substringAfter("fun innerDialPath()").substringBefore("fun layout(")
         assertEquals("664e847b679e6ac2aba0bcad32c9b8ecff62852176584abc0faf2725bd789b98",sha(dial.toByteArray(Charsets.UTF_8)))

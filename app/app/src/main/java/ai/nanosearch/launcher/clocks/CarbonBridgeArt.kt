@@ -13,7 +13,8 @@ import kotlin.math.min
 /** Original decorative framework, not a reconstruction of any proprietary movement. */
 internal object CarbonBridgeGeometry {
     /** The side-register frame is continuous; the lower register retains its separate collar. */
-    fun frame(): Path {
+    fun frame(sideOutset: Float = 0f, clipToDial: Boolean = true): Path {
+        require(sideOutset in 0f..10f)
         val frame = Path()
         fun join(path: Path) { check(frame.op(path, Path.Op.UNION)) }
         fun branch(vararg points: Float) = join(rounded(points, 2f))
@@ -27,16 +28,16 @@ internal object CarbonBridgeGeometry {
             moveTo(413f, 224f)
             cubicTo(425f, 226f, 440f, 228f, 451f, 229f)
             quadTo(438f, 246f, 433f, 272f)
-            lineTo(415f, 352f); lineTo(403f, 376f)
-            quadTo(393f, 379f, 383f, 379f)
+            lineTo(415f, 352f); lineTo(403f-sideOutset, 376f)
+            quadTo(393f-sideOutset, 379f, 383f-sideOutset, 379f)
             lineTo(398f, 348f); lineTo(415f, 268f)
             quadTo(422f, 240f, 413f, 224f); close()
         }
         join(upper)
         join(Path(upper).apply { transform(Matrix().apply { setScale(-1f, 1f, 500f, 500f) }) })
 
-        join(circle(350f, 465f, 110f))
-        join(circle(650f, 465f, 110f))
+        join(circle(350f-sideOutset, 465f, 110f))
+        join(circle(650f+sideOutset, 465f, 110f))
         join(circle(500f, 693f, 97f))
 
         // A crisp, open faceted collar ties the upper and lower counter tangencies together.
@@ -59,11 +60,24 @@ internal object CarbonBridgeGeometry {
         join(circle(500f, 500f, 20f))
 
         // Long, almost straight lower spars replace the old broad hooked/S-shaped feet.
-        val lower = Path().apply {
+        val lower = if(sideOutset==0f) Path().apply {
             moveTo(311f, 559f); lineTo(329f, 560f); lineTo(410f, 751f)
             quadTo(415f, 765f, 432f, 784f)
             lineTo(394f, 785f)
             quadTo(403f, 772f, 395f, 750f); close()
+        } else Path().apply {
+            // Translate only the register end of the spar. Ease back to the
+            // original straight beam by y610; the accepted lower seat stays put.
+            val innerSlope=81f/191f;val outerSlope=84f/191f
+            val ix=329f+innerSlope*50f;val ox=311f+outerSlope*51f
+            moveTo(311f-sideOutset,559f);lineTo(329f-sideOutset,560f)
+            cubicTo(329f-sideOutset+innerSlope*50f/3f,560f+50f/3f,
+                ix-innerSlope*50f/3f,610f-50f/3f,ix,610f)
+            lineTo(410f,751f);quadTo(415f,765f,432f,784f)
+            lineTo(394f,785f);quadTo(403f,772f,395f,750f)
+            lineTo(ox,610f)
+            cubicTo(ox-outerSlope*17f,593f,311f-sideOutset+outerSlope*17f,576f,311f-sideOutset,559f)
+            close()
         }
         join(lower)
         join(Path(lower).apply { transform(Matrix().apply { setScale(-1f, 1f, 500f, 500f) }) })
@@ -73,8 +87,8 @@ internal object CarbonBridgeGeometry {
         // Clearances include a real margin beyond the required apertures: Path-op curves and
         // independently rasterized Region circles must stay disjoint even at 240-pixel size.
         val apertures = Path().apply {
-            addCircle(350f, 465f, 103f, Path.Direction.CW)
-            addCircle(650f, 465f, 103f, Path.Direction.CW)
+            addCircle(350f-sideOutset, 465f, 103f, Path.Direction.CW)
+            addCircle(650f+sideOutset, 465f, 103f, Path.Direction.CW)
             addCircle(500f, 693f, 89f, Path.Direction.CW)
             addRoundRect(332f, 262f, 392f, 365f, 8f, 8f, Path.Direction.CW)
             addCircle(500f, 500f, 8f, Path.Direction.CW)
@@ -88,7 +102,7 @@ internal object CarbonBridgeGeometry {
         val insideDial = CarbonPusherGeometry.innerDialPath().apply {
             transform(Matrix().apply { setScale(.99f, .99f, 500f, 500f) })
         }
-        check(frame.op(insideDial, Path.Op.INTERSECT))
+        if(clipToDial)check(frame.op(insideDial, Path.Op.INTERSECT))
         return frame
     }
 
@@ -124,8 +138,16 @@ internal object CarbonBridgeGeometry {
 }
 
 /** Baked into Carbon's static overlay; no path construction or material work occurs per frame. */
-internal class CarbonBridgeArt {
-    private val frame = CarbonBridgeGeometry.frame()
+internal class CarbonBridgeArt(private val sideOutset:Float=0f) {
+    private val frame = CarbonBridgeGeometry.frame(sideOutset)
+    private val fixedFrame = if(sideOutset==0f) frame else CarbonBridgeGeometry.frame()
+    private val movingSections=Path().apply {
+        // Isolate the moved register pieces from the unchanged core, so path-op
+        // contour normalization cannot alter accepted six/central bevel pixels.
+        for(cx in listOf(350f,350f-sideOutset,650f,650f+sideOutset))addCircle(cx,465f,116f,Path.Direction.CW)
+        addRect(365f,330f,440f,402f,Path.Direction.CW);addRect(560f,330f,635f,402f,Path.Direction.CW)
+        addRect(285f,550f,370f,613f,Path.Direction.CW);addRect(630f,550f,715f,613f,Path.Direction.CW)
+    }
     private val rearSupports = CarbonRearSupportArt()
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val body = LinearGradient(320f, 235f, 690f, 785f,
@@ -137,6 +159,20 @@ internal class CarbonBridgeArt {
     fun drawRear(canvas: Canvas) = rearSupports.draw(canvas)
 
     fun draw(canvas: Canvas) {
+        if(sideOutset==0f){drawMaterial(canvas,fixedFrame);return}
+        // This painter is first in the renderer-owned transparent overlay.
+        // Draw the fixed core without a different clip/shader raster context,
+        // then replace only the moved mechanical sections. CLEAR reveals the
+        // separately cached rear layer; it never paints a bezel-shaped patch.
+        drawMaterial(canvas,fixedFrame)
+        canvas.drawPath(movingSections,Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            xfermode=android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.CLEAR)
+        })
+        val moved=canvas.save();canvas.clipPath(movingSections)
+        drawMaterial(canvas,frame);canvas.restoreToCount(moved)
+    }
+
+    private fun drawMaterial(canvas:Canvas,frame:Path) {
         val shadow = canvas.save()
         canvas.translate(1.5f, 2.5f)
         paint.color = 0xb8000000.toInt(); paint.shader = null; paint.style = Paint.Style.FILL

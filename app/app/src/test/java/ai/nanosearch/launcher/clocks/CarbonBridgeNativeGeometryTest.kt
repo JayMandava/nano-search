@@ -56,6 +56,59 @@ class CarbonBridgeNativeGeometryTest {
         }
     }
 
+    @Test fun approvedOutwardRegistersHaveContinuousSupportsClearAperturesAndAnIndependentSix() {
+        for(side in listOf(240,360,720,1000)) {
+            val material=raster(CarbonBridgeGeometry.frame(CarbonDialGeometry.SIDE_COUNTER_OUTSET),side)
+            // Case/date occlusion can split a visible circular arc into pieces.
+            // Assert structural continuity BEFORE case occlusion, then validate
+            // visible apertures/containment against the actual clipped frame.
+            val supportEnvelope=CarbonPusherGeometry.innerDialPath().apply {
+                transform(Matrix().apply {setScale(.99f,.99f,500f,500f)})
+                // Include the actual side-assembly footprints hidden by the
+                // bezel. Keep the existing crop elsewhere (e.g. upper tips).
+                check(op(circle(CarbonDialGeometry.LEFT_COUNTER_X,465f,110f),Path.Op.UNION))
+                check(op(circle(CarbonDialGeometry.RIGHT_COUNTER_X,465f,110f),Path.Op.UNION))
+            }
+            val unoccludedSideAssemblies=CarbonBridgeGeometry.frame(CarbonDialGeometry.SIDE_COUNTER_OUTSET,clipToDial=false).apply {
+                check(op(supportEnvelope,Path.Op.INTERSECT))
+            }
+            // Keep every actual visible raster pixel. Boolean-path rounding at
+            // the case boundary must not discard one while restoring hidden
+            // ring material; a genuinely unsupported visible piece still adds
+            // a component and fails the exact count below.
+            val structural=raster(unoccludedSideAssemblies,side).apply {op(material,Region.Op.UNION)}
+            val pieces=components(structural,side).sortedByDescending {it.area}
+            val summary=pieces.map {p->"area=${p.area} bounds=${p.pixels.minOf {it%side}},${p.pixels.minOf {it/side}}..${p.pixels.maxOf {it%side}},${p.pixels.maxOf {it/side}}"}
+            val diagnostic=System.getenv("CARBON_MOVED_BRIDGE_DIAGNOSTIC").orEmpty()
+            if(diagnostic.isNotEmpty()) {
+                val directory=java.io.File(diagnostic);directory.mkdirs()
+                val colors=intArrayOf(0xff70dcb0.toInt(),0xff6babef.toInt(),0xffff684f.toInt(),0xffe7c84c.toInt(),0xffdf70d2.toInt())
+                val pixels=IntArray(side*side){0xff161b20.toInt()}
+                pieces.forEachIndexed {i,p->p.pixels.forEach {pixels[it]=colors[i%colors.size]}}
+                val image=Bitmap.createBitmap(pixels,side,side,Bitmap.Config.ARGB_8888)
+                try {java.io.File(directory,"components-$side.png").outputStream().use {image.compress(Bitmap.CompressFormat.PNG,100,it)}}finally{image.recycle()}
+            }
+            assertEquals("Approved unoccluded structure has main bridge and separate six, no fragments/$side: $summary",2,pieces.size)
+            val main=pieces[0];val lower=pieces[1]
+            for((x,y) in listOf(500f to 420f,447f to 465f,553f to 465f)) {
+                val witness=raster(circle(x,y,3f),side)
+                assertTrue("Both moved collars must join the same central support/$x,$y/$side",main.pixels.any {witness.contains(it%side,it/side)})
+            }
+            val six=raster(circle(500f,600f,3f),side)
+            assertTrue("The second component is still six/$side",lower.pixels.any {six.contains(it%side,it/side)})
+            val gap=raster(Path().apply {addRect(484f,563f,516f,595f,Path.Direction.CW)},side)
+            assertTrue("Approved placement must retain the real centre-to-six gap/$side",Region(gap).apply {op(material,Region.Op.INTERSECT)}.isEmpty)
+            val openings=listOf(
+                circle(CarbonDialGeometry.LEFT_COUNTER_X,465f,102f),
+                circle(CarbonDialGeometry.RIGHT_COUNTER_X,465f,102f),
+                circle(500f,693f,88f),
+                Path().apply {addRoundRect(333f,263f,391f,364f,7f,7f,Path.Direction.CW)},
+                circle(500f,500f,7f))
+            for(opening in openings)assertTrue("No support intrudes into an approved aperture/$side",Region(raster(opening,side)).apply {op(material,Region.Op.INTERSECT)}.isEmpty)
+            assertTrue("Moved support stays inside the unchanged case contour/$side",Region(material).apply {op(raster(CarbonPusherGeometry.innerDialPath(),side),Region.Op.DIFFERENCE)}.isEmpty)
+        }
+    }
+
     @Test fun removedCentreToSixNeckIsARealOpenGapAtEveryRasterSize() {
         val gap = Path().apply { addRect(484f, 563f, 516f, 595f, Path.Direction.CW) }
         for (side in listOf(240, 360, 720, 1000)) {
