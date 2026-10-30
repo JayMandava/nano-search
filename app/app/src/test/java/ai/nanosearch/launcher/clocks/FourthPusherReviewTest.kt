@@ -21,7 +21,8 @@ class FourthPusherReviewTest {
     private fun bitmap(side:Int)=Bitmap.createBitmap(side,side,Bitmap.Config.ARGB_8888)
     private fun bounds(side:Int)=RectF(0f,0f,side.toFloat(),side.toFloat())
     private fun allowed(x:Float,y:Float)=((x in 25f..155f || x in 845f..975f) && y in 180f..390f) ||
-        ((x in 25f..155f || x in 845f..975f) && y in 610f..820f)
+        ((x in 25f..155f || x in 845f..975f) && y in 610f..820f) ||
+        (x in 910f..1000f && y in 398f..602f)
     @Test fun referenceScalePaddlesStayLongAndLowerLeftIsBroadOrange() {
         val old=BaselineSmallPusherCarbonDialArt();val current=CarbonDialArt()
         val a=bitmap(1000);val b=bitmap(1000)
@@ -55,7 +56,7 @@ class FourthPusherReviewTest {
                         }
                         if(a.getPixel(x,y)!=b.getPixel(x,y))changed++
                     }
-                    assertTrue(protected>side*side*.88);assertTrue(changed>side/2)
+                    assertTrue(protected>side*side*.86);assertTrue(changed>side/2)
                 }finally{a.recycle();b.recycle()}
             }
         }finally{before.release();after.release()}
@@ -161,11 +162,11 @@ class FourthPusherReviewTest {
 
     @Test fun exportOriginalNativeBeforeAfterFullFaceAndButtons() {
         val output=System.getenv("CARBON_FOURTH_PUSHER_OUTPUT").orEmpty();assumeTrue(output.isNotEmpty())
-        val dir=File(output);check(dir.mkdirs());val old=BaselineSmallPusherCarbonDialArt();val current=CarbonDialArt()
+        val dir=File(output);check(dir.mkdirs());val old=BaselineApprovedPaddleCarbonDialArt();val current=CarbonDialArt()
         fun write(name:String,b:Bitmap){File(dir,name).outputStream().use {check(b.compress(Bitmap.CompressFormat.PNG,100,it))}}
         fun compare(a:Bitmap,b:Bitmap,title:String):Bitmap=Bitmap.createBitmap(a.width+b.width+30,a.height+80,Bitmap.Config.ARGB_8888).also {
             val c=Canvas(it);c.drawColor(0xff161b20.toInt());val p=Paint(Paint.ANTI_ALIAS_FLAG).apply {color=Color.WHITE;textSize=20f}
-            c.drawText("BEFORE · SMALL PUSHERS",10f,28f,p);c.drawText(title,a.width+20f,28f,p)
+            c.drawText("BEFORE · APPROVED PADDLES",10f,28f,p);c.drawText(title,a.width+20f,28f,p)
             c.drawBitmap(a,10f,44f,null);c.drawBitmap(b,a.width+20f,44f,null)
         }
         try {
@@ -177,16 +178,16 @@ class FourthPusherReviewTest {
                     current.draw(Canvas(b),bounds(side),epoch,motion=false,batteryBand=BatteryBand.MEDIUM)
                     write("before-$side.png",a);write("after-$side.png",b)
                     if(side==720) {
-                        val full=compare(a,b,"FOUR PUSHERS · REVIEW")
+                        val full=compare(a,b,"SEATED JOINTS + CROWN")
                         val details=mutableListOf<Bitmap>()
                         try {
                             write("comparison-full.png",full)
-                            for((name,r) in listOf("left" to Rect(10,115,125,610),"right" to Rect(595,115,710,610))) {
+                            for((name,r) in listOf("left joints" to Rect(10,115,125,610),"right + crown" to Rect(595,115,720,610))) {
                                 fun crop(source:Bitmap)=Bitmap.createBitmap(r.width()*3,r.height()*3,Bitmap.Config.ARGB_8888).also {Canvas(it).drawBitmap(source,r,Rect(0,0,it.width,it.height),Paint().apply {isFilterBitmap=false})}
                                 val ca=crop(a);val cb=crop(b)
                                 try {details+=compare(ca,cb,name.uppercase()+" · 3× NATIVE PIXELS")}finally{ca.recycle();cb.recycle()}
                             }
-                            val sheet=Bitmap.createBitmap(full.width,full.height+details.maxOf {it.height}+20,Bitmap.Config.ARGB_8888)
+                            val sheet=Bitmap.createBitmap(maxOf(full.width,details.sumOf {it.width}+10),full.height+details.maxOf {it.height}+20,Bitmap.Config.ARGB_8888)
                             try {
                                 val c=Canvas(sheet);c.drawColor(0xff161b20.toInt());c.drawBitmap(full,0f,0f,null)
                                 c.drawBitmap(details[0],0f,full.height.toFloat(),null);c.drawBitmap(details[1],details[0].width+10f,full.height.toFloat(),null)

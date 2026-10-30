@@ -195,24 +195,37 @@ class CarbonDialArt {
         }
         // Long slanted paddles follow the case shoulders. Their 184-unit length
         // is about one fifth of the 900-unit case, as in the owner's close-up.
-        val body=mirror(Path().apply {
+        fun paddleOutline()=Path().apply {
             moveTo(865f,196f);lineTo(914f,191f);quadTo(922f,191f,925f,201f)
             lineTo(965f,340f);quadTo(969f,351f,958f,359f)
-            lineTo(916f,375f);quadTo(908f,378f,904f,365f);close()
-        })
+            lineTo(916f,375f);quadTo(908f,378f,904f,365f)
+        }
+        val body=mirror(paddleOutline().apply {close()})
+        // Keep the approved body path and its rasterization unchanged. A
+        // separate lap paints over its former inner outline and fills the gap
+        // beneath the case. Drawing it last avoids a seam across the new seat.
+        val lap=mirror(polygon(floatArrayOf(840f,196f,865f,196f,885f,250f,906f,350f,904f,365f,916f,375f,870f,365f)))
         val orangePaddle=lower && left
         if(orangePaddle) {
             fill(c,body,orange);stroke(c,body,1.5f,0xffa34914.toInt())
+            fill(c,lap,orange)
         } else {
             gradient(c,body,865f,196f,965f,359f,intArrayOf(0xff354044.toInt(),0xff20292c.toInt(),0xff303b3e.toInt()))
             stroke(c,body,1.5f,0xff536063.toInt())
+            gradient(c,lap,865f,196f,965f,359f,intArrayOf(0xff354044.toInt(),0xff20292c.toInt(),0xff303b3e.toInt()))
         }
-        val shoulder=mirror(Path().apply {
-            moveTo(865f,196f);lineTo(875f,194f)
-            cubicTo(884f,246f,899f,314f,916f,374f)
-            lineTo(904f,377f);cubicTo(886f,316f,872f,249f,865f,196f);close()
+        val joint=mirror(Path().apply {
+            // The identical two Bezier segments used by tonneau(), not a
+            // straight approximation. The case paints over the inner half.
+            moveTo(865f,191f)
+            cubicTo(885f,232f,891f,263f,883f,298f)
+            cubicTo(878f,322f,897f,357f,913f,397f)
         })
-        gradient(c,shoulder,865f,196f,916f,377f,intArrayOf(0xff7e8d8f.toInt(),0xffe1e6e3.toInt(),0xff69797d.toInt()))
+        val seated=c.save()
+        val seat=Path(body).apply {op(lap,Path.Op.UNION)}
+        c.clipPath(seat)
+        stroke(c,joint,8f,0xffaebcbb.toInt())
+        c.restoreToCount(seated)
     }
 
     private fun inner(): Path = CarbonPusherGeometry.innerDialPath()
@@ -224,10 +237,14 @@ class CarbonDialArt {
     private fun underlay(c: Canvas) {
         // Pusher guards and crown are part of the drawing, not touch targets.
         pusherGuard(c,false);pusherGuard(c,true);pusherGuard(c,false,left=true);pusherGuard(c,true,left=true)
-        round(c, 875f, 420f, 970f, 580f, 29f, orange)
-        for (i in 0..9) line(c, 880f + i * 8, 433f, 880f + i * 8, 568f, 3f, 0xffa34914.toInt())
-        oval(c, 923f, 436f, 985f, 564f, 0xffb5bbbc.toInt())
-        oval(c, 936f, 448f, 982f, 550f, 0xff555b5d.toInt())
+        // 188 / 900 = 20.9% of case height. Keep the stepped cylindrical end
+        // inside the fixed 1000-unit square; the accepted case leaves 77 units.
+        round(c, 895f, 406f, 982f, 594f, 24f, orange)
+        for (i in 0..7) line(c, 919f + i * 8, 417f, 919f + i * 8, 583f, 3f, 0xffa34914.toInt())
+        round(c, 967f, 427f, 987f, 573f, 7f, 0xff7d898b.toInt())
+        round(c, 975f, 429f, 988f, 571f, 5f, 0xffb5bfbe.toInt())
+        oval(c, 975f, 427f, 998f, 573f, 0xffd1d8d4.toInt())
+        oval(c, 981f, 440f, 996f, 560f, 0xff465155.toInt())
         val case = tonneau()
         gradient(c, case, 80f, 150f, 940f, 820f, intArrayOf(0xfff1f3ef.toInt(), 0xff646c70.toInt(), 0xffcbd0cf.toInt(), 0xff373c40.toInt(), 0xffe6e8e3.toInt()))
         stroke(c, case, 2f, 0xffe1e5e4.toInt())
