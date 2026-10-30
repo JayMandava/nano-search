@@ -192,6 +192,7 @@ class CarbonDialArt {
                 val f=Canvas(sideForeground);f.scale(size/1000f,size/1000f)
                 f.scale(CarbonDialGeometry.ASSEMBLY_SCALE,CarbonDialGeometry.ASSEMBLY_SCALE,500f,500f)
                 f.clipPath(sideBezelForegroundMask())
+                fill(f,sideBezelForegroundMask(),0xff1b2024.toInt())
                 track(f)
                 paint.shader=null;paint.color=Color.WHITE;paint.style=Paint.Style.FILL
                 c.drawBitmap(sideForeground,0f,0f,paint)
@@ -200,7 +201,10 @@ class CarbonDialArt {
     }
 
     private fun sideBezelForegroundMask():Path {
-        val mask=Path(bezelFootprint)
+        // The full existing dark bezel lip is foreground, not just its cyan stripe.
+        val mask=Path().also { Paint().apply {style=Paint.Style.STROKE;strokeWidth=18f}.getFillPath(inner(),it) }
+        val contact=CarbonSideBezelSeat.geometry()
+        check(mask.op(contact,Path.Op.UNION))
         for((x,angle) in listOf(240f to 270f,760f to 90f)) {
             // Identical applied-marker polygon and 5-unit border from track().
             val marker=Path().apply {
@@ -211,11 +215,10 @@ class CarbonDialArt {
             Paint().apply {style=Paint.Style.FILL_AND_STROKE;strokeWidth=5f;strokeJoin=Paint.Join.ROUND;strokeCap=Paint.Cap.ROUND}.getFillPath(marker,border)
             check(mask.op(border,Path.Op.UNION))
         }
-        val joins=Path().apply {addRect(228f,375f,277f,575f,Path.Direction.CW);addRect(723f,375f,772f,575f,Path.Direction.CW)}
+        val joins=Path().apply {addRect(220f,375f,300f,560f,Path.Direction.CW);addRect(700f,375f,780f,560f,Path.Direction.CW)}
         check(mask.op(joins,Path.Op.INTERSECT))
-        // Original face radius is 91. This six-unit buffer also protects its
-        // antialiasing at the smallest 256->240 cached rendering size.
-        val faces=Path().apply {addCircle(350f,465f,97f,Path.Direction.CW);addCircle(650f,465f,97f,Path.Direction.CW)}
+        // Protect the complete front register including its black seat (radius100).
+        val faces=Path().apply {addCircle(350f,465f,100.5f,Path.Direction.CW);addCircle(650f,465f,100.5f,Path.Direction.CW)}
         check(mask.op(faces,Path.Op.DIFFERENCE))
         return mask
     }
@@ -426,7 +429,7 @@ class CarbonDialArt {
             fill(c,p,0xff101416.toInt());stroke(c,p,5f,0xff171d20.toInt());fill(c,p,white)
             c.restoreToCount(s)
         }
-        for ((str,x,y) in arrayOf(Triple("65",307f,219f),Triple("70",253f,317f),Triple("80",214f,440f),Triple("90",214f,597f),Triple("105",287f,773f),Triple("120",500f,820f),Triple("180",713f,773f),Triple("240",786f,597f),Triple("360",786f,440f),Triple("720",693f,219f))) text(c,str,x,y,12f,white)
+        CarbonScaleLabels.draw(c,white)
     }
 
     private fun subDial(c:Canvas,x:Float,y:Float,r:Float,color:Int,units:Int) {

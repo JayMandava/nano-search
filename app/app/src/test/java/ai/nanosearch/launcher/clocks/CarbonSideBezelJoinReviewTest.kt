@@ -20,7 +20,7 @@ class CarbonSideBezelJoinReviewTest {
     private fun bounds(side:Int)=RectF(0f,0f,side.toFloat(),side.toFloat())
     private fun point(x:Int,y:Int,side:Int)=Pair(500f+((x+.5f)*1000/side-500f)/1.05f,500f+((y+.5f)*1000/side-500f)/1.05f)
     @Test fun everyUnrelatedPixelIncludingAcceptedSixAndAllCounterFacesStaysExact() {
-        val old=BaselineAcceptedSixCarbonDialArt();val current=CarbonDialArt()
+        val old=BaselineAcceptedSixCarbonDialArt();val current=BaselineSidePolishCarbonDialArt()
         try {
             for(side in listOf(240,360,720,1000))for(band in listOf(null,*BatteryBand.entries.toTypedArray()))for(lume in listOf(0f,1f)) {
                 val a=bitmap(side);val b=bitmap(side)
@@ -41,7 +41,7 @@ class CarbonSideBezelJoinReviewTest {
         }finally{old.release();current.release()}
     }
     @Test fun existingAppliedSideMarkersSitOverTheClearanceRatherThanAbutItsBlackEdge() {
-        val old=BaselineAcceptedSixCarbonDialArt();val current=CarbonDialArt();val a=bitmap(1000);val b=bitmap(1000)
+        val old=BaselineAcceptedSixCarbonDialArt();val current=BaselineSidePolishCarbonDialArt();val a=bitmap(1000);val b=bitmap(1000)
         try {
             old.draw(Canvas(a),bounds(1000),epoch,motion=false)
             current.draw(Canvas(b),bounds(1000),epoch,motion=false)
@@ -54,14 +54,14 @@ class CarbonSideBezelJoinReviewTest {
     }
     @Test fun ringGeometryTrackAndAcceptedSixPlaneSourceAreUnchanged() {
         val before=File("src/test/java/ai/nanosearch/launcher/clocks/BaselineAcceptedSixCarbonDialArt.kt").readText().replace("BaselineAcceptedSixCarbonDialGeometry","CarbonDialGeometry")
-        val current=File("src/main/java/ai/nanosearch/launcher/clocks/CarbonDialArt.kt").readText()
+        val current=File("src/test/java/ai/nanosearch/launcher/clocks/BaselineSidePolishCarbonDialArt.kt").readText().replace("BaselineSidePolishCarbonDialGeometry","CarbonDialGeometry")
         fun section(s:String,a:String,b:String)=s.substringAfter(a).substringBefore(b)
         assertEquals(section(before,"private fun track(c: Canvas)","private fun date(c:Canvas"),section(current,"private fun track(c: Canvas)","private fun date(c:Canvas"))
         assertEquals(section(before,"val foreground=Bitmap.createBitmap","}finally{foreground.recycle()}"),section(current,"val foreground=Bitmap.createBitmap","}finally{foreground.recycle()}"))
     }
     @Test fun exportNativeFullFaceSideJoinsAndUnchangedSixControl() {
         val output=System.getenv("CARBON_SIDE_JOIN_OUTPUT").orEmpty();assumeTrue(output.isNotEmpty())
-        val dir=File(output);check(dir.mkdirs());val old=BaselineAcceptedSixCarbonDialArt();val current=CarbonDialArt();val panels=mutableListOf<Bitmap>()
+        val dir=File(output);check(dir.mkdirs());val old=BaselineAcceptedSixCarbonDialArt();val current=BaselineSidePolishCarbonDialArt();val panels=mutableListOf<Bitmap>()
         fun write(name:String,b:Bitmap)=File(dir,name).outputStream().use {check(b.compress(Bitmap.CompressFormat.PNG,100,it))}
         fun pair(a:Bitmap,b:Bitmap,title:String)=Bitmap.createBitmap(a.width+b.width+30,a.height+80,Bitmap.Config.ARGB_8888).also {
             val c=Canvas(it);c.drawColor(0xff161b20.toInt());val p=Paint(Paint.ANTI_ALIAS_FLAG).apply {color=Color.WHITE;textSize=20f}
