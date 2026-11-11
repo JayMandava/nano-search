@@ -68,12 +68,15 @@ android {
 
     buildTypes {
         debug {
-            // Opt-in cloud-built physical QA: never replace the installed production package,
-            // become a Home candidate, or expose a selectable QA wallpaper provider.
-            if (providers.gradleProperty("clockQaBuild").map(String::toBoolean).getOrElse(false)) {
+            // Clock QA remains excluded from Home. Launcher QA is a separate, explicit opt-in:
+            // it keeps the isolated QA package/signature while allowing actual Home-role testing.
+            // Neither profile can replace production or expose a selectable QA wallpaper provider.
+            val clockQaBuild = providers.gradleProperty("clockQaBuild").map(String::toBoolean).getOrElse(false)
+            val os7QaLauncherBuild = providers.gradleProperty("os7QaLauncherBuild").map(String::toBoolean).getOrElse(false)
+            if (clockQaBuild || os7QaLauncherBuild) {
                 applicationIdSuffix = ".clockqa"
-                manifestPlaceholders["nanoAppLabel"] = "Nano Clock QA"
-                manifestPlaceholders["nanoHomeCategory"] = "ai.nanosearch.launcher.category.QA_ONLY"
+                manifestPlaceholders["nanoAppLabel"] = if (os7QaLauncherBuild) "Nano Search v2" else "Nano Clock QA"
+                manifestPlaceholders["nanoHomeCategory"] = if (os7QaLauncherBuild) "android.intent.category.HOME" else "ai.nanosearch.launcher.category.QA_ONLY"
                 manifestPlaceholders["nanoWallpaperEnabled"] = "false"
             }
         }

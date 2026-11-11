@@ -59,3 +59,9 @@ The same APK was installed on the user's authorized CPH2467 as the previously ab
 Actual-device checks passed: header/cutout-safe inset, one/two/three-row and hidden tray, five panels, dark menus, search with existing keyboard, keyboard-bounded menu, explicit HOME reset and Options scrolling to Advanced. No blocking visual issue or crash/ANR was observed in the scoped app log sample. QA remained installed and open for review.
 
 A bounded mixed-navigation sample recorded 564 frames,40 janky(7.09%),median8ms,p95 27ms. The display reported120Hz, but this is not sustained120fps; drops remain. The separate QA manifest omits HOME registration, so default-launcher system Home integration and populated production-data migration remain untested.
+
+## Named v2 launcher build and real Home tests
+
+User-requested display name is `Nano Search v2`, verified against original installed `Nano Search`. New debug-only `-Pos7QaLauncherBuild=true` retains the same isolated `.clockqa` ID and signer, enables HOME registration and keeps wallpaper provider disabled. Ordinary clock-QA remains non-HOME; regular debug remains unchanged. Packaged-manifest matrix and signer checks passed. APK SHA-256: `2f9847e2cb1c757cab6ea86550c90f44a93f26afa30ceddbe99af7e87b1cfa89`.
+
+Installed in place preserving first-install time/data. Temporarily made v2 the actual default HOME on CPH2467. Real Home key from menu, search, folder and Android Settings returned clean All/one-row Home; repeated Home stable. Actual bottom swipe Home from Android Settings passed. Synthetic test folder removed. Exact original HD2 default restored and resolver verified; no additional grants or production-data changes. V2 remains installed with its new label.
