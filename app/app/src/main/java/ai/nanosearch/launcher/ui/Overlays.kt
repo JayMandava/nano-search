@@ -1,5 +1,6 @@
 package ai.nanosearch.launcher.ui
 
+import ai.nanosearch.launcher.AppSettings
 import ai.nanosearch.launcher.NText
 import ai.nanosearch.launcher.NEdit
 import android.app.Activity
@@ -8,6 +9,9 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
+import android.graphics.drawable.StateListDrawable
+import android.graphics.drawable.ColorDrawable
+import android.widget.ScrollView
 import android.text.Editable
 import android.text.TextWatcher
 import android.util.TypedValue
@@ -40,6 +44,10 @@ class PickApp(val title: String, val key: String, val icon: android.graphics.dra
  * Everything lives in [host], a full-screen layer above the launcher, so it can be dismissed from the activity when Home or Back is pressed.
  */
 class Overlays(private val activity: Activity, private val host: FrameLayout, private val pal: Palette) {
+    private val classic get() = AppSettings.os7Mode(activity)
+    private val overlaySurface get() = if (classic) 0xFFF5F5F3.toInt() else pal.card
+    private val overlayInk get() = if (classic) 0xFF171D24.toInt() else pal.onSurface
+    private val overlaySecondary get() = if (classic) 0xFF505A63.toInt() else pal.onVariant
     private val density = activity.resources.displayMetrics.density
     private fun dp(v: Int) = (v * density).toInt()
     private fun dpf(v: Int) = v * density
@@ -79,6 +87,10 @@ class Overlays(private val activity: Activity, private val host: FrameLayout, pr
 
     /** Popup at a point (where a long-press happened). [top] and [bottom] are the edges it must not cover; for a bare point they are the same. */
     fun popup(x: Float, top: Float, bottom: Float = top, groups: List<List<MenuItem>>, arrow: Boolean = false) {
+        if (AppSettings.os7Mode(activity)) {
+            classicPopup(x, top, bottom, groups)
+            return
+        }
         dismissAll()
         val layer = FrameLayout(activity).apply {
             setBackgroundColor(Color.TRANSPARENT)
@@ -117,7 +129,7 @@ class Overlays(private val activity: Activity, private val host: FrameLayout, pr
         val below = bottom + gap + h + margin <= screenH - dp(24)
         val topPx = if (below) bottom + gap else (top - gap - h).coerceAtLeast(margin.toFloat())
         layer.addView(card, FrameLayout.LayoutParams(w, h).apply { leftMargin = left.toInt(); this.topMargin = topPx.toInt() })
-        val pointer = if (arrow) TriangleView(activity, pal.card, pointingDown = !below).also {
+        val pointer = if (arrow) TriangleView(activity, overlaySurface, pointingDown = !below).also {
             val aw = dp(12); val ah = dp(10)
             val ax = (x - aw / 2f).coerceIn(left + dp(16), left + w - dp(16) - aw)
             val ay = if (below) topPx - ah + 1 else topPx + h - 1
@@ -137,6 +149,87 @@ class Overlays(private val activity: Activity, private val host: FrameLayout, pr
         pointer?.apply { alpha = 0f; pivotX = width / 2f; animate().alpha(1f).setStartDelay(60).setDuration(83).start() }
     }
 
+    /** Classic Options menu. Scroll rather than clip actions on compact displays or large text. */
+    private fun classicPopup(x: Float, top: Float, bottom: Float, groups: List<List<MenuItem>>, title: String? = null) {
+        dismissAll()
+        val location = IntArray(2).also(host::getLocationOnScreen)
+        val insets = host.rootWindowInsets?.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout() or WindowInsets.Type.ime())
+        val width = host.width.takeIf { it > 0 } ?: activity.resources.displayMetrics.widthPixels
+        val height = host.height.takeIf { it > 0 } ?: activity.resources.displayMetrics.heightPixels
+        val margin = dp(8)
+        val minY = max(margin, (insets?.top ?: 0) - location[1] + margin)
+        val maxY = height - (insets?.bottom ?: 0) - margin
+        val menuWidth = min(dp(300), width - margin * 2).coerceAtLeast(1)
+        val layer = FrameLayout(activity).apply { isClickable = true }
+        layer.addView(View(activity).apply {
+            setBackgroundColor(0x55000000)
+            setOnClickListener { dismissPopup(false) }
+        }, FrameLayout.LayoutParams(-1, -1))
+        val rows = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(0xFF292E34.toInt())
+        }
+        if (title != null) rows.addView(NText(activity).apply {
+            text = title; setTextColor(Color.WHITE); setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0xFF555E66.toInt(), 0xFF171D24.toInt()))
+            isAccessibilityHeading = true
+        }, LinearLayout.LayoutParams(-1, -2))
+        groups.forEachIndexed { groupIndex, group ->
+            if (groupIndex > 0) rows.addView(View(activity).apply { setBackgroundColor(0xFF525C66.toInt()) }, LinearLayout.LayoutParams(-1, dp(1)))
+            group.forEach { item ->
+                rows.addView(classicMenuRow(item), LinearLayout.LayoutParams(-1, -2))
+            }
+        }
+        val scroll = ScrollView(activity).apply {
+            isFillViewport = false
+            elevation = dpf(8)
+            background = GradientDrawable().apply { setColor(0xFF292E34.toInt()); setStroke(dp(1), 0xFF737F88.toInt()) }
+            setPadding(dp(1), dp(1), dp(1), dp(1))
+            addView(rows, ViewGroup.LayoutParams(-1, -2))
+        }
+        val available = (maxY - minY).coerceAtLeast(1)
+        scroll.measure(View.MeasureSpec.makeMeasureSpec(menuWidth, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(available, View.MeasureSpec.AT_MOST))
+        val menuHeight = scroll.measuredHeight.coerceAtMost(available)
+        val left = (x - location[0] - menuWidth / 2f).toInt().coerceIn(margin, (width - menuWidth - margin).coerceAtLeast(margin))
+        val below = bottom - location[1] + margin
+        val desiredY = if (below + menuHeight <= maxY) below else top - location[1] - margin - menuHeight
+        val y = desiredY.toInt().coerceIn(minY, (maxY - menuHeight).coerceAtLeast(minY))
+        layer.addView(scroll, FrameLayout.LayoutParams(menuWidth, menuHeight).apply { leftMargin = left; topMargin = y })
+        host.addView(layer, FrameLayout.LayoutParams(-1, -1))
+        popupLayer = layer
+        // Focus starts in the menu for keyboard / trackpad navigation; all actions retain their labels.
+        rows.childrenFirstFocusable()?.requestFocus()
+    }
+
+    private fun LinearLayout.childrenFirstFocusable(): View? = (0 until childCount).map { getChildAt(it) }.firstOrNull { it.isFocusable }
+
+    private fun classicMenuRow(item: MenuItem): View {
+        val focused = intArrayOf(android.R.attr.state_focused)
+        val pressed = intArrayOf(android.R.attr.state_pressed)
+        val ink = if (item.destructive) 0xFFFF9B91.toInt() else Color.WHITE
+        val states = arrayOf(pressed, focused, intArrayOf())
+        val colors = ColorStateList(states, intArrayOf(Color.WHITE, Color.WHITE, ink))
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+            minimumHeight = dp(48); isFocusable = true
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            background = StateListDrawable().apply {
+                fun selection() = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0xFF249EE5.toInt(), 0xFF0067AC.toInt()))
+                addState(pressed, selection()); addState(focused, selection()); addState(intArrayOf(), ColorDrawable(0xFF292E34.toInt()))
+            }
+            addView(ImageView(activity).apply {
+                setImageResource(item.icon); imageTintList = colors; isDuplicateParentStateEnabled = true
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }, LinearLayout.LayoutParams(dp(20), dp(20)))
+            addView(NText(activity).apply {
+                text = item.label; setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f); setTextColor(colors)
+                isDuplicateParentStateEnabled = true; setPadding(dp(12), 0, 0, 0)
+            }, LinearLayout.LayoutParams(0, -2, 1f))
+            setOnClickListener { dismissPopup(false); item.action() }
+        }
+    }
+
     private fun cornerRadii(i: Int, n: Int, outer: Int, inner: Int): FloatArray {
         if (n == 1) return FloatArray(8) { dpf(pal.radius(28)) } // a lone row is a full pill
         val top = if (i == 0) dpf(pal.radius(outer)) else dpf(pal.radius(inner))
@@ -146,8 +239,8 @@ class Overlays(private val activity: Activity, private val host: FrameLayout, pr
 
     private fun menuRow(item: MenuItem, radii: FloatArray): View {
         val spirit = true
-        val ink = if (item.destructive) pal.error else pal.onSurface
-        val bg = GradientDrawable().apply { setColor(if (spirit) Color.TRANSPARENT else pal.card); cornerRadii = if (spirit) FloatArray(8) else radii }
+        val ink = if (item.destructive) pal.error else overlayInk
+        val bg = GradientDrawable().apply { setColor(if (spirit) Color.TRANSPARENT else overlaySurface); cornerRadii = if (spirit) FloatArray(8) else radii }
         val mask = GradientDrawable().apply { setColor(Color.WHITE); cornerRadii = radii }
         return LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -194,7 +287,7 @@ class Overlays(private val activity: Activity, private val host: FrameLayout, pr
 
         val sheet = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            background = GradientDrawable().apply { setColor(pal.card); cornerRadii = floatArrayOf(dpf(pal.radius(28)), dpf(pal.radius(28)), dpf(pal.radius(28)), dpf(pal.radius(28)), 0f, 0f, 0f, 0f) }
+            background = GradientDrawable().apply { setColor(overlaySurface); cornerRadii = if (classic) FloatArray(8) else floatArrayOf(dpf(pal.radius(28)), dpf(pal.radius(28)), dpf(pal.radius(28)), dpf(pal.radius(28)), 0f, 0f, 0f, 0f) }
             elevation = dpf(16)
             setPadding(0, 0, 0, bottomInset())
             isClickable = true
@@ -203,11 +296,11 @@ class Overlays(private val activity: Activity, private val host: FrameLayout, pr
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             setPadding(dp(24), dp(12), dp(24), if (title != null) dp(8) else dp(4))
-            addView(View(activity).apply { background = GradientDrawable().apply { setColor(pal.onVariant); alpha = 110; cornerRadius = dpf(2) } }, LinearLayout.LayoutParams(dp(32), dp(4)))
+            addView(View(activity).apply { background = GradientDrawable().apply { setColor(overlaySecondary); alpha = 110; cornerRadius = dpf(2) } }, LinearLayout.LayoutParams(dp(32), dp(4)))
             if (title != null) addView(NText(activity).apply {
                 text = title
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
-                setTextColor(pal.onSurface)
+                setTextColor(overlayInk)
                 setPadding(0, dp(16), 0, 0)
             }, LinearLayout.LayoutParams(-1, -2))
         }
@@ -233,6 +326,12 @@ class Overlays(private val activity: Activity, private val host: FrameLayout, pr
     }
 
     fun listSheet(title: String?, items: List<MenuItem>) {
+        if (AppSettings.os7Mode(activity)) {
+            val position = IntArray(2).also(host::getLocationOnScreen)
+            val mid = position[1] + host.height / 2f
+            classicPopup(position[0] + host.width / 2f, mid, mid, listOf(items), title)
+            return
+        }
         val list = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(8), 0, dp(8), dp(12)) }
         items.forEachIndexed { i, item ->
             list.addView(menuRow(item, cornerRadii(i, items.size, 24, 4)).also { r -> r.setOnClickListener { dismissSheet(); item.action() } },
@@ -246,7 +345,7 @@ class Overlays(private val activity: Activity, private val host: FrameLayout, pr
         val list = ListView(activity).apply {
             this.adapter = adapter
             divider = null
-            selector = android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)
+            selector = android.graphics.drawable.ColorDrawable(if (classic) 0xFF89C9F0.toInt() else Color.TRANSPARENT)
             setOnItemClickListener { _, _, p, _ -> dismissSheet(); onPick(p) }
             setPadding(0, 0, 0, dp(12)); clipToPadding = false
         }
@@ -266,7 +365,7 @@ class Overlays(private val activity: Activity, private val host: FrameLayout, pr
                 val row = (convertView as? LinearLayout) ?: LinearLayout(activity).apply {
                     orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(24), dp(8), dp(24), dp(8))
                     addView(ImageView(activity), LinearLayout.LayoutParams(dp(40), dp(40)))
-                    addView(NText(activity).apply { setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f); setTextColor(pal.onSurface); setPadding(dp(16), 0, 0, 0); maxLines = 1 }, LinearLayout.LayoutParams(-2, -2))
+                    addView(NText(activity).apply { setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f); setTextColor(overlayInk); setPadding(dp(16), 0, 0, 0); maxLines = 1 }, LinearLayout.LayoutParams(-2, -2))
                 }
                 (row.getChildAt(0) as ImageView).setImageDrawable(a.icon)
                 (row.getChildAt(1) as TextView).text = a.title
@@ -275,10 +374,10 @@ class Overlays(private val activity: Activity, private val host: FrameLayout, pr
         }
         val search = NEdit(activity).apply {
             hint = "Search apps"
-            setHintTextColor(pal.onVariant); setTextColor(pal.onSurface)
+            setHintTextColor(overlaySecondary); setTextColor(overlayInk)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
             setSingleLine()
-            background = GradientDrawable().apply { setColor(pal.container); cornerRadius = dpf(pal.radius(28)) }
+            background = GradientDrawable().apply { setColor(if (classic) Color.WHITE else pal.container); cornerRadius = if (classic) dpf(2) else dpf(pal.radius(28)) }
             setPadding(dp(20), 0, dp(20), 0)
             addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) = Unit
@@ -293,7 +392,7 @@ class Overlays(private val activity: Activity, private val host: FrameLayout, pr
         val list = ListView(activity).apply {
             this.adapter = adapter
             divider = null
-            selector = android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)
+            selector = android.graphics.drawable.ColorDrawable(if (classic) 0xFF89C9F0.toInt() else Color.TRANSPARENT)
             setOnItemClickListener { _, _, p, _ -> dismissSheet(); onPick(shown[p]) }
         }
         val content = LinearLayout(activity).apply {

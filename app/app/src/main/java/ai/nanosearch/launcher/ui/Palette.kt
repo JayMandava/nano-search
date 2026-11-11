@@ -24,7 +24,7 @@ class Palette private constructor(
         private fun withAlpha(c: Color, a: Float) = c.copy(alpha = a).toArgb()
 
         fun of(context: Context): Palette {
-            val s = nanoColorScheme(context)
+            val s = launcherColorScheme(context)
             return Palette(
                 s.onSurface.toArgb(), s.onSurfaceVariant.toArgb(), s.primary.toArgb(), s.onPrimary.toArgb(),
                 s.primaryContainer.toArgb(), s.onPrimaryContainer.toArgb(),

@@ -7,7 +7,8 @@ import ai.nanosearch.launcher.clocks.ClockFaceView
 import ai.nanosearch.launcher.clocks.ClockMotionPolicy
 import ai.nanosearch.launcher.clocks.PackClockApply
 import ai.nanosearch.launcher.clocks.packs.*
-import ai.nanosearch.launcher.ui.NanoTheme
+import ai.nanosearch.launcher.ui.SettingsSurfaceTheme as NanoTheme
+import ai.nanosearch.launcher.ui.os7SettingsEnabled
 import android.app.WallpaperManager
 import android.graphics.Bitmap
 import android.content.Context
@@ -29,6 +30,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
+import ai.nanosearch.launcher.ui.SettingsCard as Card
+import ai.nanosearch.launcher.ui.SettingsSwitch as Switch
+import ai.nanosearch.launcher.ui.SettingsTopBar as TopAppBar
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -97,12 +101,12 @@ private fun ClockFacesScreen(model: ClockFacesModel, finish: () -> Unit) {
     BackHandler { back() }
     ClockNoticeExpiry(model.notice, model.noticeRevision, model::expireNotice)
     Scaffold(contentWindowInsets = WindowInsets.safeDrawing, topBar = {
-        TopAppBar(title = { Text(pack?.spec?.name ?: builtin?.label ?: "Clock Faces") },
+        TopAppBar(compact = true, title = { Text(pack?.spec?.name ?: builtin?.label ?: "Clock Faces") },
             navigationIcon = { IconButton(onClick = back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } })
     }) { padding ->
         BoxWithConstraints(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
         val detailSideLimit = clockDetailPreviewMaxSide(maxHeight)
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(if (os7SettingsEnabled()) 8.dp else 16.dp), verticalArrangement = Arrangement.spacedBy(if (os7SettingsEnabled()) 4.dp else 14.dp)) {
             model.operation?.let { operation -> item(key = "operation") { OperationCard(operation, model::cancelOperation) } }
             model.notice?.let { notice -> item(key = "notice") {
                 ClockNoticeCard(notice, model::dismissNotice)

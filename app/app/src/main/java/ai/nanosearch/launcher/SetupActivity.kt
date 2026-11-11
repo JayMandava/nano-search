@@ -1,8 +1,10 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package ai.nanosearch.launcher
 
-import ai.nanosearch.launcher.ui.NanoTheme
+import ai.nanosearch.launcher.ui.SettingsSurfaceTheme as NanoTheme
+import ai.nanosearch.launcher.ui.os7SettingsEnabled
+import ai.nanosearch.launcher.ui.SettingsTopBar
 import android.app.ActivityManager
 import android.content.Context
 import android.os.Bundle
@@ -15,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -77,7 +80,9 @@ private fun SetupScreen(onDone: () -> Unit) {
         onDispose { owner.lifecycle.removeObserver(obs) }
     }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-        Column(Modifier.systemBarsPadding().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(if (os7SettingsEnabled()) Modifier.navigationBarsPadding() else Modifier.systemBarsPadding()) {
+        if (os7SettingsEnabled()) SettingsTopBar(title = { Text("Setup") })
+        Column(Modifier.padding(if (os7SettingsEnabled()) 12.dp else 20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text("Step ${step + 1} of 4", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Column(Modifier.weight(1f)) {
                 when (step) {
@@ -94,6 +99,7 @@ private fun SetupScreen(onDone: () -> Unit) {
                 if (step > 0) TextButton(onClick = { step-- }) { Text("Back") } else TextButton(onClick = onDone) { Text("Skip setup") }
                 Button(onClick = { if (step < 3) step++ else onDone() }) { Text(if (step < 3) "Next" else "Done") }
             }
+        }
         }
     }
 }

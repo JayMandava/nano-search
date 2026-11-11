@@ -82,6 +82,10 @@ class MainActivity : Activity() {
     private val llm get() = Services.llm
 
     // layers
+    private var os7Home: Os7HomeView? = null
+    private var os7Dialog: android.app.AlertDialog? = null
+    private var nanoWorkspace = false
+    private val os7 get() = AppSettings.os7Mode(this)
     private lateinit var home: DragLayout
     private lateinit var drawer: DragLayout
     private lateinit var searchLayer: LinearLayout
@@ -172,7 +176,7 @@ class MainActivity : Activity() {
 
     /** Material 3 colours for everything the launcher paints itself; rebuilt if the user changes the theme in Settings. */
     private val pal by lazy { Palette.of(this) }
-    private val themeKey get() = AppSettings.themeMode(this) + AppSettings.hub(this) + AppSettings.dots(this) + AppSettings.frames(this) + AppSettings.fullScreen(this) + AppSettings.iconPack(this) + resources.configuration.uiMode
+    private val themeKey get() = AppSettings.os7Mode(this).toString() + AppSettings.themeMode(this) + AppSettings.hub(this) + AppSettings.dots(this) + AppSettings.frames(this) + AppSettings.fullScreen(this) + AppSettings.iconPack(this) + resources.configuration.uiMode
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
     /** A flat full-width bar with a hairline along its top edge. */
@@ -229,18 +233,28 @@ class MainActivity : Activity() {
         searchLayer = buildSearchLayer()
         voice = buildVoice()
 
+        if (os7) os7Home = Os7HomeView(this,
+            launch = { item, view -> open(item, view) }, appMenu = { item, view -> appMenu(item, view) },
+            search = { showOs7Search() }, notifications = { if(AppSettings.hub(this)) openHub() else expandNotifications() },
+            connections = { tryStart { startActivity(Intent(Settings.Panel.ACTION_INTERNET_CONNECTIVITY)) } },
+            profiles = { tryStart { startActivity(Intent(Settings.ACTION_SOUND_SETTINGS)) } },
+            menu = { view -> showOs7Menu(view) },
+        )
         val root = FrameLayout(this).apply {
             addView(home, FrameLayout.LayoutParams(-1, -1))
             addView(drawer, FrameLayout.LayoutParams(-1, -1))
+            os7Home?.let { addView(it, FrameLayout.LayoutParams(-1, -1)) }
             addView(searchLayer, FrameLayout.LayoutParams(-1, -2))
-            if (AppSettings.hub(this@MainActivity)) addView(hubEdgeStrip(), FrameLayout.LayoutParams(dp(24), -1, Gravity.START))
+            if (os7) { searchLayer.visibility = View.GONE; home.visibility = View.INVISIBLE }
+            if (!os7 && AppSettings.hub(this@MainActivity)) addView(hubEdgeStrip(), FrameLayout.LayoutParams(dp(24), -1, Gravity.START))
             addView(overlayHost, FrameLayout.LayoutParams(-1, -1)) // menus and sheets, above everything
             // targetSdk 35 is edge-to-edge: keep content clear of the system bars and the keyboard.
             setOnApplyWindowInsetsListener { _, insets ->
                 val sys = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
                 val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout() or WindowInsets.Type.ime())
                 val barSpace = dp(BAR_SPACE_DP)
-                searchLayer.setPadding(bars.left, sys.top, bars.right, bars.bottom)
+                searchLayer.setPadding(bars.left, sys.top + if(os7 && !nanoWorkspace) dp(76) else 0, bars.right, bars.bottom)
+                os7Home?.setPadding(sys.left, sys.top, sys.right, sys.bottom)
                 navBottom = sys.bottom
                 home.setPadding(bars.left, sys.top + barSpace, bars.right, 0)
                 applyDockPadding()
@@ -345,13 +359,13 @@ class MainActivity : Activity() {
     private fun buildSearchLayer(): LinearLayout {
         input = NEdit(this).apply {
             hint = "Search"
-            setHintTextColor(pal.onVariant)
-            setTextColor(pal.onSurface)
+            setHintTextColor(if(os7) 0xFF59616A.toInt() else pal.onVariant)
+            setTextColor(if(os7) Color.BLACK else pal.onSurface)
             textSize = 18f
             setSingleLine()
             imeOptions = EditorInfo.IME_ACTION_GO
-            background = barBg(28)
-            val lens = getDrawable(R.drawable.ic_search)!!.mutate().apply { setTint(pal.onVariant); setBounds(0, 0, dp(24), dp(24)) }
+            background = if(os7) GradientDrawable().apply { setColor(Color.WHITE); cornerRadius=dp(2).toFloat(); setStroke(dp(1),0xFF8E9CA7.toInt()) } else barBg(28)
+            val lens = getDrawable(R.drawable.ic_search)!!.mutate().apply { setTint(if(os7) 0xFF59616A.toInt() else pal.onVariant); setBounds(0, 0, dp(24), dp(24)) }
             setCompoundDrawablesRelative(lens, null, null, null)
             compoundDrawablePadding = dp(12)
             setPadding(dp(18), 0, dp(20), 0)
@@ -384,7 +398,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             addView(input, LinearLayout.LayoutParams(0, dp(56), 1f))
-            if (AppSettings.hub(this@MainActivity)) {
+            if (!os7 && AppSettings.hub(this@MainActivity)) {
                 hubBadge = NText(context).apply {
                     textSize = 10f; setTextColor(pal.onPrimary); gravity = Gravity.CENTER; typeface = Typeface.DEFAULT_BOLD; minWidth = dp(18)
                     background = GradientDrawable().apply { setColor(pal.primary); cornerRadius = dp(9).toFloat() }; setPadding(dp(4), 0, dp(4), 0); visibility = View.GONE
@@ -672,6 +686,7 @@ class MainActivity : Activity() {
 
     private fun updateHubBadge() {
         val n = HubStore.count(setOf("message", "call", "app", "event"))
+        os7Home?.refresh()
         hubBadge?.let { it.text = if (n > 9) "9+" else n.toString(); it.visibility = if (n > 0) View.VISIBLE else View.GONE }
     }
 
@@ -719,7 +734,7 @@ class MainActivity : Activity() {
                 appInfo = { cn -> showAppInfo(cn.packageName) },
             ).also { page ->
                 // Spirit starts with its steel dial on the first page (a widget to resize or remove like any other)
-                if (index == 0) page.widgets.seedDefault("seeded_steel", "steeldial", 270)
+                if (index == 0 && !os7) page.widgets.seedDefault("seeded_steel", "steeldial", 270)
                 page.restore()
             }
         }
@@ -825,7 +840,7 @@ class MainActivity : Activity() {
             val show = dockCell(entry.icon, entry.label, entry.component?.packageName)
             show.apply {
                 pressScale()
-                setOnClickListener { v -> entry.component?.let { AppUsage.note(this@MainActivity, it.flattenToString()) }; launchIntent(entry.launch, v) }
+                setOnClickListener { v -> launchIntent(entry.launch, v, entry.component) }
                 setOnLongClickListener { v ->
                     val pkg = entry.component?.packageName
                     overlays.popupFor(v, listOf(listOf(
@@ -1033,13 +1048,30 @@ class MainActivity : Activity() {
     }
 
     private fun appMenu(item: Item, anchor: View) {
+        if (os7 && item.kind == "folder") {
+            overlays.popupFor(anchor, listOf(listOf(
+                MenuItem(R.drawable.ic_menu_swap, "Move earlier") { os7Home?.move(item,-1) },
+                MenuItem(R.drawable.ic_menu_swap, "Move later") { os7Home?.move(item,1) },
+                MenuItem(R.drawable.ic_menu_swap, "Rename folder") { renameOs7Folder(item) },
+                MenuItem(R.drawable.ic_menu_remove, "Remove folder (keep apps)") { Os7Panels.deleteFolder(this,item.key); os7Home?.refresh() },
+            )))
+            return
+        }
         val cn = ComponentName.unflattenFromString(item.key) ?: return
         val pkg = cn.packageName
         overlays.popupFor(anchor, listOf(listOf(
+            *(if(os7 && os7Home?.canReorder == true) arrayOf(
+                MenuItem(R.drawable.ic_menu_swap, "Move earlier") { os7Home?.move(item,-1) },
+                MenuItem(R.drawable.ic_menu_swap, "Move later") { os7Home?.move(item,1) },
+            ) else emptyArray()),
+            *(if(os7) arrayOf(
+                MenuItem(R.drawable.ic_menu_apps, "Move to folder") { chooseOs7Folder(item) },
+                MenuItem(R.drawable.ic_menu_remove, "Move out of folder") { Os7Panels.folders(this).forEach { Os7Panels.removeFromFolder(this,it.id,item.key) }; os7Home?.refresh() },
+            ) else emptyArray()),
             MenuItem(R.drawable.ic_menu_info, "App info") { showAppInfo(pkg) },
-            MenuItem(R.drawable.ic_star, if (AppUsage.isFavourite(this, item.key)) "Remove from favourites" else "Add to favourites") { AppUsage.toggleFavourite(this, item.key); search() },
-            MenuItem(R.drawable.ic_menu_add, "Add to home") { currentPage().addShortcut(item.key); closeDrawer(clear = true); Toast.makeText(this, "${item.title} added to home", Toast.LENGTH_SHORT).show() },
-            MenuItem(R.drawable.ic_menu_apps, "Add to dock") {
+            MenuItem(R.drawable.ic_star, if (AppUsage.isFavourite(this, item.key)) "Remove from favourites" else "Add to favourites") { AppUsage.toggleFavourite(this, item.key); os7Home?.refresh(); search() },
+            MenuItem(R.drawable.ic_menu_add, if(os7) "Add to Nano workspace" else "Add to home") { currentPage().addShortcut(item.key); closeDrawer(clear = true); Toast.makeText(this, "${item.title} added to home", Toast.LENGTH_SHORT).show() },
+            MenuItem(R.drawable.ic_menu_apps, if(os7) "Add to workspace dock" else "Add to dock") {
                 overlays.listSheet("Add ${item.title} to the dock", List(dockSlots) { slot -> MenuItem(R.drawable.ic_menu_add, "Dock slot ${slot + 1}") { setDock(slot, item.key) } })
             },
             MenuItem(R.drawable.ic_menu_remove, "Hide") {
@@ -1052,10 +1084,9 @@ class MainActivity : Activity() {
     }
 
     /** Launches an app from an icon the user touched, growing the app's window out of that icon. */
-    private fun launchIntent(intent: Intent, from: View) {
-        intent.component?.let { AppUsage.note(this, it.flattenToString()) }
+    private fun launchIntent(intent: Intent, from: View, recordComponent: ComponentName? = intent.component) {
         val options = ActivityOptions.makeScaleUpAnimation(from, 0, 0, from.width, from.height).toBundle()
-        runCatching { startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), options) }
+        runCatching { startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), options); recordComponent?.let { AppUsage.note(this, it.flattenToString()) } }
     }
 
     private fun launchComponent(cn: ComponentName, from: View) =
@@ -1067,6 +1098,7 @@ class MainActivity : Activity() {
     private fun refreshIcons() {
         IconPacks.reset()
         AppIcons.clear()
+        os7Home?.clearIcons()
         results.clearIcons()
         apps.clearIcons()
     }
@@ -1146,6 +1178,10 @@ class MainActivity : Activity() {
         if (AppSettings.fullScreen(this)) {
             c.systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             c.hide(WindowInsets.Type.systemBars())
+        } else if (os7 && !nanoWorkspace) {
+            c.systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            c.hide(WindowInsets.Type.statusBars())
+            c.show(WindowInsets.Type.navigationBars())
         } else c.show(WindowInsets.Type.systemBars())
     }
 
@@ -1200,9 +1236,10 @@ class MainActivity : Activity() {
 
     /** With a hardware keyboard, just start typing: the keys go to the search bar, wherever you are on home. */
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (os7 && keyCode == KeyEvent.KEYCODE_MENU) { showOs7Menu(os7Home ?: home); return true }
         if (!input.hasFocus() && !overlays.isShowing && !hubScreen.isShowing && !wallpaperScreen.isShowing && event.isPrintingKey && !event.isCtrlPressed && !event.isAltPressed && !event.isMetaPressed) {
             val ch = event.unicodeChar
-            if (ch != 0) { input.requestFocus(); input.append(String(Character.toChars(ch))); input.setSelection(input.text.length); return true }
+            if (ch != 0) { if (os7) showOs7Search(); input.requestFocus(); input.append(String(Character.toChars(ch))); input.setSelection(input.text.length); return true }
         }
         return super.onKeyDown(keyCode, event)
     }
@@ -1216,6 +1253,9 @@ class MainActivity : Activity() {
             card.visibility == View.VISIBLE -> endChat()
             input.text.isNotEmpty() -> input.setText("")
             input.hasFocus() -> { hideKeyboard(); input.clearFocus() }
+            os7 && searchLayer.visibility == View.VISIBLE && !nanoWorkspace -> { searchLayer.visibility = View.GONE; os7Home?.showSearch(false); os7Home?.visibility = View.VISIBLE }
+            os7 && nanoWorkspace -> resetUi()
+            os7 && os7Home?.back() == true -> Unit
             drawerOpen -> closeDrawer(clear = true)
             pager.currentItem != pageOffset -> pager.setCurrentItem(pageOffset, true)
         }
@@ -1242,7 +1282,7 @@ class MainActivity : Activity() {
 
     /** Over the drawer or the results, the bars sit on a light panel in the light theme, so their icons must be dark there (and only there). */
     private fun updateBars(covered: Boolean) {
-        val lightPanel = !ai.nanosearch.launcher.ui.isDark(this)
+        val lightPanel = !os7 && !ai.nanosearch.launcher.ui.isDark(this)
         window.insetsController?.setSystemBarsAppearance(
             if (covered && lightPanel) android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS else 0,
             android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
@@ -1277,6 +1317,7 @@ class MainActivity : Activity() {
     }
 
     private fun openDrawer() {
+        if (os7 && !nanoWorkspace) { os7Home?.setExpanded(true); return }
         drawerOpen = true
         updateBars(true)
         drawer.visibility = View.VISIBLE
@@ -1286,7 +1327,7 @@ class MainActivity : Activity() {
     private fun closeDrawer(clear: Boolean) {
         drawerOpen = false
         updateBars(resultsPanel.visibility == View.VISIBLE)
-        home.visibility = View.VISIBLE
+        home.visibility = if(os7 && !nanoWorkspace) View.INVISIBLE else View.VISIBLE
         hideKeyboard()
         if (clear) input.setText("")
         animateDrawer(screenH, 300) { if (!drawerOpen) { drawer.visibility = View.INVISIBLE; applyDrawerProgress() } }
@@ -1294,6 +1335,7 @@ class MainActivity : Activity() {
 
     /** Back to a clean home screen: no query, no answer, drawer shut, keyboard away. */
     private fun resetUi() {
+        os7Dialog?.dismiss(); os7Dialog = null
         overlays.dismissAll()
         wallpaperScreen.dismiss()
         if (::hubScreen.isInitialized) hubScreen.dismiss(false)
@@ -1302,6 +1344,65 @@ class MainActivity : Activity() {
         input.clearFocus()
         hideAnswer()
         closeDrawer(clear = false)
+        if (os7) {
+            nanoWorkspace = false
+            applyFullScreen()
+            window.decorView.requestApplyInsets()
+            home.visibility = View.INVISIBLE
+            searchLayer.visibility = View.GONE
+            os7Home?.apply { visibility = View.VISIBLE; reset(); refresh() }
+        }
+    }
+
+    private fun showOs7Search() {
+        os7Home?.showSearch(true)
+        searchLayer.visibility = View.VISIBLE
+        input.requestFocus()
+        (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(input, InputMethodManager.SHOW_IMPLICIT)
+    }
+
+    private fun showOs7Menu(anchor: View) {
+        overlays.popupFor(anchor, listOf(listOf(
+            MenuItem(R.drawable.ic_menu_apps, "${if(os7Home?.expanded == true) "Collapse" else "Expand"} applications") { os7Home?.setExpanded(os7Home?.expanded != true) },
+            MenuItem(R.drawable.ic_menu_add, "Add folder") { createOs7Folder(null) },
+            MenuItem(R.drawable.ic_menu_apps, "Manage panels") { manageOs7Panels() },
+            MenuItem(R.drawable.ic_search, "Universal search") { showOs7Search() },
+            MenuItem(R.drawable.ic_hub, "Notifications") { if(AppSettings.hub(this)) openHub() else expandNotifications() },
+            MenuItem(R.drawable.ic_menu_wallpaper, "Wallpaper") { changeWallpaper() },
+            MenuItem(R.drawable.ic_menu_widgets, "Nano workspace & widgets") {
+                nanoWorkspace = true; applyFullScreen(); os7Home?.visibility = View.GONE
+                home.visibility = View.VISIBLE; searchLayer.visibility = View.VISIBLE; window.decorView.requestApplyInsets()
+            },
+            MenuItem(R.drawable.ic_kind_setting, "Options") { openSettings() },
+        )))
+    }
+
+    private fun manageOs7Panels() {
+        val panels = Os7Panels.Panel.entries.filter { it != Os7Panels.Panel.ALL }
+        val enabled = panels.map { it in Os7Panels.visiblePanels(this) }.toBooleanArray()
+        os7Dialog = android.app.AlertDialog.Builder(this).setTitle("Manage panels")
+            .setMultiChoiceItems(panels.map { it.title }.toTypedArray(),enabled) { _,which,on -> enabled[which]=on }
+            .setPositiveButton("Save") { _,_ -> panels.forEachIndexed { i,p -> Os7Panels.setPanelVisible(this,p,enabled[i]) }; os7Home?.reset() }
+            .setNegativeButton("Cancel",null).show()
+    }
+
+    private fun renameOs7Folder(item: Item) {
+        val field=EditText(this).apply { setText(item.title); setSingleLine(); filters=arrayOf(android.text.InputFilter.LengthFilter(40)) }
+        os7Dialog = android.app.AlertDialog.Builder(this).setTitle("Rename folder").setView(field)
+            .setPositiveButton("Save") { _,_ -> Os7Panels.renameFolder(this,item.key,field.text.toString()); os7Home?.refresh() }
+            .setNegativeButton("Cancel",null).show()
+    }
+
+    private fun chooseOs7Folder(item: Item) {
+        val choices=Os7Panels.folders(this).map { folder -> MenuItem(R.drawable.ic_menu_apps,folder.name) { Os7Panels.addToFolder(this,folder.id,item.key); os7Home?.refresh() } }
+        overlays.listSheet("Move ${item.title}", choices + MenuItem(R.drawable.ic_menu_add,"New folder…") { createOs7Folder(item) })
+    }
+
+    private fun createOs7Folder(item: Item?) {
+        val field=EditText(this).apply { hint="Folder name"; setSingleLine(); maxLines=1 }
+        os7Dialog = android.app.AlertDialog.Builder(this).setTitle("Add folder").setView(field)
+            .setPositiveButton("Create") { _,_ -> Os7Panels.createFolder(this,field.text.toString(),listOfNotNull(item?.key)); os7Home?.refresh() }
+            .setNegativeButton("Cancel",null).show()
     }
 
     private fun hideKeyboard() {
@@ -1329,9 +1430,9 @@ class MainActivity : Activity() {
         searchLayer.layoutParams = searchLayer.layoutParams.apply { height = if (active) ViewGroup.LayoutParams.MATCH_PARENT else ViewGroup.LayoutParams.WRAP_CONTENT }
         resultsPanel.visibility = if (active) View.VISIBLE else View.GONE
         // The whole layer, including the status and navigation bar areas its padding leaves, gets the panel colour while results show.
-        searchLayer.setBackgroundColor(if (active) pal.panel else Color.TRANSPARENT)
+        searchLayer.setBackgroundColor(if (active && !os7) pal.panel else Color.TRANSPARENT)
         updateBars(active || drawerOpen)
-        home.visibility = if (active || drawerOpen) View.INVISIBLE else View.VISIBLE // nothing ghosts through the panel
+        home.visibility = if ((os7 && !nanoWorkspace) || active || drawerOpen) View.INVISIBLE else View.VISIBLE // nothing ghosts through the panel
         updateBanner()
     }
 
@@ -1362,10 +1463,12 @@ class MainActivity : Activity() {
         val seq = ++searchSeq
         io.execute {
             val drawerApps = if (query.isBlank()) index.search("", limit = 500) else null
+            val os7Apps = if (os7 && drawerApps != null) drawerApps.mapNotNull { Os7Panels.describe(this,it.key,it.title) } else emptyList()
             val found = if (query.isBlank()) emptyList() else index.search(query, limit = 60, semantic = semantic)
             ui.post {
                 if (seq != searchSeq) return@post
                 if (drawerApps != null) {
+                    os7Home?.setApps(drawerApps, os7Apps)
                     val shown = forTab(drawerApps)
                     apps.set(shown); results.set(emptyList())
                     drawerEmpty.visibility = if (shown.isEmpty() && drawerTab != "all") View.VISIBLE else View.GONE
@@ -1801,7 +1904,7 @@ class MainActivity : Activity() {
     private fun open(item: Item, from: View? = null) {
         val intent = when (item.kind) {
             "app" -> Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-                .setComponent(ComponentName.unflattenFromString(item.key)).also { AppUsage.note(this, item.key) }
+                .setComponent(ComponentName.unflattenFromString(item.key))
             "contact" -> contactIntent(item)
             "message" -> Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:${item.key.substringBefore('|')}"))
             "call" -> Intent(Intent.ACTION_DIAL, Uri.parse("tel:${item.key.substringBefore('|')}"))
@@ -1818,6 +1921,7 @@ class MainActivity : Activity() {
         try {
             val options = from?.let { ActivityOptions.makeScaleUpAnimation(it, 0, 0, it.width, it.height).toBundle() }
             startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), options)
+            if (item.kind == "app") AppUsage.note(this, item.key)
             resetUi()
         } catch (e: Exception) {
             Log.w(TAG, "cannot open ${item.kind} ${item.title}: $e") // e.g. an app uninstalled since indexing

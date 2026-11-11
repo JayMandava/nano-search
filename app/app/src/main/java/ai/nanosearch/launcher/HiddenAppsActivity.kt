@@ -2,7 +2,8 @@
 
 package ai.nanosearch.launcher
 
-import ai.nanosearch.launcher.ui.NanoTheme
+import ai.nanosearch.launcher.ui.SettingsSurfaceTheme as NanoTheme
+import ai.nanosearch.launcher.ui.os7SettingsEnabled
 import android.content.ComponentName
 import android.content.Context
 import android.graphics.Bitmap
@@ -23,17 +24,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Card
+import ai.nanosearch.launcher.ui.SettingsCard as Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
+import ai.nanosearch.launcher.ui.SettingsTopBar as LargeTopAppBar
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
+import ai.nanosearch.launcher.ui.SettingsSwitch as Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -103,7 +104,7 @@ private fun HiddenAppsScreen(onBack: () -> Unit) {
     }
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
-        modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
+        modifier = if (os7SettingsEnabled()) Modifier else Modifier.nestedScroll(scroll.nestedScrollConnection),
         topBar = {
             LargeTopAppBar(
                 title = { Text("Hidden apps") },
@@ -112,7 +113,7 @@ private fun HiddenAppsScreen(onBack: () -> Unit) {
             )
         },
     ) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(if (os7SettingsEnabled()) 8.dp else 16.dp), verticalArrangement = Arrangement.spacedBy(if (os7SettingsEnabled()) 4.dp else 8.dp)) {
             item {
                 Card(shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
                     Text(

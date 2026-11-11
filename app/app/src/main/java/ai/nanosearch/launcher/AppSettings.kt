@@ -34,6 +34,10 @@ object AppSettings {
     fun iconPack(c: Context): String = prefs(c).getString("iconPack", "") ?: ""
     fun setIconPack(c: Context, pkg: String) { prefs(c).edit().putString("iconPack", pkg).apply(); IconPacks.reset() }
 
+    /** Experimental recreation; switching back never rewrites widgets, pages or app choices. */
+    fun os7Mode(c: Context) = prefs(c).getBoolean("os7Mode", true)
+    fun setOs7Mode(c: Context, on: Boolean) = prefs(c).edit().putBoolean("os7Mode", on).apply()
+
     /** "system", "light" or "dark". */
     fun themeMode(c: Context) = prefs(c).getString("themeMode", "system") ?: "system"
     fun setThemeMode(c: Context, mode: String) = prefs(c).edit().putString("themeMode", mode).apply()

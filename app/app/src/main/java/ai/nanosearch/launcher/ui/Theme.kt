@@ -51,6 +51,9 @@ fun isDark(context: Context): Boolean = when (AppSettings.themeMode(context)) {
 /** The colours: Spirit's, light or dark. */
 fun nanoColorScheme(context: Context): ColorScheme = if (isDark(context)) SpiritDark else SpiritLight
 
+/** The classic launcher chrome remains dark independently of the Options page theme. */
+fun launcherColorScheme(context: Context): ColorScheme = if (AppSettings.os7Mode(context)) SpiritDark else nanoColorScheme(context)
+
 /** Spirit text: Source Sans 3 at each weight. */
 private fun spiritTypography(context: Context): Typography {
     fun f(w: Int) = Font("SourceSans3.ttf", context.assets, FontWeight(w), variationSettings = FontVariation.Settings(FontVariation.weight(w)))

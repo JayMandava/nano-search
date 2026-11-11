@@ -76,7 +76,8 @@ class HubScreen(
     private fun round(color: Int, radius: Int) = GradientDrawable().apply { setColor(color); cornerRadius = dp(pal.radius(radius)).toFloat() }
 
     /** Spirit gives the Hub glass: a glossy header bar, glass filter pills and card rows. */
-    private val spirit = true
+    private val os7 = AppSettings.os7Mode(activity)
+    private val spirit = !os7
     private fun glass(radiusDp: Float, look: ai.nanosearch.launcher.ui.SpiritGlass.Look = ai.nanosearch.launcher.ui.SpiritGlass.Look.DARK): android.graphics.drawable.Drawable =
         ai.nanosearch.launcher.ui.SpiritGlass(activity, radiusDp, look, pal.primary)
 
@@ -89,7 +90,7 @@ class HubScreen(
         val screenW = activity.resources.displayMetrics.widthPixels
         val width = (screenW * 0.9f).toInt()
 
-        title = NText(activity).apply { text = "Hub"; textSize = if (spirit) 24f else 26f; setTextColor(pal.onSurface); if (spirit) setShadowLayer(3f, 0f, 2f, 0xCC000000.toInt()); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) }
+        title = NText(activity).apply { text = if(os7) "Notifications" else "Hub"; textSize = if (spirit) 24f else 26f; setTextColor(pal.onSurface); if (spirit) setShadowLayer(3f, 0f, 2f, 0xCC000000.toInt()); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) }
         clearButton = NText(activity).apply {
             text = "Clear all"; textSize = 14f; setTextColor(pal.primary); gravity = Gravity.CENTER; setPadding(dp(12), 0, dp(12), 0)
             setOnClickListener { clearAll() }
@@ -263,7 +264,7 @@ class HubScreen(
 
     private fun refreshList() {
         val unread = items.count { it.unread && (it.kind == "message" || it.kind == "call") }
-        title?.text = "Hub"
+        title?.text = if(os7) "Notifications" else "Hub"
         countBadge?.let { it.text = if (unread > 99) "99+" else unread.toString(); it.visibility = if (unread > 0) View.VISIBLE else View.GONE }
         clearButton?.visibility = if (items.isNotEmpty()) View.VISIBLE else View.GONE
         rows.notifyDataSetChanged()

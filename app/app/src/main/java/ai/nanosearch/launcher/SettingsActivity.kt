@@ -2,7 +2,8 @@
 
 package ai.nanosearch.launcher
 
-import ai.nanosearch.launcher.ui.NanoTheme
+import ai.nanosearch.launcher.ui.SettingsSurfaceTheme as NanoTheme
+import ai.nanosearch.launcher.ui.os7SettingsEnabled
 import ai.nanosearch.launcher.ui.nanoColorScheme
 import android.Manifest
 import android.app.role.RoleManager
@@ -21,6 +22,10 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -36,7 +41,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import ai.nanosearch.launcher.ui.SettingsCard as Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.DropdownMenu
@@ -47,14 +52,14 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.LargeTopAppBar
+import ai.nanosearch.launcher.ui.SettingsTopBar as LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Switch
+import ai.nanosearch.launcher.ui.SettingsSwitch as Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
@@ -67,6 +72,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -109,7 +116,7 @@ private fun SettingsScreen(onBack: () -> Unit, listState: LazyListState, scroll:
         onDispose { owner.lifecycle.removeObserver(obs) }
     }
     Scaffold(
-        modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
+        modifier = if (os7SettingsEnabled()) Modifier else Modifier.nestedScroll(scroll.nestedScrollConnection),
         topBar = {
             LargeTopAppBar(
                 title = { Text("Settings") },
@@ -121,8 +128,8 @@ private fun SettingsScreen(onBack: () -> Unit, listState: LazyListState, scroll:
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(if (os7SettingsEnabled()) 8.dp else 16.dp),
+            verticalArrangement = Arrangement.spacedBy(if (os7SettingsEnabled()) 4.dp else 12.dp),
         ) {
             item { DefaultHomeCard(tick) }
             item { ModelsRow() }
@@ -183,7 +190,13 @@ private fun ModelsRow() {
 }
 
 @Composable
-internal fun Header(text: String) = Text(text, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 4.dp, top = 8.dp))
+internal fun Header(text: String) {
+    val classic = os7SettingsEnabled()
+    Text(text, style = MaterialTheme.typography.titleMedium,
+        color = if (classic) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.primary,
+        modifier = (if (classic) Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.secondaryContainer).padding(horizontal = 10.dp, vertical = 6.dp)
+            else Modifier.padding(start = 4.dp, top = 8.dp)).semantics { heading() })
+}
 
 private fun isDefaultHome(context: Context): Boolean {
     val rm = context.getSystemService(RoleManager::class.java)
@@ -203,7 +216,9 @@ internal fun DefaultHomeCard(tick: Int) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(if (isDefault) "Nano Search is your home app" else "Make Nano Search your home app", style = MaterialTheme.typography.titleLarge)
             Text(
-                if (isDefault) "The home button and swipe-up gesture open this launcher." else "Pick it as the default so the home button opens your search-first home screen.",
+                if (isDefault) "The home button and swipe-up gesture open this launcher."
+                else if (os7SettingsEnabled()) "Pick it as the default so the home button opens your classic home screen."
+                else "Pick it as the default so the home button opens your search-first home screen.",
                 style = MaterialTheme.typography.bodyMedium,
             )
             if (!isDefault) {
@@ -229,7 +244,8 @@ private fun FullScreenCard() {
         Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Column(Modifier.weight(1f).padding(end = 16.dp)) {
                 Text("Full screen", style = MaterialTheme.typography.bodyLarge)
-                Text("Hide the status bar and the navigation bar. Swipe from the top for the notification shade, or from the bottom for the navigation bar; they hide again by themselves.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(if (os7SettingsEnabled()) "Also hide the navigation bar on Home. Swipe an edge to reveal Android controls."
+                    else "Hide the status bar and the navigation bar. Swipe from the top for the notification shade, or from the bottom for the navigation bar; they hide again by themselves.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Switch(checked = on, onCheckedChange = { on = it; AppSettings.setFullScreen(context, it) })
         }
@@ -249,7 +265,8 @@ private fun HubCard(tick: Int) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).padding(end = 16.dp)) {
                     Text("Hub", style = MaterialTheme.typography.bodyLarge)
-                    Text("One list for texts, missed calls, events and notifications. Swipe in from the left edge, or tap the Hub button by the search bar.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(if (os7SettingsEnabled()) "One list for texts, missed calls, events and notifications. Open Notifications from the Home header or Home Menu."
+                        else "One list for texts, missed calls, events and notifications. Swipe in from the left edge, or tap the Hub button by the search bar.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(checked = hub, onCheckedChange = { hub = it; AppSettings.setHub(context, it); SettingsTheme.bump() })
             }
@@ -263,7 +280,8 @@ private fun HubCard(tick: Int) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).padding(end = 16.dp)) {
                     Text("Active Frames", style = MaterialTheme.typography.bodyLarge)
-                    Text("Your recent apps as live tiles, on a page to the left of home.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(if (os7SettingsEnabled()) "Your recent apps as live tiles. Open Home Menu, then Nano workspace & widgets, to reach Frames and your original pages."
+                        else "Your recent apps as live tiles, on a page to the left of home.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(checked = frames, onCheckedChange = { frames = it; AppSettings.setFrames(context, it) })
             }
@@ -296,7 +314,16 @@ private fun AppearanceCard() {
     var mode by remember { mutableStateOf(AppSettings.themeMode(context)) }
     Card(shape = RoundedCornerShape(24.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Theme", style = MaterialTheme.typography.titleSmall)
+            var classic by remember { mutableStateOf(AppSettings.os7Mode(context)) }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("OS7 interface", style = MaterialTheme.typography.titleSmall)
+                    Text("Classic launcher and Options. Turn off to return to Spirit. Your settings and data stay intact.", style = MaterialTheme.typography.bodySmall)
+                }
+                Switch(checked = classic, onCheckedChange = { classic = it; AppSettings.setOs7Mode(context, it); SettingsTheme.bump() })
+            }
+            Text(if (os7SettingsEnabled()) "Spirit color mode" else "Theme", style = MaterialTheme.typography.titleSmall)
+            if (os7SettingsEnabled()) Text("Applies when OS7 interface is turned off. OS7 keeps its classic dark Home and pale Options screens.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             val options = listOf("system" to "System", "light" to "Light", "dark" to "Dark")
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                 options.forEachIndexed { i, (key, label) ->
@@ -333,7 +360,7 @@ private fun IconPackRow() {
         confirmButton = { TextButton(onClick = { open = false }) { Text("Close") } },
         title = { Text("Icon pack") },
         text = {
-            Column {
+            Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState())) {
                 val options = listOf("" to "Built in") + packs.map { it.pkg to it.label }
                 options.forEach { (pkg, label) ->
                     Row(

@@ -40,8 +40,14 @@ object AppIcons {
         val kind = if (brand != null) null else kindOf(cn.packageName, label)
         if (brand == null && kind == null && runCatching { pm.getActivityInfo(cn, 0).applicationInfo.category == android.content.pm.ApplicationInfo.CATEGORY_GAME }.getOrDefault(false)) brand = BrandIcons.GAME
         val day = if (kind == "calendar" || pack.isNotEmpty()) Calendar.getInstance().get(Calendar.DAY_OF_MONTH) else 0
-        val key = "g|$pack|${cn.flattenToShortString()}|${brand?.id}|$kind|$day"
-        return cache.get(key) ?: BitmapDrawable(context.resources, IconPacks.themed(context, cn, own, day) ?: spiritIcon(own, kind, day, brand)).also { cache.put(key, it) }
+        val os7 = AppSettings.os7Mode(context)
+        val key = "g|$os7|$pack|${cn.flattenToShortString()}|${brand?.id}|$kind|$day"
+        return cache.get(key) ?: BitmapDrawable(context.resources, IconPacks.themed(context, cn, own, day) ?: if(os7) {
+            val classicKind=kindOf(cn.packageName,label)
+            if(classicKind!=null) draw(classicKind,if(classicKind=="calendar") Calendar.getInstance().get(Calendar.DAY_OF_MONTH) else day)
+            else if(brand!=null) BrandIcons.draw(brand)
+            else bitmap { canvas -> own.setBounds(12,12,SIZE-12,SIZE-12); own.draw(canvas) }
+        } else spiritIcon(own, kind, day, brand)).also { cache.put(key, it) }
     }
 
     private val KINDS = listOf(
@@ -109,8 +115,9 @@ object AppIcons {
 
     /** The gem for a kind of thing that is not an app (a missed call, an event): the same look, cached. */
     fun kindGem(context: Context, kind: String, day: Int = 0): Drawable {
-        val key = "k|$kind|$day"
-        return cache.get(key) ?: BitmapDrawable(context.resources, gem((GEM_COLOURS[kind] ?: 0xFF3B4048).toInt(), draw(kind, day), 0.66f)).also { cache.put(key, it) }
+        val os7=AppSettings.os7Mode(context)
+        val key = "k|$os7|$kind|$day"
+        return cache.get(key) ?: BitmapDrawable(context.resources, if(os7) draw(kind,day) else gem((GEM_COLOURS[kind] ?: 0xFF3B4048).toInt(), draw(kind, day), 0.66f)).also { cache.put(key, it) }
     }
 
     /** An app's gem: a drawn object on a coloured one, or another app's own picture on a gem tinted from its colours. */

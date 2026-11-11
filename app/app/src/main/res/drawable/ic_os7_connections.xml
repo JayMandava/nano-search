@@ -1,0 +1,5 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <!-- Original connection-control glyph, not a measured network strength indicator. -->
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.5" android:strokeLineCap="round" android:fillColor="#00000000" android:pathData="M3,8 Q12,0 21,8 M6,11 Q12,5 18,11 M9,14 Q12,11 15,14" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M12,16 A1.5,1.5 0,1 0,12,19 A1.5,1.5 0,1 0,12,16" />
+</vector>
