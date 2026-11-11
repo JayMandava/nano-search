@@ -51,3 +51,11 @@ Implementation and emulator acceptance complete; this is not a physical-device o
 - Nano search/voice/models, notifications, widgets and Active Frames remain reachable. This branch is a visual/interaction recreation, not an exact firmware port or proof of original-service compatibility.
 - Populated personal-workspace migration and cutout-specific rendering were not exercised; the QA package tested synthetic baseline data and explicit HOME intents, not default-launcher system registration.
 - Final device performance and 120 Hz smoothness require the user's actual phone; emulator rendering cannot validate them.
+
+## Subsequent physical-device QA
+
+The same APK was installed on the user's authorized CPH2467 as the previously absent isolated `ai.nanosearch.launcher.clockqa` package. Original Nano/HD2 data and HD2 default HOME remained unchanged. No new personal-data permissions, accounts or model downloads were enabled.
+
+Actual-device checks passed: header/cutout-safe inset, one/two/three-row and hidden tray, five panels, dark menus, search with existing keyboard, keyboard-bounded menu, explicit HOME reset and Options scrolling to Advanced. No blocking visual issue or crash/ANR was observed in the scoped app log sample. QA remained installed and open for review.
+
+A bounded mixed-navigation sample recorded 564 frames,40 janky(7.09%),median8ms,p95 27ms. The display reported120Hz, but this is not sustained120fps; drops remain. The separate QA manifest omits HOME registration, so default-launcher system Home integration and populated production-data migration remain untested.
