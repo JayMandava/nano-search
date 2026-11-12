@@ -65,7 +65,7 @@ class Smoke:
                               + r"|\.)" + re.escape(name) + r"(?:\s|\})", resumed))
 
     def hierarchy(self):
-        target = "/sdcard/os7-cloud-smoke.xml"
+        target = "/data/local/tmp/os7-cloud-smoke.xml"
         # Remove an old dump so a failed UIAutomator call cannot masquerade as current UI.
         self.shell("rm", "-f", target)
         result = self.shell("uiautomator", "dump", "--compressed", target, timeout=65)

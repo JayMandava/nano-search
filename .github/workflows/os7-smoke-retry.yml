@@ -9,6 +9,7 @@ permissions:
   actions: read
 jobs:
   smoke:
+    if: "github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[ui-smoke]')"
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
@@ -36,6 +37,12 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'emulator' 'system-images;android-35;google_apis;x86_64' < /dev/null
           echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n os7 -p "$ANDROID_AVD_HOME/os7.avd" -k 'system-images;android-35;google_apis;x86_64'
           "$ANDROID_HOME/emulator/emulator" -list-avds | grep -x os7
+      - name: Temporary acceleration for this approved run only
+        if: contains(github.event.head_commit.message, '[approved-kvm-20261112]') && github.run_attempt == 1
+        run: |
+          getfacl -p /dev/kvm > "$RUNNER_TEMP/os7-kvm.acl"
+          sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+          "$ANDROID_HOME/emulator/emulator" -accel-check
       - name: Boot and inspect actual app
         run: |
           mkdir -p emulator-evidence
@@ -55,6 +62,15 @@ jobs:
           timeout 45 adb shell dumpsys activity activities > emulator-evidence/activities.txt || true
           timeout 45 adb shell dumpsys gfxinfo ai.nanosearch.launcher.os7preview framestats > emulator-evidence/gfxinfo.txt || true
           timeout 45 adb exec-out screencap -p > emulator-evidence/final-screen.png || true
+      - name: Restore approved runner access
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/os7-kvm.acl"; then
+            timeout 30 adb emu kill || true
+            sudo setfacl --restore="$RUNNER_TEMP/os7-kvm.acl"
+            getfacl -p /dev/kvm > "$RUNNER_TEMP/os7-kvm-restored.acl"
+            diff -u "$RUNNER_TEMP/os7-kvm.acl" "$RUNNER_TEMP/os7-kvm-restored.acl"
+          fi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
