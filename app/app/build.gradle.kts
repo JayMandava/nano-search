@@ -122,7 +122,12 @@ android {
         }
     }
 
-    if (cloudPreview) testBuildType = "preview"
+    if (cloudPreview) {
+        testBuildType = "preview"
+        // Legacy clock fixtures depend on debug-only host activities. Keep those tests unchanged
+        // for debug; the production-like preview runs its own actual-screen smoke suite.
+        sourceSets.getByName("androidTest").java.setSrcDirs(listOf("src/cloudAndroidTest/java"))
+    }
     sourceSets.getByName("preview").manifest.srcFile("src/os7Standalone/AndroidManifest.xml")
 
     lint { checkReleaseBuilds = false }

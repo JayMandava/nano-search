@@ -98,7 +98,8 @@ class Os7SettingsLayoutTest {
             assertTextFits(entry.name)
             assertTextFits(entry.note)
             assertTextFits("Download")
-            val download = compose.onNode(hasClickAction() and hasText("Download")).fetchSemanticsNode().boundsInRoot
+            // Material controls may draw smaller than their expanded accessible touch target.
+            val download = compose.onNode(hasClickAction() and hasText("Download")).fetchSemanticsNode().touchBoundsInRoot
             assertTrue("Download keeps its accessible target", download.height >= 48f)
         }
     }
@@ -115,7 +116,8 @@ class Os7SettingsLayoutTest {
             assertTrue(description.top >= maxOf(title.bottom, toggle.bottom) + 8f)
             assertEquals(title.left, description.left, 1f)
             assertTrue(description.width > title.width)
-            assertTrue(toggle.width >= 48f && toggle.height >= 48f)
+            val touchTarget = compose.onNode(isToggleable()).fetchSemanticsNode().touchBoundsInRoot
+            assertTrue(touchTarget.width >= 48f && touchTarget.height >= 48f)
             assertTextFits(source.label)
             assertTextFits(source.detail)
             compose.onNode(isToggleable()).performClick().assertIsOff()
