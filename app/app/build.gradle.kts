@@ -19,8 +19,8 @@ android {
         applicationId = "ai.nanosearch.launcher"
         minSdk = 33
         targetSdk = 35
-        versionCode = 20
-        versionName = "0.8.5"
+        versionCode = if (cloudPreview) 21 else 20
+        versionName = if (cloudPreview) "0.9.0-preview.1" else "0.8.5"
         buildConfigField("boolean", "OS7_STANDALONE", "false")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["nanoAppLabel"] = "Nano Search"
@@ -84,7 +84,6 @@ android {
             buildConfigField("boolean", "OS7_STANDALONE", os7QaLauncherBuild.toString())
             if (clockQaBuild || os7QaLauncherBuild) {
                 applicationIdSuffix = if (cloudPreview) ".os7preview" else ".clockqa"
-                if (cloudPreview) { versionCode = 21; versionName = "0.9.0-preview.1" }
                 manifestPlaceholders["nanoAppLabel"] = if (cloudPreview) "Nano Search v2 Preview" else if (os7QaLauncherBuild) "Nano Search v2" else "Nano Clock QA"
                 manifestPlaceholders["nanoHomeCategory"] = if (os7QaLauncherBuild) "android.intent.category.HOME" else "ai.nanosearch.launcher.category.QA_ONLY"
                 manifestPlaceholders["nanoWallpaperEnabled"] = os7QaLauncherBuild.toString()
