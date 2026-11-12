@@ -58,7 +58,7 @@ class Os7HomeView(
     private val alerts = text(14f)
     private val notificationRow = LinearLayout(context)
     private val tray = LinearLayout(context)
-    private val trayContent = FrameLayout(context)
+    private val trayContent = Os7PanelSwipeLayout(context) { changePanel(it) }
     private lateinit var footer:LinearLayout
     private val previous = text(14f)
     private val selected = text(16f)
@@ -166,7 +166,6 @@ class Os7HomeView(
                     MotionEvent.ACTION_DOWN -> { x=e.x; y=e.y }
                     MotionEvent.ACTION_UP -> {
                         val dx=e.x-x; val dy=e.y-y
-                        if(kotlin.math.abs(dx)>dp(80) && kotlin.math.abs(dx)>kotlin.math.abs(dy)*1.5f) { changePanel(if(dx<0) 1 else -1); return@setOnTouchListener true }
                         if(!standalone && kotlin.math.abs(dy)>dp(48) && kotlin.math.abs(dy)>kotlin.math.abs(dx)*1.5f && ((dy<0 && rows<3) || !canScrollVertically(if(dy>0) -1 else 1))) { setRows((rows+if(dy<0) 1 else -1).coerceIn(0,3)); return@setOnTouchListener true }
                     }
                 }; false

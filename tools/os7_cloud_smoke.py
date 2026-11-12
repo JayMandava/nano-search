@@ -18,7 +18,7 @@ import sys
 import time
 import xml.etree.ElementTree as ET
 
-PACKAGE = "ai.nanosearch.launcher.os7preview"
+PACKAGE = "ai.nanosearch.launcher.os7personal2"
 ACTIVITY_PREFIX = "ai.nanosearch.launcher."
 BOUNDS = re.compile(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]")
 
@@ -216,6 +216,32 @@ class Smoke:
         self.home()
         self.capture("initial-home")
 
+    def favorites_swipe(self, name):
+        root = self.home()
+        self.tap(self.find(root, text="Favorites ›"), "Favorites tab")
+        root = self.wait_screen("MainActivity", desc="Favorites panel, three rows")
+        empty = self.find(root, text="Press and hold an app to add a favorite.")
+        if empty is None:
+            raise AssertionError("Expected fresh emulator Favorites to be empty")
+        bounds = tuple(map(int, BOUNDS.fullmatch(empty.get("bounds", "")).groups()))
+        y = (bounds[1] + bounds[3]) // 2
+        self.tap(empty, "empty Favorites area")
+        self.wait_screen("MainActivity", desc="Favorites panel, three rows")
+        self.shell("input", "swipe", str(self.width // 2), str(y + 60), str(self.width // 2), str(y - 60), "300")
+        self.wait_screen("MainActivity", desc="Favorites panel, three rows")
+        self.capture(f"{name}-favorites-empty")
+        def page(right, expected):
+            start, end = (self.width // 5, self.width * 4 // 5) if right else (self.width * 4 // 5, self.width // 5)
+            self.shell("input", "swipe", str(start), str(y), str(end), str(y), "350")
+            self.wait_screen("MainActivity", desc=f"{expected} panel, three rows")
+        page(False, "Media")
+        page(True, "Favorites")
+        page(True, "All")
+        page(False, "Favorites")
+        self.capture(f"{name}-favorites-after-roundtrip")
+        self.home()
+        self.step(f"PASS {name}: empty Favorites swipes both ways; empty tap and vertical swipe do not page")
+
     def execute(self):
         self.prepare()
         for name, width, font in (("normal", 1080, "1.0"), ("narrow", 900, "1.0"), ("large-text", 1080, "1.3")):
@@ -225,6 +251,7 @@ class Smoke:
             self.shell("wm", "density", "420")
             self.shell("settings", "put", "system", "font_scale", font)
             time.sleep(3)
+            self.favorites_swipe(name)
             self.settings()
             self.capture(f"{name}-settings-top")
             self.scroll_sample(f"{name}-settings-scroll", "SettingsActivity", 3)

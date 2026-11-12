@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -79,6 +80,17 @@ class Os7SettingsLayoutTest {
             layouts.none { it.hasVisualOverflow })
     }
 
+    private fun assertTextAlignment(text: String, alignment: TextAlign, equal: Boolean = true) {
+        val layouts = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithText(text, useUnmergedTree = true)
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertTrue(layouts.isNotEmpty())
+        for (layout in layouts) {
+            if (equal) assertEquals(alignment, layout.layoutInput.style.textAlign)
+            else assertNotEquals(alignment, layout.layoutInput.style.textAlign)
+        }
+    }
+
     @Test fun modelSelectorsDescriptionsAndActionsStaySeparatedOnNarrowScreensAtLargeFonts() {
         val entry = ModelCatalog.all.single { it.id == "ocr-ppocrv4" }
         content { ModelCard(entry, false, 0, Long.MAX_VALUE, true) {} }
@@ -99,6 +111,9 @@ class Os7SettingsLayoutTest {
             assertTrue("Actions remain inside the card", actions.bottom <= card.bottom)
             assertTextFits(entry.name)
             assertTextFits(entry.note)
+            assertTextAlignment(entry.note, TextAlign.Justify)
+            assertTextAlignment(entry.name, TextAlign.Justify, equal = false)
+            assertTextAlignment("Download", TextAlign.Center)
             assertTextFits("Download")
             // Material controls may draw smaller than their expanded accessible touch target.
             val download = compose.onNode(hasClickAction() and hasText("Download")).fetchSemanticsNode().touchBoundsInRoot
@@ -122,6 +137,8 @@ class Os7SettingsLayoutTest {
             assertTrue(touchTarget.width >= 48f && touchTarget.height >= 48f)
             assertTextFits(source.label)
             assertTextFits(source.detail)
+            assertTextAlignment(source.detail, TextAlign.Justify)
+            assertTextAlignment(source.label, TextAlign.Justify, equal = false)
             compose.onNode(isToggleable()).performClick().assertIsOff()
             assertFalse(AppSettings.sourceEnabled(RuntimeEnvironment.getApplication(), source.kind))
             compose.onNode(isToggleable()).performClick().assertIsOn()

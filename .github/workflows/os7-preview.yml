@@ -25,18 +25,18 @@ jobs:
       - run: python3 tools/release/install_tools.py
       - name: Fast UI regressions before native compilation
         working-directory: app
-        run: ./gradlew --no-daemon --max-workers=2 -PunsignedRelease=true -PincludePersonalOverlay=false -Pos7CloudPreview=true :app:testDebugUnitTest -x :app:buildGpuLib --tests ai.nanosearch.launcher.Os7SettingsLayoutTest --tests ai.nanosearch.launcher.InteractionFrameRateTest
+        run: ./gradlew --no-daemon --max-workers=2 -PunsignedRelease=true -PincludePersonalOverlay=false -Pos7CloudPreview=true :app:testDebugUnitTest -x :app:buildGpuLib --tests ai.nanosearch.launcher.Os7SettingsLayoutTest --tests ai.nanosearch.launcher.InteractionFrameRateTest --tests ai.nanosearch.launcher.Os7PanelSwipeLayoutTest --tests ai.nanosearch.launcher.Os7HomeViewTest
       - name: Test and build isolated public preview
         working-directory: app
         run: ./gradlew --no-daemon --max-workers=2 -PunsignedRelease=true -PincludePersonalOverlay=false -Pos7CloudPreview=true :app:testDebugUnitTest :app:lintPreview :app:assemblePreview
       - name: Verify no private font and record artifact identity
         run: |
           mkdir -p preview
-          cp app/app/build/outputs/apk/preview/app-preview.apk preview/Nano-Search-v2-0.9.0-preview.1.apk
+          cp app/app/build/outputs/apk/preview/app-preview.apk preview/Nano-Search-v2-0.9.0-personal.2.apk
           unzip -l preview/*.apk > preview/contents.txt
           if grep -Ei 'porsche|personal/|PORSCHE' preview/contents.txt; then exit 1; fi
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging preview/*.apk > preview/package.txt
-          grep "name='ai.nanosearch.launcher.os7preview'" preview/package.txt
+          grep "name='ai.nanosearch.launcher.os7personal2'" preview/package.txt
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs preview/*.apk > preview/signature.txt
           (cd preview && sha256sum *.apk > SHA256SUMS.txt)
           printf '%s\n' "$GITHUB_SHA" > preview/commit.txt
@@ -78,7 +78,7 @@ jobs:
           "$ANDROID_HOME/emulator/emulator" -list-avds | grep -x os7
       - name: Build actual x86 emulator app and tests
         working-directory: app
-        run: ./gradlew --no-daemon --max-workers=2 -PunsignedRelease=true -PincludePersonalOverlay=false -Pos7CloudPreview=true -PnanoEmulatorBuild=true :app:assemblePreview :app:assemblePreviewAndroidTest
+        run: ./gradlew --no-daemon --max-workers=2 -PunsignedRelease=true -PincludePersonalOverlay=false -Pos7CloudPreview=true -PnanoEmulatorBuild=true :app:assemblePreview
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: os7-emulator-apks
@@ -86,24 +86,36 @@ jobs:
             app/app/build/outputs/apk/preview/app-preview.apk
             app/app/build/outputs/apk/androidTest/preview/app-preview-androidTest.apk
           retention-days: 3
-      - name: Boot and test emulator
+      - name: Enable approved acceleration for this run
+        if: contains(github.event.head_commit.message, '[personal-kvm-20261112]') && github.run_attempt == 1
         run: |
-          accel=off
-          if "$ANDROID_HOME/emulator/emulator" -accel-check; then accel=on; fi
-          "$ANDROID_HOME/emulator/emulator" -avd os7 -memory 2048 -cores 2 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -accel "$accel" > /tmp/emulator.log 2>&1 &
+          getfacl -p /dev/kvm > "$RUNNER_TEMP/os7-kvm.acl"
+          sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+          "$ANDROID_HOME/emulator/emulator" -accel-check
+      - name: Boot and test actual UI
+        run: |
+          mkdir -p emulator-evidence
+          "$ANDROID_HOME/emulator/emulator" -avd os7 -memory 2048 -cores 2 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -accel on > emulator-evidence/emulator.log 2>&1 &
           timeout 600 adb wait-for-device
-          timeout 1200 bash -c 'until adb shell getprop sys.boot_completed | grep -q 1; do sleep 5; done'
+          timeout 600 bash -c 'until adb shell getprop sys.boot_completed | grep -q 1; do sleep 5; done'
           adb shell input keyevent 82
           adb install app/app/build/outputs/apk/preview/app-preview.apk
-          adb install app/app/build/outputs/apk/androidTest/preview/app-preview-androidTest.apk
-          adb shell am instrument -w -r -e class ai.nanosearch.launcher.Os7CloudSmokeTest ai.nanosearch.launcher.os7preview.test/androidx.test.runner.AndroidJUnitRunner | tee /tmp/instrumentation.txt
-          grep -q 'OK (2 tests)' /tmp/instrumentation.txt
+          python3 tools/os7_cloud_smoke.py
+      - name: Restore temporary runner access
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/os7-kvm.acl"; then
+            timeout 30 adb emu kill || true
+            sudo setfacl --restore="$RUNNER_TEMP/os7-kvm.acl"
+            getfacl -p /dev/kvm > "$RUNNER_TEMP/os7-kvm-restored.acl"
+            diff -u "$RUNNER_TEMP/os7-kvm.acl" "$RUNNER_TEMP/os7-kvm-restored.acl"
+          fi
       - name: Collect visual and frame evidence
         if: always()
         run: |
           mkdir -p emulator-evidence
-          adb pull /sdcard/Android/data/ai.nanosearch.launcher.os7preview/files/os7-cloud-qa emulator-evidence/ || true
-          adb shell dumpsys gfxinfo ai.nanosearch.launcher.os7preview framestats > emulator-evidence/gfxinfo.txt || true
+          adb pull /sdcard/Android/data/ai.nanosearch.launcher.os7personal2/files/os7-cloud-qa emulator-evidence/ || true
+          adb shell dumpsys gfxinfo ai.nanosearch.launcher.os7personal2 framestats > emulator-evidence/gfxinfo.txt || true
           cp /tmp/emulator.log /tmp/instrumentation.txt emulator-evidence/ 2>/dev/null || true
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()

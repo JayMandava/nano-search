@@ -19,8 +19,8 @@ android {
         applicationId = "ai.nanosearch.launcher"
         minSdk = 33
         targetSdk = 35
-        versionCode = if (cloudPreview) 21 else 20
-        versionName = if (cloudPreview) "0.9.0-preview.1" else "0.8.5"
+        versionCode = if (cloudPreview) 22 else 20
+        versionName = if (cloudPreview) "0.9.0-personal.2" else "0.8.5"
         buildConfigField("boolean", "OS7_STANDALONE", "false")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["nanoAppLabel"] = "Nano Search"
@@ -83,8 +83,8 @@ android {
             val os7QaLauncherBuild = providers.gradleProperty("os7QaLauncherBuild").map(String::toBoolean).getOrElse(false) || cloudPreview
             buildConfigField("boolean", "OS7_STANDALONE", os7QaLauncherBuild.toString())
             if (clockQaBuild || os7QaLauncherBuild) {
-                applicationIdSuffix = if (cloudPreview) ".os7preview" else ".clockqa"
-                manifestPlaceholders["nanoAppLabel"] = if (cloudPreview) "Nano Search v2 Preview" else if (os7QaLauncherBuild) "Nano Search v2" else "Nano Clock QA"
+                applicationIdSuffix = if (cloudPreview) ".os7personal2" else ".clockqa"
+                manifestPlaceholders["nanoAppLabel"] = if (cloudPreview) "Nano Search v2 Personal" else if (os7QaLauncherBuild) "Nano Search v2" else "Nano Clock QA"
                 manifestPlaceholders["nanoHomeCategory"] = if (os7QaLauncherBuild) "android.intent.category.HOME" else "ai.nanosearch.launcher.category.QA_ONLY"
                 manifestPlaceholders["nanoWallpaperEnabled"] = os7QaLauncherBuild.toString()
                 if (os7QaLauncherBuild) manifestPlaceholders["nanoWallpaperLabel"] = "Nano Search v2 · Steel Dial"
@@ -106,9 +106,9 @@ android {
             isDebuggable = false
             signingConfig = signingConfigs.getByName("debug")
             testProguardFiles("proguard-preview-tests.pro")
-            applicationIdSuffix = ".os7preview"
+            applicationIdSuffix = ".os7personal2"
             buildConfigField("boolean", "OS7_STANDALONE", "true")
-            manifestPlaceholders["nanoAppLabel"] = "Nano Search v2 Preview"
+            manifestPlaceholders["nanoAppLabel"] = "Nano Search v2 Personal"
             manifestPlaceholders["nanoHomeCategory"] = "android.intent.category.HOME"
             manifestPlaceholders["nanoWallpaperEnabled"] = "true"
             manifestPlaceholders["nanoWallpaperLabel"] = "Nano Search v2 · Steel Dial"

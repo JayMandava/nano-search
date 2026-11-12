@@ -2,6 +2,7 @@
 
 package ai.nanosearch.launcher
 
+import ai.nanosearch.launcher.ui.SettingsDescription
 import ai.nanosearch.launcher.ui.SettingsSurfaceTheme as NanoTheme
 import ai.nanosearch.launcher.ui.os7SettingsEnabled
 import ai.nanosearch.launcher.ui.SettingsControlRow
@@ -104,7 +105,7 @@ internal fun ModelsScreen(onBack: () -> Unit) {
                 Card(shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
                     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Everything runs on this phone", style = MaterialTheme.typography.titleLarge)
-                        Text(
+                        SettingsDescription(
                             "Downloading a model is the only time Nano Search uses the internet, and only when you tap Download. Every file is checked against its checksum before it is used.",
                             style = MaterialTheme.typography.bodyMedium,
                         )
@@ -119,7 +120,7 @@ internal fun ModelsScreen(onBack: () -> Unit) {
                 item(key = "h-${slot.name}") {
                     Column(Modifier.padding(start = 4.dp, top = 16.dp, end = 4.dp, bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(slot.title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                        Text(slot.blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        SettingsDescription(slot.blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 val entries = ModelStore.entries(slot)
@@ -160,7 +161,7 @@ internal fun ModelCard(entry: ModelEntry, selected: Boolean, version: Int, total
                     }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            Text(entry.note, Modifier.fillMaxWidth().testTag("model-description-${entry.id}"), style = MaterialTheme.typography.bodyMedium)
+            SettingsDescription(entry.note, Modifier.fillMaxWidth().testTag("model-description-${entry.id}"), style = MaterialTheme.typography.bodyMedium)
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(if (entry.custom) "Your file" else "Download: ${Formatter.formatFileSize(context, entry.bytes)} · Memory: about ${Formatter.formatFileSize(context, entry.ramBytes)}",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -168,7 +169,7 @@ internal fun ModelCard(entry: ModelEntry, selected: Boolean, version: Int, total
             }
             if (chosen && active && !installed) {
                 val fallback = ModelStore.selected(entry.slot)
-                Text(if (ModelStore.installed(fallback)) "Selected when ready. Using ${fallback.name} until the download is verified."
+                SettingsDescription(if (ModelStore.installed(fallback)) "Selected when ready. Using ${fallback.name} until the download is verified."
                     else "Selected when ready. The download must finish and pass verification first.",
                     style = MaterialTheme.typography.bodySmall)
             }
@@ -186,12 +187,12 @@ internal fun ModelCard(entry: ModelEntry, selected: Boolean, version: Int, total
             val tested = ModelTest.results[entry.id]
             if (tested != null) Text(tested, style = MaterialTheme.typography.bodySmall)
             if (downloading.any { it.stalled }) {
-                Text("Not connecting. Check Wi-Fi, and that Nano Search is allowed to use the network.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 4.dp))
+                SettingsDescription("Not connecting. Check Wi-Fi, and that Nano Search is allowed to use the network.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 4.dp))
                 TextButton(onClick = {
                     context.startActivity(android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:${context.packageName}")))
                 }) { Text("Open app settings") }
             }
-            if (failure != null) Text(failure.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 4.dp))
+            if (failure != null) SettingsDescription(failure.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 4.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             // Both the button and its label use the available width. Shrink-wrapped text can
             // round below fractional glyph widths. Height remains content-driven at larger fonts.

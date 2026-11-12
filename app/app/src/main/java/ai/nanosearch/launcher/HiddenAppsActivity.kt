@@ -2,6 +2,7 @@
 
 package ai.nanosearch.launcher
 
+import ai.nanosearch.launcher.ui.SettingsDescription
 import ai.nanosearch.launcher.ui.SettingsSurfaceTheme as NanoTheme
 import ai.nanosearch.launcher.ui.os7SettingsEnabled
 import android.content.ComponentName
@@ -116,7 +117,7 @@ private fun HiddenAppsScreen(onBack: () -> Unit) {
         LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(if (os7SettingsEnabled()) 8.dp else 16.dp), verticalArrangement = Arrangement.spacedBy(if (os7SettingsEnabled()) 4.dp else 8.dp)) {
             item {
                 Card(shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
-                    Text(
+                    SettingsDescription(
                         if (BuildConfig.OS7_STANDALONE) "Hidden apps stay installed and keep working. They do not appear in the launcher, its folders or app search. Turn hiding off here to show an app again." else "A hidden app stays installed and keeps working. It just does not show in the app drawer, in search, in recents or favourites, or in Frames. Switch it off here to see it again.",
                         Modifier.padding(20.dp), style = MaterialTheme.typography.bodyMedium,
                     )

@@ -2,6 +2,7 @@
 
 package ai.nanosearch.launcher
 
+import ai.nanosearch.launcher.ui.SettingsDescription
 import ai.nanosearch.launcher.ui.SettingsSurfaceTheme as NanoTheme
 import ai.nanosearch.launcher.ui.os7SettingsEnabled
 import android.os.Bundle
@@ -80,7 +81,7 @@ private fun AdvancedScreen(onBack: () -> Unit) {
         val v = version
         LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(if (os7SettingsEnabled()) 8.dp else 16.dp), verticalArrangement = Arrangement.spacedBy(if (os7SettingsEnabled()) 4.dp else 12.dp)) {
             item {
-                Text(
+                SettingsDescription(
                     "Nano Search picks these itself and re-checks when the phone or the app changes. Change them only if you know why. A wrong choice can make it slower or use more battery.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -104,7 +105,7 @@ private fun ProcessorCard(version: Int, changed: () -> Unit) {
     Card(shape = RoundedCornerShape(24.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Processor", style = MaterialTheme.typography.titleMedium)
-            Text(
+            SettingsDescription(
                 "This phone has ${CpuPlan.coreCount} cores in ${CpuPlan.clusters.size} " + if (CpuPlan.clusters.size == 1) "group." else "groups (${CpuPlan.clusters.joinToString(", ") { it.size.toString() }} cores, fastest first).",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -119,7 +120,7 @@ private fun ProcessorCard(version: Int, changed: () -> Unit) {
             }
             if (!manual) {
                 val measured = CpuPlan.tunedMs()
-                Text(
+                SettingsDescription(
                     "Using: ${current.label}, ${current.threads} threads." + when {
                         measured != null && measured.first > 0 -> " Measured: about ${"%.1f".format(measured.first / 1000.0)} s a request."
                         CpuPlan.candidates.size < 2 -> " Nothing else to choose between on this phone."
@@ -158,7 +159,7 @@ private fun MemoryCard(version: Int, changed: () -> Unit) {
     Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Memory", style = MaterialTheme.typography.titleMedium)
-            Text(
+            SettingsDescription(
                 "This phone has ${Formatter.formatFileSize(context, MemoryPolicy.totalBytes)} of RAM. Models stay loaded after use so the next request is instant, then are released.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -169,7 +170,7 @@ private fun MemoryCard(version: Int, changed: () -> Unit) {
                 }
             }
             fun mins(ms: Long) = if (ms >= 60_000) "${ms / 60_000} min" else "${ms / 1000} s"
-            Text(
+            SettingsDescription(
                 "Understanding model released after ${mins(MemoryPolicy.parserIdleMs)} idle, answering model after ${mins(MemoryPolicy.answerIdleMs)}. " +
                     if (MemoryPolicy.keepBoth) "Both can be loaded at once." else "Only one is loaded at a time.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -186,7 +187,7 @@ private fun GpuCard(version: Int, changed: () -> Unit) {
     Card(shape = RoundedCornerShape(24.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("GPU (experimental)", style = MaterialTheme.typography.titleMedium)
-            Text(
+            SettingsDescription(
                 "Runs the language models on the graphics chip (Vulkan). It helps on some phones and slows down others, so it is only used if a test on this phone shows it is faster. " +
                     "If it fails or crashes, it switches itself off.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -203,9 +204,9 @@ private fun GpuCard(version: Int, changed: () -> Unit) {
             val blocked = GpuSupport.blocked
             val name = if (on) GpuSupport.deviceName else null
             when {
-                blocked != null -> Text(blocked, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+                blocked != null -> SettingsDescription(blocked, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
                 on && name != null -> Text("GPU found: $name. $measuring", style = MaterialTheme.typography.bodyMedium)
-                on -> Text("This phone reports no usable GPU, so the CPU is used.", style = MaterialTheme.typography.bodyMedium)
+                on -> SettingsDescription("This phone reports no usable GPU, so the CPU is used.", style = MaterialTheme.typography.bodyMedium)
             }
         }
     }

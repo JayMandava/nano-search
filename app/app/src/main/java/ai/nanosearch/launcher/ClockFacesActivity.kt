@@ -7,6 +7,7 @@ import ai.nanosearch.launcher.clocks.ClockFaceView
 import ai.nanosearch.launcher.clocks.ClockMotionPolicy
 import ai.nanosearch.launcher.clocks.PackClockApply
 import ai.nanosearch.launcher.clocks.packs.*
+import ai.nanosearch.launcher.ui.SettingsDescription
 import ai.nanosearch.launcher.ui.SettingsSurfaceTheme as NanoTheme
 import ai.nanosearch.launcher.ui.os7SettingsEnabled
 import android.app.WallpaperManager
@@ -112,9 +113,9 @@ private fun ClockFacesScreen(model: ClockFacesModel, finish: () -> Unit) {
                 ClockNoticeCard(notice, model::dismissNotice)
             } }
             if (selected == null) {
-                item { Text("A face collection for your Home clocks and optional Lock Clock wallpaper. Installing a face does not apply it.", style = MaterialTheme.typography.bodyLarge) }
+                item { SettingsDescription("A face collection for your Home clocks and optional Lock Clock wallpaper. Installing a face does not apply it.", style = MaterialTheme.typography.bodyLarge) }
                 item { Button(onClick = chooseFile, enabled = !busy && state.ready && state.error == null, modifier = Modifier.fillMaxWidth()) { Text("Import face ZIP…") } }
-                item { Text("Data-only analog faces, up to 4 MiB per ZIP. Files are copied privately; no lasting document access is kept.", style = MaterialTheme.typography.bodySmall) }
+                item { SettingsDescription("Data-only analog faces, up to 4 MiB per ZIP. Files are copied privately; no lasting document access is kept.", style = MaterialTheme.typography.bodySmall) }
                 item { SectionTitle("Built-in") }
                 items(listOf(ClockFaces.STEEL_ID, ClockFaces.CARBON_ID), key = { it }) { id ->
                     FaceCard(model, id, ClockFaces.find(id).label, "Built-in · Always available offline", state.generation) { model.selectedId = id }
@@ -127,7 +128,7 @@ private fun ClockFacesScreen(model: ClockFacesModel, finish: () -> Unit) {
                     if (state.unavailable.isEmpty()) OutlinedButton(onClick = model::retryCollection, enabled = !busy) { Text("Retry collection") }
                     else Text("Use Retry check on each unavailable face below.", style = MaterialTheme.typography.bodySmall)
                 } } } }
-                if (state.ready && state.error == null && state.packs.isEmpty() && state.unavailable.isEmpty()) item { Text("No extra faces installed. Import a compatible ZIP to get started.") }
+                if (state.ready && state.error == null && state.packs.isEmpty() && state.unavailable.isEmpty()) item { SettingsDescription("No extra faces installed. Import a compatible ZIP to get started.") }
                 items(state.packs, key = { it.id }) { installed ->
                     FaceCard(model, installed.id, installed.spec.name, "${sourceLabel(installed.source)} · Version ${installed.spec.packVersion}", state.generation) { model.selectedId = installed.id }
                 }
@@ -135,19 +136,19 @@ private fun ClockFacesScreen(model: ClockFacesModel, finish: () -> Unit) {
                     Card { Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(unavailable.name, style = MaterialTheme.typography.titleMedium)
                         Text("Unavailable · ${sourceLabel(unavailable.source)}")
-                        Text("This face could not be loaded. Existing selections safely show Steel Dial. Retry the local check; if memory is low, close other apps first. A damaged face can be removed and reimported from a trusted copy.")
+                        SettingsDescription("This face could not be loaded. Existing selections safely show Steel Dial. Retry the local check; if memory is low, close other apps first. A damaged face can be removed and reimported from a trusted copy.")
                         OutlinedButton(onClick = { model.retry(unavailable.id) }, enabled = !busy) { Text("Retry check") }
                         TextButton(onClick = { removalId = unavailable.id }, enabled = !busy) { Text("Remove…") }
                     } }
                 }
                 item { SectionTitle("Available") }
-                if (FacePackCatalog.entries.isEmpty()) item { Text("No curated downloads have been published yet. Built-in and installed faces work offline; Import ZIP is available now.") }
+                if (FacePackCatalog.entries.isEmpty()) item { SettingsDescription("No curated downloads have been published yet. Built-in and installed faces work offline; Import ZIP is available now.") }
                 items(FacePackCatalog.entries, key = { "catalog-${it.id}" }) { entry ->
                     val installed = state.packs.firstOrNull { it.source == FacePackSource.CURATED && it.spec.packId == entry.packId }
                     Card { Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(entry.name, style = MaterialTheme.typography.titleMedium)
                         Text("Curated catalog · Version ${entry.version} · ${byteCount(entry.bytes)} ZIP")
-                        Text("Verified against this app's pinned digest before installation. Preview and license details are available after validation.")
+                        SettingsDescription("Verified against this app's pinned digest before installation. Preview and license details are available after validation.")
                         when {
                             installed != null && installed.spec.packVersion >= entry.version -> OutlinedButton(onClick = { model.selectedId = installed.id }) { Text("View installed face") }
                             else -> Button(onClick = { model.download(entry) }, enabled = !busy && state.ready && state.error == null) { Text(if (installed == null) "Download" else "Review update…") }
@@ -163,11 +164,11 @@ private fun ClockFacesScreen(model: ClockFacesModel, finish: () -> Unit) {
                     item { Text("Publisher: ${pack.spec.author}${if (pack.source == FacePackSource.IMPORTED) " (self-declared, not verified)" else " (pack metadata)"}") }
                     pack.spec.description?.let { item { Text(it) } }
                     item { Text("License: ${pack.spec.license}"); TextButton(onClick = { licenseId = pack.id }) { Text("Read license terms") } }
-                    item { Text("Compatible with this Nano version · analog-v1${if (pack.spec.dateWindow != null) " with day-of-month" else ""}. No downloadable code, GMT or new complications.", style = MaterialTheme.typography.bodySmall) }
-                    if (pack.source == FacePackSource.CURATED) item { Text("Downloaded content matched the catalog digest. This verifies the reviewed file, not independent publisher ownership.", style = MaterialTheme.typography.bodySmall) }
+                    item { SettingsDescription("Compatible with this Nano version · analog-v1${if (pack.spec.dateWindow != null) " with day-of-month" else ""}. No downloadable code, GMT or new complications.", style = MaterialTheme.typography.bodySmall) }
+                    if (pack.source == FacePackSource.CURATED) item { SettingsDescription("Downloaded content matched the catalog digest. This verifies the reviewed file, not independent publisher ownership.", style = MaterialTheme.typography.bodySmall) }
                 } else {
                     builtin?.credit?.let { item { Text(it) } }
-                    item { Text("Version: included with Nano $appVersion. Built-in artwork and license notices ship with the app; this face cannot be removed.") }
+                    item { SettingsDescription("Version: included with Nano $appVersion. Built-in artwork and license notices ship with the app; this face cannot be removed.") }
                 }
                 // resumeTick re-reads choices after the Android wallpaper picker or another settings screen.
                 item { Text("Used by ${usage?.homeCount ?: 0} Home ${if (usage?.homeCount == 1) "clock" else "clocks"}${if (lockSelected) " · Selected for Lock Clock" else " · Not selected for Lock Clock"}.") }
@@ -187,7 +188,7 @@ private fun ClockFacesScreen(model: ClockFacesModel, finish: () -> Unit) {
                     item { TextButton(onClick = { removalId = pack.id }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Remove face…") } }
                 }
             } else {
-                item { Text("This face is no longer available. Existing selections safely fall back to Steel Dial.") }
+                item { SettingsDescription("This face is no longer available. Existing selections safely fall back to Steel Dial.") }
                 item { Button(onClick = { model.selectedId = null }) { Text("Back to collection") } }
             }
         }
@@ -199,19 +200,19 @@ private fun ClockFacesScreen(model: ClockFacesModel, finish: () -> Unit) {
         dismissButton = { TextButton(onClick = { backConfirmation = false; model.cancelOperation() }, enabled = model.operation?.let { it.cancellable && it.progress.stage != FacePackStage.INSTALLING && !it.cancelling } == true) { Text("Cancel operation") } })
     LaunchedEffect(model.operation) { if (model.operation == null) backConfirmation = false }
     model.updateReview?.let { review -> AlertDialog(onDismissRequest = model::dismissUpdate, title = { Text("Replace installed version?") },
-        text = { Text("Install ${review.name}, version ${review.version}? The current version stays available if validation or installation fails. The file will be checked again and must match the content just reviewed. Existing Home and Lock Clock placements keep their choices and display the updated artwork immediately.") },
+        text = { SettingsDescription("Install ${review.name}, version ${review.version}? The current version stays available if validation or installation fails. The file will be checked again and must match the content just reviewed. Existing Home and Lock Clock placements keep their choices and display the updated artwork immediately.") },
         confirmButton = { TextButton(onClick = model::confirmUpdate) { Text("Update face") } }, dismissButton = { TextButton(onClick = model::dismissUpdate) { Text("Keep current") } }) }
     if (homeDialog && selected != null) HomeTargetDialog(selected, onDismiss = { homeDialog = false }) { token, page -> homeDialog = false; model.applyHome(selected, token, page) }
     if (lockDialog && selected != null) {
         val active = remember(lockDialog, resumeTick) { runCatching { WallpaperManager.getInstance(context).wallpaperInfo?.component == LockClock.component(context) }.getOrDefault(false) }
         AlertDialog(onDismissRequest = { lockDialog = false }, title = { Text("Use for Lock Clock?") },
-            text = { Text((if (active) "Lock Clock is your active wallpaper. Changing this choice changes its face immediately. " else "This saves Nano's Lock Clock face choice; it does not apply wallpaper. If Lock Clock is already active, its face changes immediately. ") + "Home clocks, background photo and position stay unchanged.") },
+            text = { SettingsDescription((if (active) "Lock Clock is your active wallpaper. Changing this choice changes its face immediately. " else "This saves Nano's Lock Clock face choice; it does not apply wallpaper. If Lock Clock is already active, its face changes immediately. ") + "Home clocks, background photo and position stay unchanged.") },
             confirmButton = { TextButton(onClick = { lockDialog = false; model.applyLock(selected) }) { Text("Use this face") } }, dismissButton = { TextButton(onClick = { lockDialog = false }) { Text("Cancel") } })
     }
     removalId?.let { id ->
         val usage = remember(id, state.generation) { PackClockApply.removalUsage(context, id) }
         AlertDialog(onDismissRequest = { removalId = null }, title = { Text("Remove face?") },
-            text = { Text("This removes only the downloaded or imported face, not its original document. ${usage.homeCount} Home ${if (usage.homeCount == 1) "clock will" else "clocks will"} use Steel Dial instead.${if (usage.lockSelected) " Lock Clock will also use Steel Dial." else " The Lock Clock choice is unchanged."} Widget positions and sizes are kept.") },
+            text = { SettingsDescription("This removes only the downloaded or imported face, not its original document. ${usage.homeCount} Home ${if (usage.homeCount == 1) "clock will" else "clocks will"} use Steel Dial instead.${if (usage.lockSelected) " Lock Clock will also use Steel Dial." else " The Lock Clock choice is unchanged."} Widget positions and sizes are kept.") },
             confirmButton = { TextButton(onClick = { removalId = null; model.remove(id) }) { Text("Remove") } }, dismissButton = { TextButton(onClick = { removalId = null }) { Text("Keep face") } })
     }
     licenseId?.let { id -> state.packs.firstOrNull { it.id == id }?.let { licensed ->
@@ -266,9 +267,9 @@ private fun DetailFacePreview(model: ClockFacesModel, id: String, name: String, 
             Text("Live local-time preview", Modifier.weight(1f))
             Switch(checked = showingLive, onCheckedChange = { live = it }, enabled = resumed && motionAllowed, modifier = Modifier.semantics { contentDescription = "Live local-time preview" })
         }
-        Text(if (showingLive) "Live preview only; your Home and Lock Clock choices are unchanged."
+        SettingsDescription(if (showingLive) "Live preview only; your Home and Lock Clock choices are unchanged."
             else "Static preview at 10:10, using the same renderer as Home and Lock Clock.", style = MaterialTheme.typography.bodySmall)
-        if (!motionAllowed || !resumed) Text("Live preview stays off when motion is reduced, battery saver is on, system animations are disabled, or this screen is paused.", style = MaterialTheme.typography.bodySmall)
+        if (!motionAllowed || !resumed) SettingsDescription("Live preview stays off when motion is reduced, battery saver is on, system animations are disabled, or this screen is paused.", style = MaterialTheme.typography.bodySmall)
     }
 }
 
@@ -345,7 +346,7 @@ private fun HomeTargetDialog(id: String, onDismiss: () -> Unit, confirm: (String
     val validChoice = placements.any { choice == "existing:${it.token}" } || pages.any { choice == "new:${it.key}" }
     AlertDialog(onDismissRequest = onDismiss, title = { Text("Choose one Home destination") },
         text = { Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Replace one existing clock without moving or resizing it, or add a new clock to a specific page.")
+            SettingsDescription("Replace one existing clock without moving or resizing it, or add a new clock to a specific page.")
             placements.forEach { placement -> RadioChoice("existing:${placement.token}", "Replace ${placement.label}", choice) { choice = it } }
             pages.forEach { page -> RadioChoice("new:${page.key}", "Add a new clock to ${page.label}", choice) { choice = it } }
         } },

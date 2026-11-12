@@ -19,6 +19,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -135,4 +137,24 @@ fun SettingsControlRow(
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp), content = description)
         }
     }
+}
+
+/** Full-width explanatory paragraphs only. Titles, values and controls keep their normal alignment.
+ * Android leaves the final (or only) line start-aligned, avoiding stretched short labels.
+ */
+@Composable
+fun SettingsDescription(
+    text: String,
+    modifier: Modifier = Modifier,
+    style: TextStyle = LocalTextStyle.current,
+    color: Color = Color.Unspecified,
+) {
+    val classic = os7SettingsEnabled()
+    Text(
+        text = text,
+        modifier = if (classic) modifier.fillMaxWidth() else modifier,
+        style = style,
+        color = color,
+        textAlign = if (classic) TextAlign.Justify else TextAlign.Unspecified,
+    )
 }

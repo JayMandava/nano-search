@@ -83,6 +83,47 @@ class Os7HomeViewTest {
         assertTrue(home.expanded)
     }
 
+    private fun swipeArea(home: Os7HomeView, right: Boolean) {
+        val area = grid(home).parent as View
+        val density = context.resources.displayMetrics.density
+        val start = (if (right) 20 else 250) * density
+        val end = (if (right) 250 else 20) * density
+        listOf(android.view.MotionEvent.ACTION_DOWN to start,
+            android.view.MotionEvent.ACTION_MOVE to end,
+            android.view.MotionEvent.ACTION_UP to end).forEachIndexed { index, (action, x) ->
+            val event = android.view.MotionEvent.obtain(0, index * 40L, action, x, 180 * density, 0)
+            area.dispatchTouchEvent(event)
+            event.recycle()
+        }
+    }
+
+    @Test fun emptyFavoritesSwipeBothWaysAndPreserveFixedTray() {
+        val home = home(standalone = true)
+        val area = grid(home).parent as View
+        val height = area.layoutParams.height
+        next(home).performClick()
+        assertEquals("Favorites", selected(home).text.toString())
+        assertEquals(View.GONE, grid(home).visibility)
+        swipeArea(home, right = false)
+        assertEquals("Media", selected(home).text.toString())
+        swipeArea(home, right = true)
+        assertEquals("Favorites", selected(home).text.toString())
+        swipeArea(home, right = true)
+        assertEquals("All", selected(home).text.toString())
+        assertEquals(height, area.layoutParams.height)
+        assertTrue(launched.isEmpty())
+    }
+
+    @Test fun sparseFavoritesSwipeWithoutLaunchingOrChangingFavorites() {
+        AppUsage.toggleFavourite(context, alpha.key)
+        val home = home(standalone = true)
+        next(home).performClick()
+        swipeArea(home, right = true)
+        assertEquals("All", selected(home).text.toString())
+        assertEquals(listOf(alpha.key), AppUsage.favourites(context))
+        assertTrue(launched.isEmpty())
+    }
+
     @Test fun dateAndClockExposeIndependentClickActions() {
         var calendarClicks = 0
         var clockClicks = 0
