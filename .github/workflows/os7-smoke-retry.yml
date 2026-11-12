@@ -1,0 +1,63 @@
+name: OS7 saved APK UI validation
+on:
+  push:
+    branches: [feat/os7-recreation]
+    paths: ['.github/workflows/os7-smoke-retry.yml', 'tools/os7_cloud_smoke.py']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Download exact validated emulator APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/JayMandava/nano-search/actions/artifacts/13917007843/zip > emulator-apks.zip
+          unzip -q emulator-apks.zip -d emulator-apks
+          echo "154944e620b1f20bd7effd30417d7202b64fad55ec4a9d224849389e6ec1e48d  emulator-apks.zip" | sha256sum -c -
+      - name: Provision emulator using existing licenses
+        run: |
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/os7-avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+          test -s "$ANDROID_HOME/licenses/android-sdk-license"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'emulator' 'system-images;android-35;google_apis;x86_64' < /dev/null
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n os7 -p "$ANDROID_AVD_HOME/os7.avd" -k 'system-images;android-35;google_apis;x86_64'
+          "$ANDROID_HOME/emulator/emulator" -list-avds | grep -x os7
+      - name: Boot and inspect actual app
+        run: |
+          mkdir -p emulator-evidence
+          accel=off
+          if "$ANDROID_HOME/emulator/emulator" -accel-check; then accel=on; fi
+          "$ANDROID_HOME/emulator/emulator" -avd os7 -memory 2048 -cores 2 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -accel "$accel" > emulator-evidence/emulator.log 2>&1 &
+          timeout 600 adb wait-for-device
+          timeout 1500 bash -c 'until adb shell getprop sys.boot_completed | grep -q 1; do sleep 10; done'
+          adb shell input keyevent 82
+          adb install "$(find emulator-apks -name app-preview.apk -print -quit)"
+          python3 tools/os7_cloud_smoke.py
+      - name: Collect diagnostics
+        if: always()
+        run: |
+          mkdir -p emulator-evidence
+          timeout 45 adb logcat -d > emulator-evidence/logcat.txt || true
+          timeout 45 adb shell dumpsys activity activities > emulator-evidence/activities.txt || true
+          timeout 45 adb shell dumpsys gfxinfo ai.nanosearch.launcher.os7preview framestats > emulator-evidence/gfxinfo.txt || true
+          timeout 45 adb exec-out screencap -p > emulator-evidence/final-screen.png || true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: os7-external-ui-evidence
+          path: emulator-evidence/
+          retention-days: 7

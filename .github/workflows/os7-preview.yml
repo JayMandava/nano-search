@@ -10,6 +10,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   validate:
+    if: "!contains(github.event.head_commit.message, '[smoke-only]')"
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     steps:
@@ -52,6 +53,7 @@ jobs:
             app/app/build/reports/
             app/app/build/test-results/
   emulator:
+    if: "!contains(github.event.head_commit.message, '[smoke-only]')"
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     steps:
