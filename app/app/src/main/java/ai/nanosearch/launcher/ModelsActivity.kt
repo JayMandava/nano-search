@@ -58,6 +58,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.ui.unit.dp
@@ -192,22 +193,28 @@ internal fun ModelCard(entry: ModelEntry, selected: Boolean, version: Int, total
             }
             if (failure != null) Text(failure.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 4.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            // Full-width actions avoid an intrinsic-width flow measurement squeezing large
-            // button labels. Height stays content-driven, including at accessibility font sizes.
+            // Both the button and its label use the available width. Shrink-wrapped text can
+            // round below fractional glyph widths. Height remains content-driven at larger fonts.
             Column(Modifier.fillMaxWidth().testTag("model-actions-${entry.id}"),
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 val actionModifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
                 if (installed && ModelTest.canTest(entry) && tested != "Testing…") {
-                    TextButton(onClick = { ModelTest.run(context, entry) }, modifier = actionModifier) { Text(if (tested == null) "Try it" else "Try again") }
+                    TextButton(onClick = { ModelTest.run(context, entry) }, modifier = actionModifier) {
+                        Text(if (tested == null) "Try it" else "Try again", Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                    }
                 }
                 when {
-                    active -> TextButton(onClick = { ModelStore.cancel(entry); changed() }, modifier = actionModifier) { Text("Cancel") }
+                    active -> TextButton(onClick = { ModelStore.cancel(entry); changed() }, modifier = actionModifier) {
+                        Text("Cancel", Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                    }
                     installed -> TextButton(onClick = {
                         ModelStore.delete(entry)?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
                         changed()
-                    }, modifier = actionModifier) { Text("Delete") }
+                    }, modifier = actionModifier) { Text("Delete", Modifier.fillMaxWidth(), textAlign = TextAlign.Center) }
                     tooBig -> Text("Too big for this phone", Modifier.padding(vertical = 12.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
-                    else -> FilledTonalButton(onClick = { ModelStore.download(entry, wifi); changed() }, modifier = actionModifier) { Text("Download") }
+                    else -> FilledTonalButton(onClick = { ModelStore.download(entry, wifi); changed() }, modifier = actionModifier) {
+                        Text("Download", Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                    }
                 }
             }
         }

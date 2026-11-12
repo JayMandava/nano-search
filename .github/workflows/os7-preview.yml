@@ -22,6 +22,9 @@ jobs:
           distribution: temurin
           java-version: '17'
       - run: python3 tools/release/install_tools.py
+      - name: Fast UI regressions before native compilation
+        working-directory: app
+        run: ./gradlew --no-daemon --max-workers=2 -PunsignedRelease=true -PincludePersonalOverlay=false -Pos7CloudPreview=true :app:testDebugUnitTest -x :app:buildGpuLib --tests ai.nanosearch.launcher.Os7SettingsLayoutTest --tests ai.nanosearch.launcher.InteractionFrameRateTest
       - name: Test and build isolated public preview
         working-directory: app
         run: ./gradlew --no-daemon --max-workers=2 -PunsignedRelease=true -PincludePersonalOverlay=false -Pos7CloudPreview=true :app:testDebugUnitTest :app:lintPreview :app:assemblePreview
