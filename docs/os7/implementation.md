@@ -1,3 +1,26 @@
+# Core restoration and direct gesture acceptance
+
+This follow-up restores models and indexing as core launcher functionality. Standalone means separate launcher UI, not app-only search: on-device models, voice, query parsing, indexing sources, Files, index counts/rebuild and existing search are restored. Widgets, Active Frames and theme-mode framing remain excluded. Source permissions are declared again but not automatically granted; no model download was initiated by this work.
+
+- Empty Favorites previously replaced the three-row grid with wrap-content text and collapsed the tray. A fixed-height content container now reserves the same space for empty, one-app and populated panels. Unit coverage checks these states.
+- Battery/date share a left gutter; carrier and connection control sit together. Date opens the calendar. Clock opens the resolved clock app's launcher activity, avoiding a headless alarm API handler where available.
+- Immersive navigation consumed bottom swipes on Home/menu/Hub. Standalone now keeps Android navigation available instead of hiding it. This is separate from default HOME selection: Android routes Home to the selected launcher.
+- Notification title has extra cutout-safe top clearance and tabs have symmetric side gutters. Unchanged app lists no longer invalidate the grid adapter on each refresh.
+- The search-hiding test was corrected to refer to the actual tray ancestor after the new fixed-height container was introduced; the requirement that the full tray is hidden during search and restored afterward remains unchanged.
+
+## Follow-up verification
+
+- Final private device APK: `ec30268b44b641290a50059dc7ae7218e64f19c777fdfc4740e7ce0ee4d4fff9`. It was installed as an in-place v2 update; original Nano/HTC data was preserved. Private font/APK remain local-only.
+- Actual bottom-edge Home swipes, not only Home key injection, passed from Home menu, keyboard-visible search, Hub, Settings, Models, Calendar, Clock and a completed local Ask response while v2 was temporarily default. Original HD2 default was restored and verified afterward. To use v2 as daily Home, it must be selected as Android's default launcher.
+- Empty and one-item Favorites retained the same tray position on the phone; unit tests cover empty, one and multiple favorites. Test favorite state was restored. Header alignment, compact network group and date/clock targets were checked visually; clock text now opens DeskClock's main screen.
+- Models and index controls are present. App/settings indexing and app search were populated. The existing Qwen model answered a harmless arithmetic query locally in roughly 30 seconds; no model download or selection change was initiated. This is a functional smoke test, not a model-quality or inference-speed benchmark.
+- Hub title began below the 100 px cutout; tabs had 45 px side gutters at the phone's density. Populated Hub layout was inspected without copying personal payloads. Real notifications were not opened, pinned, replied to or dismissed. Synthetic posting was skipped because the available shell command lacked a corresponding safe cancellation operation.
+- A bounded navigation sample recorded 182 frames, 14 janky (7.69%), p50 7 ms, p95 21 ms, p99 32 ms. The sample differs from the earlier run and does not establish a speed gain or sustained 120 fps. Adapter invalidation regression coverage verifies unchanged lists no longer trigger a redraw.
+- Device logs included SQLite connection/WAL warnings during indexing, without a crash; app search and inference completed. This is not a claim that all logging/performance concerns are eliminated.
+- Standalone and original Nano profiles each passed 282 tests: 272 passed, ten existing skips, zero failures/errors. Final lint passed with zero errors, 334 warnings and one hint. The private device artifact hash remained unchanged.
+
+---
+
 # Current standalone v2 refinement
 
 This section supersedes the earlier experimental workspace/theme behavior documented below. The OS7 launcher build is selected by `os7QaLauncherBuild`; it remains a separate application from original Nano and HTC.

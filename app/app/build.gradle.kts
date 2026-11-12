@@ -119,7 +119,7 @@ android {
         }
     }
 
-    // Standalone debug launcher drops permissions belonging only to Nano search/widgets.
+    // Standalone debug launcher drops the unsupported Home-widget binding permission.
     // This overlay is never attached to production/release or ordinary clock QA.
     if (providers.gradleProperty("os7QaLauncherBuild").map(String::toBoolean).getOrElse(false)) {
         sourceSets.getByName("debug").manifest.srcFile("src/os7Standalone/AndroidManifest.xml")

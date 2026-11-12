@@ -240,6 +240,15 @@ class MainActivity : Activity() {
             connections = { tryStart { startActivity(Intent(Settings.Panel.ACTION_INTERNET_CONNECTIVITY)) } },
             profiles = { tryStart { startActivity(Intent(Settings.ACTION_SOUND_SETTINGS)) } },
             menu = { view -> showOs7Menu(view) },
+            openCalendar = { tryStart { startActivity(Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_CALENDAR)) } },
+            openClock = { tryStart {
+                val alarms = Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS)
+                // Some clock apps route SHOW_ALARMS through a headless API handler.
+                // Open that app's actual launcher activity when one is available.
+                val clockPackage = packageManager.resolveActivity(alarms, PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName
+                val clock = clockPackage?.let { packageManager.getLaunchIntentForPackage(it) }
+                startActivity(clock ?: alarms)
+            } },
         )
         val root = FrameLayout(this).apply {
             addView(home, FrameLayout.LayoutParams(-1, -1))
@@ -416,7 +425,7 @@ class MainActivity : Activity() {
                     addView(hubBadge, FrameLayout.LayoutParams(-2, dp(18), Gravity.TOP or Gravity.END).apply { topMargin = dp(2); marginEnd = dp(2) })
                 }, LinearLayout.LayoutParams(dp(56), dp(56)).apply { leftMargin = dp(8) })
             }
-            if (!standalone) addView(mic, LinearLayout.LayoutParams(dp(56), dp(56)).apply { leftMargin = dp(8) })
+            addView(mic, LinearLayout.LayoutParams(dp(56), dp(56)).apply { leftMargin = dp(8) })
         }
 
         list = ListView(this).apply {
@@ -1180,7 +1189,13 @@ class MainActivity : Activity() {
     /** Full screen: hide both system bars; a swipe from the top or bottom edge brings them back for a moment. */
     private fun applyFullScreen() {
         val c = window.insetsController ?: return
-        if (AppSettings.fullScreen(this)) {
+        // Keep Android's Home gesture available immediately. Immersive navigation
+        // consumes an edge swipe to reveal the bar instead of going Home.
+        if (standalone) {
+            c.systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_DEFAULT
+            c.hide(WindowInsets.Type.statusBars())
+            c.show(WindowInsets.Type.navigationBars())
+        } else if (AppSettings.fullScreen(this)) {
             c.systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             c.hide(WindowInsets.Type.systemBars())
         } else if (os7 && !nanoWorkspace) {
@@ -1214,7 +1229,6 @@ class MainActivity : Activity() {
 
     /** Fingerprints new photos for "photos of a beach" style search; a no-op if the image models are not installed or a run is in progress. */
     private fun startEmbedding() {
-        if (standalone) return
         if (!Services.clip.available && !Services.ocr.available) return
         if (embedRunning.getAndSet(true)) { embedAgain.set(true); return } // the photos may have changed since that run began: go round again
         embedder.execute {
@@ -1382,7 +1396,7 @@ class MainActivity : Activity() {
             *(if (!standalone) arrayOf(MenuItem(R.drawable.ic_menu_apps, "${if(os7Home?.expanded == true) "Collapse" else "Expand"} applications") { os7Home?.setExpanded(os7Home?.expanded != true) }) else emptyArray()),
             MenuItem(R.drawable.ic_menu_add, "Add folder") { createOs7Folder(null) },
             MenuItem(R.drawable.ic_menu_apps, "Manage panels") { manageOs7Panels() },
-            MenuItem(R.drawable.ic_search, if(standalone) "Search apps" else "Universal search") { showOs7Search() },
+            MenuItem(R.drawable.ic_search, "Universal search") { showOs7Search() },
             MenuItem(R.drawable.ic_hub, "Notifications") { if(standalone || AppSettings.hub(this)) openHub() else expandNotifications() },
             MenuItem(R.drawable.ic_menu_wallpaper, "Wallpaper") { changeWallpaper() },
             *(if (!standalone) arrayOf(MenuItem(R.drawable.ic_menu_widgets, "Nano workspace & widgets") {
@@ -1436,7 +1450,7 @@ class MainActivity : Activity() {
         val q = input.text.toString()
         setSearchActive(q.isNotBlank() || chatOpen)
         // Photo requests ("photos from Goa last September") are understood by rules and answered instantly; a model would only blur them.
-        if (!standalone && q.isNotBlank() && looksNatural(q) && parser.available && PhotoQuery.parse(q) == null && !isFollowUp(q)) ui.postDelayed(parseRunnable, PARSE_DEBOUNCE_MS)
+        if (q.isNotBlank() && looksNatural(q) && parser.available && PhotoQuery.parse(q) == null && !isFollowUp(q)) ui.postDelayed(parseRunnable, PARSE_DEBOUNCE_MS)
         search()
     }
 
@@ -1468,7 +1482,6 @@ class MainActivity : Activity() {
 
     private fun search() {
         val query = input.text.toString()
-        if (standalone) { runSearch(query, semantic = false); return }
         ui.removeCallbacks(semanticRunnable)
         // Anything that may involve the image model ("photos of a dog", or a short plain word like "beach") waits for a pause in typing
         // rather than running on "photos of a d"; the instant keyword results appear straight away either way.
@@ -1482,7 +1495,7 @@ class MainActivity : Activity() {
         io.execute {
             val drawerApps = if (query.isBlank()) index.search("", limit = 500) else null
             val os7Apps = if (os7 && drawerApps != null) drawerApps.mapNotNull { Os7Panels.describe(this,it.key,it.title) } else emptyList()
-            val found = if (query.isBlank()) emptyList() else if (standalone) findStandaloneApps(query) else index.search(query, limit = 60, semantic = semantic)
+            val found = if (query.isBlank()) emptyList() else index.search(query, limit = 60, semantic = semantic)
             ui.post {
                 if (seq != searchSeq) return@post
                 if (drawerApps != null) {
@@ -1496,14 +1509,9 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun findStandaloneApps(query:String):List<Item> {
-        val tokens=query.trim().lowercase(java.util.Locale.ROOT).split(Regex("\\s+"))
-        return index.search("",limit=1000).filter { item -> tokens.all { item.title.lowercase(java.util.Locale.ROOT).contains(it) } }.take(60)
-    }
-
     /** An "Ask" row at the top of the results; pressing Enter does the same thing. */
     private fun withAsk(query: String, found: List<Item>): List<Item> =
-        if (!standalone && answerer.available && query.isNotBlank()) listOf(Item("ask", "Ask “${query.trim()}”", "ask")) + found else found
+        if (answerer.available && query.isNotBlank()) listOf(Item("ask", "Ask “${query.trim()}”", "ask")) + found else found
 
     private fun kindsFor(kind: String?): List<String>? = when (kind) {
         "app" -> listOf("app", "setting")
@@ -1546,14 +1554,6 @@ class MainActivity : Activity() {
     private fun submit() {
         val q = input.text.toString().trim()
         if (q.isEmpty()) return
-        if (standalone) {
-            val seq=++searchSeq
-            io.execute {
-                val top=findStandaloneApps(q).firstOrNull()
-                ui.post { if(seq==searchSeq && input.text.toString().trim()==q && top!=null) open(top) }
-            }
-            return
-        }
         // One answer at a time: the next question waits until this one is finished (or stopped with the mic button).
         if (busy) { input.performHapticFeedback(HapticFeedbackConstants.REJECT); return }
         // One press of Enter can arrive twice (as an editor action and as a key event); the second would cancel the first answer.
@@ -1843,7 +1843,6 @@ class MainActivity : Activity() {
                 indexedHiddenKey = hiddenKey
                 changed = true
             }
-            if (standalone) { if (changed) ui.post { search() }; return@execute }
             if (index.count("setting") == 0) { index.replaceKind("setting", Indexers.settings()); changed = true }
             val now = System.currentTimeMillis()
             val force = prefs.getBoolean("reindex", false).also { if (it) prefs.edit().remove("reindex").apply() }

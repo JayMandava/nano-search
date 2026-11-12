@@ -24,6 +24,8 @@ class Os7HomeView(
     private val profiles: () -> Unit,
     private val menu: (View) -> Unit,
     private val standalone: Boolean = BuildConfig.OS7_STANDALONE,
+    private val openCalendar: () -> Unit = {},
+    private val openClock: () -> Unit = {},
 ) : LinearLayout(context) {
     private fun dp(n: Int) = (n * resources.displayMetrics.density).toInt()
     private val white = Color.WHITE
@@ -51,6 +53,7 @@ class Os7HomeView(
     private val alerts = text(14f)
     private val notificationRow = LinearLayout(context)
     private val tray = LinearLayout(context)
+    private val trayContent = FrameLayout(context)
     private lateinit var footer:LinearLayout
     private val previous = text(14f)
     private val selected = text(16f)
@@ -83,23 +86,33 @@ class Os7HomeView(
             clipChildren=false
             background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0xD0101419.toInt(),0x50101419))
             battery.gravity=Gravity.START or Gravity.CENTER_VERTICAL
-            battery.setPadding(dp(8),0,0,0)
+            battery.setPadding(dp(12),0,0,0)
             battery.compoundDrawablePadding=dp(4)
+            battery.maxWidth=dp(100)
             val carrier=runCatching { (context.getSystemService(Context.TELEPHONY_SERVICE) as android.telephony.TelephonyManager).networkOperatorName }.getOrDefault("")
             statusArea=FrameLayout(context).apply {
-                addView(battery,FrameLayout.LayoutParams(dp(100),-1,Gravity.START))
-                carrierLabel=text(12f).apply { text=carrier; maxLines=1; ellipsize=android.text.TextUtils.TruncateAt.END }
-                addView(carrierLabel,FrameLayout.LayoutParams(dp(100),-1,Gravity.END).apply { rightMargin=dp(52) })
-                addView(button("Connections",R.drawable.ic_os7_connections) { connections() },FrameLayout.LayoutParams(dp(48),dp(48),Gravity.END or Gravity.TOP))
+                addView(battery,FrameLayout.LayoutParams(-2,dp(48),Gravity.START or Gravity.TOP))
+                val network = LinearLayout(context).apply {
+                    gravity = Gravity.CENTER_VERTICAL
+                    carrierLabel=text(12f).apply {
+                        text=carrier; maxLines=1; maxWidth=dp(100)
+                        ellipsize=android.text.TextUtils.TruncateAt.END
+                        setPadding(0,0,dp(4),0)
+                        visibility=if(carrier.isBlank()) GONE else VISIBLE
+                    }
+                    addView(carrierLabel,LayoutParams(-2,dp(48)))
+                    addView(button("Connections",R.drawable.ic_os7_connections) { connections() },LayoutParams(dp(48),dp(48)))
+                }
+                addView(network,FrameLayout.LayoutParams(-2,dp(48),Gravity.END or Gravity.TOP).apply { rightMargin=dp(8) })
             }
             if(standalone) {
                 addView(statusArea,FrameLayout.LayoutParams(-1,dp(48),Gravity.TOP))
-                addView(TextClock(context).apply { format12Hour="EEE d MMM";format24Hour="EEE d MMM";textSize=12f;setTextColor(white);gravity=Gravity.START or Gravity.CENTER_VERTICAL;setPadding(dp(8),0,0,0) },FrameLayout.LayoutParams(dp(105),dp(48),Gravity.BOTTOM))
-                addView(TextClock(context).apply { format12Hour="h:mm";format24Hour="HH:mm";setSingleLine();setAutoSizeTextTypeUniformWithConfiguration(18,32,1,android.util.TypedValue.COMPLEX_UNIT_SP);setTextColor(white);gravity=Gravity.CENTER;typeface=Typeface.create("sans-serif-condensed",Typeface.NORMAL) },FrameLayout.LayoutParams(-1,dp(48),Gravity.BOTTOM).apply { leftMargin=dp(105);rightMargin=dp(105) })
+                addView(TextClock(context).apply { format12Hour="EEE d MMM";format24Hour="EEE d MMM";textSize=12f;setTextColor(white);gravity=Gravity.START or Gravity.CENTER_VERTICAL;setPadding(dp(12),0,0,0); contentDescription="Open calendar"; isFocusable=true; background=focusBackground(); setOnClickListener { openCalendar() } },FrameLayout.LayoutParams(dp(105),dp(48),Gravity.BOTTOM))
+                addView(TextClock(context).apply { format12Hour="h:mm";format24Hour="HH:mm";setSingleLine();setAutoSizeTextTypeUniformWithConfiguration(18,32,1,android.util.TypedValue.COMPLEX_UNIT_SP);setTextColor(white);gravity=Gravity.CENTER;typeface=Typeface.create("sans-serif-condensed",Typeface.NORMAL); contentDescription="Open clock"; isFocusable=true; background=focusBackground(); setOnClickListener { openClock() } },FrameLayout.LayoutParams(-1,dp(48),Gravity.BOTTOM).apply { leftMargin=dp(105);rightMargin=dp(105) })
             } else {
                 addView(statusArea,FrameLayout.LayoutParams(-1,dp(28),Gravity.TOP))
-                addView(TextClock(context).apply { format12Hour="EEE d MMM";format24Hour="EEE d MMM";textSize=12f;setTextColor(white);gravity=Gravity.START or Gravity.CENTER_VERTICAL },FrameLayout.LayoutParams(dp(105),dp(30),Gravity.BOTTOM))
-                addView(TextClock(context).apply { format12Hour="h:mm";format24Hour="HH:mm";textSize=34f;setTextColor(white);gravity=Gravity.CENTER },FrameLayout.LayoutParams(-1,dp(48),Gravity.BOTTOM).apply { leftMargin=dp(105);rightMargin=dp(105) })
+                addView(TextClock(context).apply { format12Hour="EEE d MMM";format24Hour="EEE d MMM";textSize=12f;setTextColor(white);gravity=Gravity.START or Gravity.CENTER_VERTICAL; setPadding(dp(12),0,0,0); contentDescription="Open calendar"; isFocusable=true; background=focusBackground(); setOnClickListener { openCalendar() } },FrameLayout.LayoutParams(dp(105),dp(30),Gravity.BOTTOM))
+                addView(TextClock(context).apply { format12Hour="h:mm";format24Hour="HH:mm";textSize=34f;setTextColor(white);gravity=Gravity.CENTER; contentDescription="Open clock"; isFocusable=true; background=focusBackground(); setOnClickListener { openClock() } },FrameLayout.LayoutParams(-1,dp(48),Gravity.BOTTOM).apply { leftMargin=dp(105);rightMargin=dp(105) })
             }
         }
         topChrome=top
@@ -154,9 +167,10 @@ class Os7HomeView(
                 }; false
             }
         }
-        tray.addView(grid,LayoutParams(-1,rowHeight()))
+        trayContent.addView(grid,FrameLayout.LayoutParams(-1,-1))
         empty.apply { setPadding(dp(20),dp(16),dp(20),dp(16)); visibility=GONE }
-        tray.addView(empty,LayoutParams(-1,-2))
+        trayContent.addView(empty,FrameLayout.LayoutParams(-1,-1))
+        tray.addView(trayContent,LayoutParams(-1,rows*rowHeight()))
         addView(tray,LayoutParams(-1,-2))
         footer=LinearLayout(context).apply {
             gravity=Gravity.END; setBackgroundColor(0xEA0B1017.toInt())
@@ -179,7 +193,7 @@ class Os7HomeView(
     fun setApps(items:List<Item>, described:List<Os7Panels.App>) { loaded=true; all=items; metadata=described; refresh() }
     fun refresh() {
         battery.text="${(context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager).getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY).coerceIn(0,100)}%"
-        battery.setCompoundDrawablesWithIntrinsicBounds(BatteryOutline((context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager).getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)),null,null,null)
+        battery.setCompoundDrawablesWithIntrinsicBounds(null,null,BatteryOutline((context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager).getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)),null)
         val count=HubStore.count(setOf("message","call","app","event"))
         alerts.text=if(count>0) "✉  $count" else ""
         alerts.contentDescription=if(count>0) "$count notifications" else "Open notifications"
@@ -193,6 +207,7 @@ class Os7HomeView(
         val folders=Os7Panels.folders(context)
         val folder=folders.firstOrNull { it.id==folderId }
         if(folderId!=null && folder==null) folderId=null
+        val previouslyShown = shown
         shown=if(folder!=null) {
             selected.text=folder.name
             selected.contentDescription=if(standalone) "${folder.name} folder, three rows" else "${folder.name} folder, $rows rows. Change application tray height"
@@ -211,8 +226,9 @@ class Os7HomeView(
         empty.text=if(folder!=null) "This folder is empty. Press and hold an app to move it here." else when(panel) {1->"Press and hold an app to add a favorite.";2->"No media apps found.";3->"No downloaded apps found.";4->"Apps you open from Nano appear here.";else->if(loaded) "No visible apps. Manage hidden apps in Options." else "Loading applications…"}
         empty.visibility=if(shown.isEmpty()) VISIBLE else GONE
         grid.visibility=if(shown.isEmpty() || rows==0) GONE else VISIBLE
+        trayContent.visibility=if(rows==0) GONE else VISIBLE
         if(rows==0) empty.visibility=GONE
-        adapter.notifyDataSetChanged()
+        if(shown != previouslyShown) adapter.notifyDataSetChanged()
     }
     private inner class BatteryOutline(private val level:Int) : android.graphics.drawable.Drawable() {
         private val paint=android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
@@ -238,7 +254,7 @@ class Os7HomeView(
             val scale=intent.getIntExtra(BatteryManager.EXTRA_SCALE,100)
             battery.text=if(level>=0 && scale>0) "${level*100/scale}%" else "—"
             battery.contentDescription="Battery ${battery.text}"
-            battery.setCompoundDrawablesWithIntrinsicBounds(BatteryOutline(if(scale>0) level*100/scale else 0),null,null,null)
+            battery.setCompoundDrawablesWithIntrinsicBounds(null,null,BatteryOutline(if(scale>0) level*100/scale else 0),null)
         }
     }
     override fun onAttachedToWindow() {
@@ -252,7 +268,10 @@ class Os7HomeView(
     private fun changePanel(delta:Int) { folderId=null; panel=neighbor(delta); grid.setSelection(0); refresh() }
     fun setExpanded(value:Boolean) = setRows(if(value) 3 else 1)
     private fun setRows(value:Int) { rows=if(standalone) 3 else value.coerceIn(0,3); resizeTray(); refresh() }
-    private fun resizeTray() { grid.layoutParams=grid.layoutParams.apply { height=minOf(rows*rowHeight(), heightAvailable()).coerceAtLeast(dp(48)) } }
+    private fun resizeTray() {
+        val desired=minOf(rows*rowHeight(), heightAvailable()).coerceAtLeast(dp(48))
+        if(trayContent.layoutParams.height != desired) trayContent.layoutParams=trayContent.layoutParams.apply { height=desired }
+    }
     private fun heightAvailable()=(height-paddingTop-paddingBottom-searchTopOffset-dp(144)).coerceAtLeast(dp(96))
     fun applyTopInset(inset:Int,cutouts:List<android.graphics.Rect> = emptyList()) {
         if(!standalone) return
@@ -264,7 +283,7 @@ class Os7HomeView(
         statusArea.setPadding(0,if(corner) inset else 0,0,0)
         val cutoutRight=if(corner) 0 else cutouts.maxOfOrNull { it.right } ?: 0
         val available=(screenWidth-cutoutRight-dp(60)).coerceAtLeast(0)
-        carrierLabel.layoutParams=carrierLabel.layoutParams.apply { width=minOf(dp(100),available) }
+        carrierLabel.maxWidth=minOf(dp(100),available)
         statusArea.layoutParams=statusArea.layoutParams.apply { height=statusHeight }
         topChrome.layoutParams=topChrome.layoutParams.apply { height=searchTopOffset }
         resizeTray()

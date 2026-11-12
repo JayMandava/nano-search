@@ -62,6 +62,58 @@ class Os7HomeViewTest {
         assertTrue(grid(home).performItemClick(View(context), position, position.toLong()))
     }
 
+    @Test fun standaloneFavoritesKeepTraySpaceForEmptySingleAndMultipleApps() {
+        val home = home(standalone = true)
+        val area = grid(home).parent as View
+        val height = area.layoutParams.height
+        assertTrue(height > 0)
+        next(home).performClick()
+        assertTrue(items(home).isEmpty())
+        assertEquals(View.VISIBLE, area.visibility)
+        assertEquals(height, area.layoutParams.height)
+        AppUsage.toggleFavourite(context, alpha.key)
+        home.refresh()
+        assertEquals(listOf(alpha), items(home))
+        assertEquals(height, area.layoutParams.height)
+        AppUsage.toggleFavourite(context, beta.key)
+        home.refresh()
+        assertEquals(listOf(alpha, beta), items(home))
+        assertEquals(height, area.layoutParams.height)
+        home.reset()
+        assertTrue(home.expanded)
+    }
+
+    @Test fun dateAndClockExposeIndependentClickActions() {
+        var calendarClicks = 0
+        var clockClicks = 0
+        val home = Os7HomeView(context, launch = { _, _ -> }, appMenu = { _, _ -> },
+            search = {}, notifications = {}, connections = {}, profiles = {}, menu = {},
+            standalone = true, openCalendar = { calendarClicks++ }, openClock = { clockClicks++ })
+        val date = descendants(home).single { it.contentDescription == "Open calendar" }
+        val clock = descendants(home).single { it.contentDescription == "Open clock" }
+        assertTrue(date.isFocusable)
+        assertTrue(clock.isFocusable)
+        assertTrue(date.performClick())
+        assertEquals(1, calendarClicks)
+        assertEquals(0, clockClicks)
+        assertTrue(clock.performClick())
+        assertEquals(1, calendarClicks)
+        assertEquals(1, clockClicks)
+    }
+
+    @Test fun unchangedRefreshDoesNotInvalidateTheAppAdapter() {
+        val home = home(standalone = true)
+        var changes = 0
+        grid(home).adapter.registerDataSetObserver(object : android.database.DataSetObserver() {
+            override fun onChanged() { changes++ }
+        })
+        home.refresh()
+        assertEquals(0, changes)
+        Os7Panels.saveOrder(context, listOf(beta.key, alpha.key, gamma.key))
+        home.refresh()
+        assertEquals(1, changes)
+    }
+
     @Test fun standaloneHeaderUsesCenterCutoutSidesAndProtectsCornerCutouts() {
         val home=home(standalone=true)
         val base=home.searchTopOffset
@@ -82,10 +134,14 @@ class Os7HomeViewTest {
         home.setExpanded(false)
         assertTrue(home.expanded)
         assertFalse(home.back())
+        // The fixed-height content frame sits inside the tray that search hides.
+        val tray = (grid.parent as View).parent as View
         home.showSearch(true)
-        assertEquals(View.INVISIBLE,(grid.parent as View).visibility)
+        assertEquals(View.INVISIBLE, tray.visibility)
         home.reset()
-        assertEquals(View.VISIBLE,(grid.parent as View).visibility)
+        assertEquals(View.VISIBLE, tray.visibility)
+        assertEquals(View.VISIBLE, (grid.parent as View).visibility)
+        assertEquals(View.VISIBLE, grid.visibility)
         assertTrue(home.expanded)
         assertTrue(title.text.startsWith("All"))
     }

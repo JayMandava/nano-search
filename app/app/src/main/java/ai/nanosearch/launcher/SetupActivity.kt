@@ -47,7 +47,7 @@ import kotlinx.coroutines.delay
 class SetupActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (!BuildConfig.OS7_STANDALONE) Services.init(this)
+        Services.init(this)
         getSharedPreferences("nano", MODE_PRIVATE).edit().putBoolean("setupShown", true).apply() // leaving with Back must not bring it up again
         setContent { NanoTheme { SetupScreen(onDone = { finishSetup(this); finish() }) } }
     }
@@ -80,18 +80,6 @@ private fun SetupScreen(onDone: () -> Unit) {
         owner.lifecycle.addObserver(obs)
         onDispose { owner.lifecycle.removeObserver(obs) }
     }
-    if (BuildConfig.OS7_STANDALONE) {
-        androidx.compose.material3.Scaffold(topBar = { SettingsTopBar(title = { Text("Welcome") }) }) { padding ->
-            LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                item { Text("Make this your Home", style = MaterialTheme.typography.titleLarge) }
-                item { Text("Your apps, folders and notifications in one place. Both choices below are optional.") }
-                item { DefaultHomeCard(tick) }
-                item { LauncherNotificationsCard(tick, setup = true) }
-                item { Button(onClick = onDone, modifier = Modifier.fillMaxWidth()) { Text("Continue") } }
-            }
-        }
-        return
-    }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
         Column(if (os7SettingsEnabled()) Modifier.navigationBarsPadding() else Modifier.systemBarsPadding()) {
         if (os7SettingsEnabled()) SettingsTopBar(title = { Text("Setup") })
@@ -105,6 +93,7 @@ private fun SetupScreen(onDone: () -> Unit) {
                     else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         item { Text("Make it your home screen", style = MaterialTheme.typography.headlineMedium) }
                         item { DefaultHomeCard(tick) }
+                        if (BuildConfig.OS7_STANDALONE) item { LauncherNotificationsCard(tick, setup = true) }
                     }
                 }
             }

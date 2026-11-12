@@ -95,7 +95,7 @@ class HubScreen(
         if (layer != null) return
         // the size the bars have when shown, even in full screen, so the header stays clear of the status bar when it slides in over the Hub
         val bars = host.rootWindowInsets?.getInsetsIgnoringVisibility(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
-        val top = bars?.top ?: dp(24); val bottom = bars?.bottom ?: dp(24)
+        val top = maxOf(bars?.top ?: dp(24), host.rootWindowInsets?.displayCutout?.safeInsetTop ?: 0) + if(standalone) dp(8) else 0; val bottom = bars?.bottom ?: dp(24)
         val screenW = activity.resources.displayMetrics.widthPixels
         val width = if (standalone) screenW else (screenW * 0.9f).toInt()
 
@@ -108,7 +108,7 @@ class HubScreen(
         val header = LinearLayout(activity).apply {
             gravity = Gravity.CENTER_VERTICAL
             if (standalone) {
-                setPadding(dp(12), 0, dp(4), 0)
+                setPadding(dp(16), 0, dp(8), 0)
                 background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0xFF4A5864.toInt(), 0xFF17212B.toInt()))
             }
             if (spirit) setPadding(dp(18), 0, dp(10), 0) // just the title and Clear all, no close button (Back or a tap beside the panel closes it)
@@ -178,7 +178,7 @@ class HubScreen(
                 }, LinearLayout.LayoutParams(-1, dp(1)).apply { marginStart = dp(10); marginEnd = dp(10) })
                 addView(View(activity).apply { setBackgroundColor(0x99000000.toInt()) }, LinearLayout.LayoutParams(-1, dp(1)).apply { marginStart = dp(10); marginEnd = dp(10) })
             }
-            addView(chipScroll, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(if (spirit) 12 else 6); bottomMargin = dp(10); if (spirit) marginStart = dp(10) })
+            addView(chipScroll, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(if (spirit) 12 else 6); bottomMargin = dp(10); if (spirit) marginStart = dp(10); if(standalone) { marginStart=dp(16); marginEnd=dp(16) } })
             addView(banner, LinearLayout.LayoutParams(-1, dp(if (standalone) 48 else 38)).apply { bottomMargin = dp(8); marginEnd = dp(if (spirit) 10 else 8); if (spirit) marginStart = dp(10) })
             addView(listView, LinearLayout.LayoutParams(-1, 0, 1f))
         }

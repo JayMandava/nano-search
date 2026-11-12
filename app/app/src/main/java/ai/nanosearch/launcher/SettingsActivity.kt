@@ -132,6 +132,16 @@ private fun SettingsScreen(onBack: () -> Unit, listState: LazyListState, scroll:
             verticalArrangement = Arrangement.spacedBy(if (os7SettingsEnabled()) 4.dp else 12.dp),
         ) {
             if (BuildConfig.OS7_STANDALONE) {
+                item { Header("Search and intelligence") }
+                item { ModelsRow() }
+                item { AdvancedRow() }
+                item { Header("Indexing") }
+                item { DataCard(tick) }
+                item { Header("Search sources") }
+                item { Text("Choose what search can read. Access is optional and stays under your control.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) }
+                items(AppSettings.SOURCES, key = { it.kind }) { SourceRow(it, tick) }
+                item { FilesRow(tick) }
+                item { Header("Launcher") }
                 item { DefaultHomeCard(tick) }
                 item { Header("Apps") }
                 item { HiddenAppsRow(tick) }
@@ -140,14 +150,15 @@ private fun SettingsScreen(onBack: () -> Unit, listState: LazyListState, scroll:
                 item { LauncherNotificationsCard(tick) }
                 item { MutedNotificationAppsRow() }
                 item { Header("Display") }
-                item { FullScreenCard() }
+                item { Text("Android Home navigation stays available.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) }
                 item { Card(onClick = { context.startActivity(Intent(context, LockClockSettingsActivity::class.java)) }) {
                     ListItem(headlineContent = { Text("Steel Dial wallpaper") }, supportingContent = { Text("Preview the clock, background and position before applying it.") }, colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent))
                 } }
                 item { Header("Help") }
+                item { SetupRow() }
                 item { Card { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Your launcher", style = MaterialTheme.typography.titleMedium)
-                    Text("Tap an app to open it. Touch and hold for app actions. Use the panel arrows to browse your apps, and open Notifications from the header.")
+                    Text("Search apps and the sources you allow. Models add natural-language search, answers, voice and photo understanding. Touch and hold an app for actions; open Notifications from the header.")
                     Text("Hidden apps stay installed. You can show them again in Hidden apps. Choosing a default launcher and allowing notification access are optional.", style = MaterialTheme.typography.bodySmall)
                 } } }
             } else {
@@ -204,7 +215,7 @@ private fun ModelsRow() {
     Card(shape = RoundedCornerShape(24.dp), onClick = { context.startActivity(Intent(context, ModelsActivity::class.java)) }) {
         ListItem(
             colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
-            headlineContent = { Text("Models") },
+            headlineContent = { Text(if (BuildConfig.OS7_STANDALONE) "On-device models" else "Models") },
             supportingContent = { Text("Choose, download or import the models that understand, answer, listen and see.") },
         )
     }
@@ -465,6 +476,7 @@ private fun DataCard(tick: Int) {
     val size = stored?.second ?: 0L
     Card(shape = RoundedCornerShape(24.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (BuildConfig.OS7_STANDALONE) Text("Search index", style = MaterialTheme.typography.titleMedium)
             Text(if (counts.isEmpty()) "Nothing indexed yet." else counts.joinToString(" · ") { "${it.first} ${it.second}" }, style = MaterialTheme.typography.bodyMedium)
             Text(
                 "Stored only inside this app, about ${android.text.format.Formatter.formatFileSize(context, size)}. It never leaves the phone; the only network use is downloading models, when you ask.",
@@ -508,7 +520,7 @@ private fun AdvancedRow() {
     }
 }
 
-/** Standalone launcher controls never expose indexing, models, widgets or appearance-mode switches. */
+/** Notification controls are independent of search sources and model downloads. */
 @Composable
 internal fun LauncherNotificationsCard(tick: Int, setup: Boolean = false) {
     val context = LocalContext.current
