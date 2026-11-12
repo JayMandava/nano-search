@@ -100,6 +100,19 @@ android {
                 signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
             }
         }
+        // Public standalone test build: production optimizations without production credentials.
+        create("preview") {
+            initWith(getByName("release"))
+            isDebuggable = false
+            signingConfig = signingConfigs.getByName("debug")
+            applicationIdSuffix = ".os7preview"
+            buildConfigField("boolean", "OS7_STANDALONE", "true")
+            manifestPlaceholders["nanoAppLabel"] = "Nano Search v2 Preview"
+            manifestPlaceholders["nanoHomeCategory"] = "android.intent.category.HOME"
+            manifestPlaceholders["nanoWallpaperEnabled"] = "true"
+            manifestPlaceholders["nanoWallpaperLabel"] = "Nano Search v2 · Steel Dial"
+            matchingFallbacks += "release"
+        }
         // The release build (shrunk, optimised) signed with the debug key, so it can be installed over a debug install to test the shrinking.
         create("minified") {
             initWith(getByName("release"))
@@ -108,6 +121,9 @@ android {
             matchingFallbacks += "release"
         }
     }
+
+    if (cloudPreview) testBuildType = "preview"
+    sourceSets.getByName("preview").manifest.srcFile("src/os7Standalone/AndroidManifest.xml")
 
     lint { checkReleaseBuilds = false }
 

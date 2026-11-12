@@ -24,11 +24,11 @@ jobs:
       - run: python3 tools/release/install_tools.py
       - name: Test and build isolated public preview
         working-directory: app
-        run: ./gradlew --no-daemon --max-workers=2 -PunsignedRelease=true -PincludePersonalOverlay=false -Pos7CloudPreview=true :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+        run: ./gradlew --no-daemon --max-workers=2 -PunsignedRelease=true -PincludePersonalOverlay=false -Pos7CloudPreview=true :app:testDebugUnitTest :app:lintPreview :app:assemblePreview
       - name: Verify no private font and record artifact identity
         run: |
           mkdir -p preview
-          cp app/app/build/outputs/apk/debug/app-debug.apk preview/Nano-Search-v2-0.9.0-preview.1.apk
+          cp app/app/build/outputs/apk/preview/app-preview.apk preview/Nano-Search-v2-0.9.0-preview.1.apk
           unzip -l preview/*.apk > preview/contents.txt
           if grep -Ei 'porsche|personal/|PORSCHE' preview/contents.txt; then exit 1; fi
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging preview/*.apk > preview/package.txt
@@ -69,15 +69,15 @@ jobs:
           echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n os7 -k 'system-images;android-35;google_apis;x86_64'
       - name: Build actual x86 emulator app and tests
         working-directory: app
-        run: ./gradlew --no-daemon --max-workers=2 -PunsignedRelease=true -PincludePersonalOverlay=false -Pos7CloudPreview=true -PnanoEmulatorBuild=true :app:assembleDebug :app:assembleDebugAndroidTest
+        run: ./gradlew --no-daemon --max-workers=2 -PunsignedRelease=true -PincludePersonalOverlay=false -Pos7CloudPreview=true -PnanoEmulatorBuild=true :app:assemblePreview :app:assemblePreviewAndroidTest
       - name: Boot and test emulator
         run: |
           "$ANDROID_HOME/emulator/emulator" -avd os7 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -accel auto > /tmp/emulator.log 2>&1 &
           adb wait-for-device
           timeout 420 bash -c 'until adb shell getprop sys.boot_completed | grep -q 1; do sleep 5; done'
           adb shell input keyevent 82
-          adb install app/app/build/outputs/apk/debug/app-debug.apk
-          adb install app/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          adb install app/app/build/outputs/apk/preview/app-preview.apk
+          adb install app/app/build/outputs/apk/androidTest/preview/app-preview-androidTest.apk
           adb shell am instrument -w -r -e class ai.nanosearch.launcher.Os7CloudSmokeTest ai.nanosearch.launcher.os7preview.test/androidx.test.runner.AndroidJUnitRunner | tee /tmp/instrumentation.txt
           grep -q 'OK (2 tests)' /tmp/instrumentation.txt
       - name: Collect visual and frame evidence
