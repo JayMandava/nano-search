@@ -86,30 +86,17 @@ jobs:
             app/app/build/outputs/apk/preview/app-preview.apk
             app/app/build/outputs/apk/androidTest/preview/app-preview-androidTest.apk
           retention-days: 3
-      - name: Enable approved acceleration for this run
-        if: contains(github.event.head_commit.message, '[personal-kvm-20261112]') && github.run_attempt == 1
-        run: |
-          getfacl -p /dev/kvm > "$RUNNER_TEMP/os7-kvm.acl"
-          sudo setfacl -m "u:$(id -un):rw" /dev/kvm
-          "$ANDROID_HOME/emulator/emulator" -accel-check
       - name: Boot and test actual UI
         run: |
           mkdir -p emulator-evidence
-          "$ANDROID_HOME/emulator/emulator" -avd os7 -memory 2048 -cores 2 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -accel on > emulator-evidence/emulator.log 2>&1 &
+          accel=off
+          if "$ANDROID_HOME/emulator/emulator" -accel-check; then accel=on; fi
+          "$ANDROID_HOME/emulator/emulator" -avd os7 -memory 2048 -cores 2 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -accel "$accel" > emulator-evidence/emulator.log 2>&1 &
           timeout 600 adb wait-for-device
           timeout 600 bash -c 'until adb shell getprop sys.boot_completed | grep -q 1; do sleep 5; done'
           adb shell input keyevent 82
           adb install app/app/build/outputs/apk/preview/app-preview.apk
           python3 tools/os7_cloud_smoke.py
-      - name: Restore temporary runner access
-        if: always()
-        run: |
-          if test -f "$RUNNER_TEMP/os7-kvm.acl"; then
-            timeout 30 adb emu kill || true
-            sudo setfacl --restore="$RUNNER_TEMP/os7-kvm.acl"
-            getfacl -p /dev/kvm > "$RUNNER_TEMP/os7-kvm-restored.acl"
-            diff -u "$RUNNER_TEMP/os7-kvm.acl" "$RUNNER_TEMP/os7-kvm-restored.acl"
-          fi
       - name: Collect visual and frame evidence
         if: always()
         run: |
