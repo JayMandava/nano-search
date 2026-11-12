@@ -105,6 +105,7 @@ android {
             initWith(getByName("release"))
             isDebuggable = false
             signingConfig = signingConfigs.getByName("debug")
+            testProguardFiles("proguard-preview-tests.pro")
             applicationIdSuffix = ".os7preview"
             buildConfigField("boolean", "OS7_STANDALONE", "true")
             manifestPlaceholders["nanoAppLabel"] = "Nano Search v2 Preview"

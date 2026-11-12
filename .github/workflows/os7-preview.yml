@@ -6,7 +6,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: os7-preview
+  group: os7-preview-${{ github.sha }}
   cancel-in-progress: true
 jobs:
   validate:
@@ -75,9 +75,11 @@ jobs:
         run: ./gradlew --no-daemon --max-workers=2 -PunsignedRelease=true -PincludePersonalOverlay=false -Pos7CloudPreview=true -PnanoEmulatorBuild=true :app:assemblePreview :app:assemblePreviewAndroidTest
       - name: Boot and test emulator
         run: |
-          "$ANDROID_HOME/emulator/emulator" -avd os7 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -accel auto > /tmp/emulator.log 2>&1 &
-          adb wait-for-device
-          timeout 420 bash -c 'until adb shell getprop sys.boot_completed | grep -q 1; do sleep 5; done'
+          accel=off
+          if "$ANDROID_HOME/emulator/emulator" -accel-check; then accel=on; fi
+          "$ANDROID_HOME/emulator/emulator" -avd os7 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -accel "$accel" > /tmp/emulator.log 2>&1 &
+          timeout 180 adb wait-for-device
+          timeout 1200 bash -c 'until adb shell getprop sys.boot_completed | grep -q 1; do sleep 5; done'
           adb shell input keyevent 82
           adb install app/app/build/outputs/apk/preview/app-preview.apk
           adb install app/app/build/outputs/apk/androidTest/preview/app-preview-androidTest.apk
