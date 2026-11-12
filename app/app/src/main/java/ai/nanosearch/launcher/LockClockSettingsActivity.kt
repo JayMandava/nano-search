@@ -15,7 +15,7 @@ import android.widget.TextView
 import android.widget.Toast
 
 /** Standalone v2 entry to the existing Steel Dial renderer and Android-owned wallpaper confirmation. */
-class LockClockSettingsActivity : Activity() {
+class LockClockSettingsActivity : SmoothActivity() {
     private lateinit var backgroundButton: Button
     private lateinit var positionButton: Button
     private lateinit var motionButton: Button

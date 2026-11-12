@@ -54,7 +54,7 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import java.text.NumberFormat
 
 /** Data-only faces. Browsing and previewing never change a Home or wallpaper selection. */
-class ClockFacesActivity : ComponentActivity() {
+class ClockFacesActivity : SmoothComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val model = ViewModelProvider(this)[ClockFacesModel::class.java]

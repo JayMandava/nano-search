@@ -20,9 +20,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /** What a file being fetched is doing right now. A file that is not in [ModelStore.status] is idle. */
 sealed interface Transfer {
-    class Downloading(val done: Long, val total: Long, val stalled: Boolean = false) : Transfer
+    data class Downloading(val done: Long, val total: Long, val stalled: Boolean = false) : Transfer
     object Verifying : Transfer
-    class Failed(val reason: String) : Transfer
+    data class Failed(val reason: String) : Transfer
 }
 
 /**
@@ -228,6 +228,9 @@ object ModelStore {
         for (entry in entries) for (p in entry.parts) {
             if (!seen.add(p.file) || p.file in verifying || p.file in retiring) continue
             val id = downloadId(p)
+            // No pending transfer and no stale status: nothing to reconcile. Avoid repeated
+            // filesystem metadata calls for every model while the user scrolls an idle list.
+            if (id == -1L && status[p.file] == null) continue
             val token = attemptToken(p)
             if (partInstalled(entry, p)) {
                 if (id != -1L) retireCompleted(p, id, token, runCatching { stagingFile(p, token) }.getOrNull())

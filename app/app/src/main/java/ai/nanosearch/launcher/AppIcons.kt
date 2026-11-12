@@ -27,22 +27,26 @@ object AppIcons {
     internal const val SIZE = 192
     private val cache = LruCache<String, Drawable>(160)
 
-    fun clear() = cache.evictAll()
+    @Volatile private var generation = 0
+    fun clear() { generation++; cache.evictAll() }
 
     /** The icon to show for [cn]: the app's own in Modern, the Classic one otherwise. */
     fun get(context: Context, cn: ComponentName): Drawable {
+        // Check before PackageManager calls. A warm icon must not reload its APK resources
+        // and label on every bind. Package/day changes already clear this process cache.
+        val pack = IconPacks.active(context)
+        val os7 = AppSettings.os7Mode(context)
+        val day = Calendar.getInstance().get(Calendar.DAY_OF_MONTH)
+        val key = "g|$generation|$os7|$pack|${cn.flattenToShortString()}|$day"
+        cache.get(key)?.let { return it }
         val pm = context.packageManager
         val own = runCatching { pm.getActivityIcon(cn) }.getOrNull() ?: pm.defaultActivityIcon
         val label = runCatching { pm.getActivityInfo(cn, 0).loadLabel(pm).toString() }.getOrDefault("")
-        val pack = IconPacks.active(context)
         // a known app gets its own drawing; otherwise its kind of app (a handset, a camera...); otherwise a game's controller; otherwise its own picture
         var brand = BrandIcons.find(context, cn.packageName)
         val kind = if (brand != null) null else kindOf(cn.packageName, label)
         if (brand == null && kind == null && runCatching { pm.getActivityInfo(cn, 0).applicationInfo.category == android.content.pm.ApplicationInfo.CATEGORY_GAME }.getOrDefault(false)) brand = BrandIcons.GAME
-        val day = if (kind == "calendar" || pack.isNotEmpty()) Calendar.getInstance().get(Calendar.DAY_OF_MONTH) else 0
-        val os7 = AppSettings.os7Mode(context)
-        val key = "g|$os7|$pack|${cn.flattenToShortString()}|${brand?.id}|$kind|$day"
-        return cache.get(key) ?: BitmapDrawable(context.resources, IconPacks.themed(context, cn, own, day) ?: if(os7) {
+        return BitmapDrawable(context.resources, IconPacks.themed(context, cn, own, day) ?: if(os7) {
             val classicKind=kindOf(cn.packageName,label)
             if(classicKind!=null) draw(classicKind,if(classicKind=="calendar") Calendar.getInstance().get(Calendar.DAY_OF_MONTH) else day)
             else if(brand!=null) BrandIcons.draw(brand)
@@ -116,7 +120,7 @@ object AppIcons {
     /** The gem for a kind of thing that is not an app (a missed call, an event): the same look, cached. */
     fun kindGem(context: Context, kind: String, day: Int = 0): Drawable {
         val os7=AppSettings.os7Mode(context)
-        val key = "k|$os7|$kind|$day"
+        val key = "k|$generation|$os7|$kind|$day"
         return cache.get(key) ?: BitmapDrawable(context.resources, if(os7) draw(kind,day) else gem((GEM_COLOURS[kind] ?: 0xFF3B4048).toInt(), draw(kind, day), 0.66f)).also { cache.put(key, it) }
     }
 

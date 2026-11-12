@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -111,4 +112,27 @@ fun SettingsCard(
 fun SettingsSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier: Modifier = Modifier, enabled: Boolean = true) {
     if (os7SettingsEnabled()) Checkbox(checked = checked, onCheckedChange = onCheckedChange, modifier = modifier, enabled = enabled)
     else Switch(checked = checked, onCheckedChange = onCheckedChange, modifier = modifier, enabled = enabled)
+}
+
+/** Keep explanatory copy out of the control's column, including at larger font sizes. */
+@Composable
+fun SettingsControlRow(
+    title: String,
+    modifier: Modifier = Modifier,
+    description: (@Composable ColumnScope.() -> Unit)? = null,
+    control: @Composable () -> Unit,
+) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(title, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            control()
+        }
+        if (description != null) {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp), content = description)
+        }
+    }
 }

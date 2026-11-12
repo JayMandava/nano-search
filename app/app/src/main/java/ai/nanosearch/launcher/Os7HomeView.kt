@@ -27,6 +27,7 @@ class Os7HomeView(
     private val openCalendar: () -> Unit = {},
     private val openClock: () -> Unit = {},
 ) : LinearLayout(context) {
+    private companion object { const val FOLDER_ICON = "folder-icon" }
     private fun dp(n: Int) = (n * resources.displayMetrics.density).toInt()
     private val white = Color.WHITE
     private var topInset=0
@@ -47,8 +48,12 @@ class Os7HomeView(
     val canReorder get() = panel != 4
     var folderId: String? = null; private set
     private var metadata = emptyList<Os7Panels.App>()
-    private val icons = android.util.LruCache<String,android.graphics.drawable.Drawable>(128)
-    fun clearIcons() { icons.evictAll(); adapter.notifyDataSetChanged() }
+    private val icons = AsyncIconLoader(load = { key ->
+        val app = context.applicationContext
+        if (key == FOLDER_ICON) AppIcons.kindGem(app, "files", 0)
+        else ComponentName.unflattenFromString(key)?.let { AppIcons.get(app, it) }
+    })
+    fun clearIcons() { icons.clear(); adapter.notifyDataSetChanged() }
     private val battery = text(12f)
     private val alerts = text(14f)
     private val notificationRow = LinearLayout(context)
@@ -73,7 +78,7 @@ class Os7HomeView(
                 addView(text(12f).apply { maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END }, LayoutParams(-1, (36 * resources.displayMetrics.scaledDensity).toInt()))
             }
             val item = shown[position]
-            (cell.getChildAt(0) as ImageView).setImageDrawable(if(item.kind == "folder") AppIcons.kindGem(context,"files",0) else icons.get(item.key) ?: runCatching { AppIcons.get(context, ComponentName.unflattenFromString(item.key)!!) }.getOrNull()?.also { icons.put(item.key,it) })
+            icons.bind(cell.getChildAt(0) as ImageView, if (item.kind == "folder") FOLDER_ICON else item.key)
             (cell.getChildAt(1) as TextView).text = item.title
             cell.contentDescription = item.title
             return cell

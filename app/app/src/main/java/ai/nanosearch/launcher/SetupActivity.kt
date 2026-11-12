@@ -44,7 +44,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import kotlinx.coroutines.delay
 
 /** First run: what this is, what it may read, which models to fetch, and making it the home app. Four short steps, all skippable. */
-class SetupActivity : ComponentActivity() {
+class SetupActivity : SmoothComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Services.init(this)

@@ -55,7 +55,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /** Choose which apps stay out of the app drawer and search. They are still installed and still work; this only hides them from view. */
-class HiddenAppsActivity : ComponentActivity() {
+class HiddenAppsActivity : SmoothComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent { NanoTheme { HiddenAppsScreen(onBack = { finish() }) } }

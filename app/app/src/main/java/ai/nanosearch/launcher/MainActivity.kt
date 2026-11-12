@@ -73,7 +73,7 @@ import java.util.concurrent.Executors
  * device; pressing Enter acts on the request (open, call, message) or answers it. Long-press the home screen for
  * widgets and wallpaper, long-press a dock icon to change it.
  */
-class MainActivity : Activity() {
+class MainActivity : SmoothActivity() {
 
     private lateinit var index: SearchIndex
     private val models get() = Services.models
@@ -1327,13 +1327,9 @@ class MainActivity : Activity() {
         homeContent.alpha = 1f - 0.85f * p
     }
 
-    /** Asks for the display's top refresh rate (120 Hz here) while something moves, then lets it settle back so a still screen costs nothing. Android 15 and later. */
-    private val frameRateOff = Runnable { if (Build.VERSION.SDK_INT >= 35) window.decorView.setRequestedFrameRate(View.REQUESTED_FRAME_RATE_CATEGORY_NO_PREFERENCE) }
+    /** Extend the shared interaction hint through programmatic movement, then release it. */
     private fun boostFrameRate(on: Boolean, holdMs: Long = 400) {
-        if (Build.VERSION.SDK_INT < 35) return
-        val v = window.decorView
-        v.removeCallbacks(frameRateOff)
-        if (on) v.setRequestedFrameRate(120f) else v.postDelayed(frameRateOff, holdMs)
+        requestInteractionFrames(if (on) 1_200L else holdMs)
     }
 
     private fun animateDrawer(to: Float, durationMs: Long, end: () -> Unit) {

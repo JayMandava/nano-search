@@ -4,6 +4,7 @@ package ai.nanosearch.launcher
 
 import ai.nanosearch.launcher.ui.SettingsSurfaceTheme as NanoTheme
 import ai.nanosearch.launcher.ui.os7SettingsEnabled
+import ai.nanosearch.launcher.ui.SettingsControlRow
 import android.app.ActivityManager
 import android.content.Context
 import android.os.Bundle
@@ -16,11 +17,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.selection.selectable
@@ -31,6 +34,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.HorizontalDivider
 import ai.nanosearch.launcher.ui.SettingsTopBar as LargeTopAppBar
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -60,7 +64,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
 /** Pick, download, import and remove the models behind each job. */
-class ModelsActivity : ComponentActivity() {
+class ModelsActivity : SmoothComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Services.init(this)
@@ -79,7 +83,8 @@ internal fun ModelsScreen(onBack: () -> Unit) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (true) { ModelStore.poll(); version++; delay(900) }
+            // Transfer state is observable. Idle polling must not invalidate the entire list.
+            while (true) { ModelStore.poll(); delay(900) }
         }
     }
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -93,7 +98,7 @@ internal fun ModelsScreen(onBack: () -> Unit) {
             )
         },
     ) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(if (os7SettingsEnabled()) 8.dp else 16.dp), verticalArrangement = Arrangement.spacedBy(if (os7SettingsEnabled()) 4.dp else 12.dp)) {
+        LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(if (os7SettingsEnabled()) 12.dp else 16.dp), verticalArrangement = Arrangement.spacedBy(if (os7SettingsEnabled()) 8.dp else 12.dp)) {
             item {
                 Card(shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
                     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -102,8 +107,7 @@ internal fun ModelsScreen(onBack: () -> Unit) {
                             "Downloading a model is the only time Nano Search uses the internet, and only when you tap Download. Every file is checked against its checksum before it is used.",
                             style = MaterialTheme.typography.bodyMedium,
                         )
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Download on Wi-Fi only", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                        SettingsControlRow("Download on Wi-Fi only") {
                             Switch(checked = wifi, onCheckedChange = { wifi = it; context.getSharedPreferences("nano", Context.MODE_PRIVATE).edit().putBoolean("wifiOnly", it).apply() })
                         }
                     }
@@ -112,7 +116,7 @@ internal fun ModelsScreen(onBack: () -> Unit) {
             val current = version // the list below is rebuilt whenever a choice, download or delete changes the store
             for (slot in Slot.entries) {
                 item(key = "h-${slot.name}") {
-                    Column(Modifier.padding(start = 4.dp, top = 12.dp)) {
+                    Column(Modifier.padding(start = 4.dp, top = 16.dp, end = 4.dp, bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(slot.title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
                         Text(slot.blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -140,31 +144,32 @@ internal fun ModelCard(entry: ModelEntry, selected: Boolean, version: Int, total
         .selectable(selected = chosen, enabled = installed, role = Role.RadioButton,
             onClick = { ModelStore.select(entry); changed() }),
         shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = if (chosen) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh)) {
-        Column(Modifier.padding(12.dp, 12.dp, 16.dp, 12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                RadioButton(selected = chosen, enabled = installed, onClick = null)
-                Column(Modifier.weight(1f)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                RadioButton(selected = chosen, enabled = installed, onClick = null,
+                    modifier = Modifier.size(48.dp).testTag("model-selector-${entry.id}"))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(entry.name, style = MaterialTheme.typography.titleMedium)
-                    Text(entry.note, style = MaterialTheme.typography.bodyMedium)
-                    val size = if (entry.custom) "Your file" else Formatter.formatFileSize(context, entry.bytes)
-                    val memory = if (entry.custom) "" else " · needs about ${Formatter.formatFileSize(context, entry.ramBytes)} of memory"
-                    Text("$size$memory · ${entry.license}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(when {
+                        chosen && active && !installed -> "Selected when ready"
+                        chosen -> "Selected"
+                        installed -> "Downloaded · tap to select"
+                        active -> "Downloading"
+                        else -> "Not downloaded"
+                    }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                when {
-                    active -> TextButton(onClick = { ModelStore.cancel(entry); changed() }) { Text("Cancel") }
-                    installed -> TextButton(onClick = {
-                        ModelStore.delete(entry)?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
-                        changed()
-                    }) { Text("Delete") }
-                    tooBig -> Text("Too big", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
-                    else -> FilledTonalButton(onClick = { ModelStore.download(entry, wifi); changed() }) { Text("Download") }
-                }
+            }
+            Text(entry.note, Modifier.fillMaxWidth().testTag("model-description-${entry.id}"), style = MaterialTheme.typography.bodyMedium)
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(if (entry.custom) "Your file" else "Download: ${Formatter.formatFileSize(context, entry.bytes)} · Memory: about ${Formatter.formatFileSize(context, entry.ramBytes)}",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Licence: ${entry.license}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (chosen && active && !installed) {
                 val fallback = ModelStore.selected(entry.slot)
                 Text(if (ModelStore.installed(fallback)) "Selected when ready. Using ${fallback.name} until the download is verified."
                     else "Selected when ready. The download must finish and pass verification first.",
-                    style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
+                    style = MaterialTheme.typography.bodySmall)
             }
             val downloading = entry.parts.mapNotNull { ModelStore.status[it.file] as? Transfer.Downloading }
             val verifying = entry.parts.any { ModelStore.status[it.file] == Transfer.Verifying }
@@ -178,8 +183,7 @@ internal fun ModelCard(entry: ModelEntry, selected: Boolean, version: Int, total
                 Text("${Formatter.formatFileSize(context, done)} of ${Formatter.formatFileSize(context, entry.bytes)}", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
             }
             val tested = ModelTest.results[entry.id]
-            if (tested != null) Text(tested, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 12.dp, top = 6.dp))
-            if (installed && ModelTest.canTest(entry) && tested != "Testing…") TextButton(onClick = { ModelTest.run(context, entry) }) { Text(if (tested == null) "Try it" else "Try again") }
+            if (tested != null) Text(tested, style = MaterialTheme.typography.bodySmall)
             if (downloading.any { it.stalled }) {
                 Text("Not connecting. Check Wi-Fi, and that Nano Search is allowed to use the network.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 4.dp))
                 TextButton(onClick = {
@@ -187,6 +191,23 @@ internal fun ModelCard(entry: ModelEntry, selected: Boolean, version: Int, total
                 }) { Text("Open app settings") }
             }
             if (failure != null) Text(failure.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 4.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            FlowRow(Modifier.fillMaxWidth().testTag("model-actions-${entry.id}"),
+                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
+                verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (installed && ModelTest.canTest(entry) && tested != "Testing…") {
+                    TextButton(onClick = { ModelTest.run(context, entry) }) { Text(if (tested == null) "Try it" else "Try again") }
+                }
+                when {
+                    active -> TextButton(onClick = { ModelStore.cancel(entry); changed() }) { Text("Cancel") }
+                    installed -> TextButton(onClick = {
+                        ModelStore.delete(entry)?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
+                        changed()
+                    }) { Text("Delete") }
+                    tooBig -> Text("Too big for this phone", Modifier.padding(vertical = 12.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
+                    else -> FilledTonalButton(onClick = { ModelStore.download(entry, wifi); changed() }) { Text("Download") }
+                }
+            }
         }
     }
 }

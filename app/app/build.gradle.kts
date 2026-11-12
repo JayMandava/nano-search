@@ -7,6 +7,10 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// Cloud preview is isolated from both production and the Mac-signed QA install.
+val cloudPreview = providers.gradleProperty("os7CloudPreview").map(String::toBooleanStrict).getOrElse(false)
+val emulatorBuild = providers.gradleProperty("nanoEmulatorBuild").map(String::toBooleanStrict).getOrElse(false)
+
 android {
     namespace = "ai.nanosearch.launcher"
     compileSdk = 36
@@ -25,7 +29,7 @@ android {
         manifestPlaceholders["nanoWallpaperLabel"] = "Nano Clock"
 
         ndk {
-            abiFilters += "arm64-v8a"
+            abiFilters += if (emulatorBuild) "x86_64" else "arm64-v8a"
         }
         externalNativeBuild {
             cmake {
@@ -35,8 +39,10 @@ android {
                     "-DANDROID_STL=c++_static",
                     // Align ELF segments to 16 KB so the library loads on 16 KB-page devices (Android 15+).
                     "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON",
-                    "-DCMAKE_C_FLAGS=-march=armv8.2-a+dotprod",
-                    "-DCMAKE_CXX_FLAGS=-march=armv8.2-a+dotprod",
+                    *(if (emulatorBuild) arrayOf("-DGGML_NATIVE=OFF") else arrayOf(
+                        "-DCMAKE_C_FLAGS=-march=armv8.2-a+dotprod",
+                        "-DCMAKE_CXX_FLAGS=-march=armv8.2-a+dotprod",
+                    )),
                 )
             }
         }
@@ -74,11 +80,12 @@ android {
             // it keeps the isolated QA package/signature while allowing actual Home-role testing.
             // Neither profile replaces production. Only standalone launcher QA exposes its clock wallpaper.
             val clockQaBuild = providers.gradleProperty("clockQaBuild").map(String::toBoolean).getOrElse(false)
-            val os7QaLauncherBuild = providers.gradleProperty("os7QaLauncherBuild").map(String::toBoolean).getOrElse(false)
+            val os7QaLauncherBuild = providers.gradleProperty("os7QaLauncherBuild").map(String::toBoolean).getOrElse(false) || cloudPreview
             buildConfigField("boolean", "OS7_STANDALONE", os7QaLauncherBuild.toString())
             if (clockQaBuild || os7QaLauncherBuild) {
-                applicationIdSuffix = ".clockqa"
-                manifestPlaceholders["nanoAppLabel"] = if (os7QaLauncherBuild) "Nano Search v2" else "Nano Clock QA"
+                applicationIdSuffix = if (cloudPreview) ".os7preview" else ".clockqa"
+                if (cloudPreview) { versionCode = 21; versionName = "0.9.0-preview.1" }
+                manifestPlaceholders["nanoAppLabel"] = if (cloudPreview) "Nano Search v2 Preview" else if (os7QaLauncherBuild) "Nano Search v2" else "Nano Clock QA"
                 manifestPlaceholders["nanoHomeCategory"] = if (os7QaLauncherBuild) "android.intent.category.HOME" else "ai.nanosearch.launcher.category.QA_ONLY"
                 manifestPlaceholders["nanoWallpaperEnabled"] = os7QaLauncherBuild.toString()
                 if (os7QaLauncherBuild) manifestPlaceholders["nanoWallpaperLabel"] = "Nano Search v2 · Steel Dial"
@@ -108,7 +115,7 @@ android {
     // Private, local-only built-in widgets live in src/personal (git ignores it). They are compiled into the debug and minified test builds only,
     // never into release, so nothing in it can reach a published APK. The launcher finds them by name at run time (see BuiltinWidgets.kt).
     val includePersonalOverlay = providers.gradleProperty("includePersonalOverlay").map(String::toBoolean).getOrElse(true)
-    if (includePersonalOverlay && file("src/personal").exists()) {
+    if (includePersonalOverlay && !cloudPreview && file("src/personal").exists()) {
         listOf("debug", "minified").forEach { name ->
             sourceSets.getByName(name) {
                 java.srcDir("src/personal/java")
@@ -121,7 +128,7 @@ android {
 
     // Standalone debug launcher drops the unsupported Home-widget binding permission.
     // This overlay is never attached to production/release or ordinary clock QA.
-    if (providers.gradleProperty("os7QaLauncherBuild").map(String::toBoolean).getOrElse(false)) {
+    if (providers.gradleProperty("os7QaLauncherBuild").map(String::toBoolean).getOrElse(false) || cloudPreview) {
         sourceSets.getByName("debug").manifest.srcFile("src/os7Standalone/AndroidManifest.xml")
     }
 
@@ -182,7 +189,7 @@ val buildGpuLib = tasks.register<Exec>("buildGpuLib") {
     )
 }
 android.sourceSets.getByName("main").jniLibs.srcDir(gpuLibs)
-tasks.named("preBuild") { dependsOn(buildGpuLib) }
+tasks.named("preBuild") { if (!emulatorBuild) dependsOn(buildGpuLib) }
 
 dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.1")
@@ -194,6 +201,7 @@ dependencies {
     implementation("org.apache.commons:commons-compress:1.28.0")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test:rules:1.6.1")
+    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     implementation(platform("androidx.compose:compose-bom:2025.09.00"))
     implementation("androidx.compose.material3:material3:1.5.0-alpha04")

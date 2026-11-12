@@ -1,0 +1,94 @@
+name: OS7 cloud preview validation
+on:
+  push:
+    branches: [feat/os7-recreation]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: os7-preview
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: python3 tools/release/install_tools.py
+      - name: Test and build isolated public preview
+        working-directory: app
+        run: ./gradlew --no-daemon --max-workers=2 -PunsignedRelease=true -PincludePersonalOverlay=false -Pos7CloudPreview=true :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+      - name: Verify no private font and record artifact identity
+        run: |
+          mkdir -p preview
+          cp app/app/build/outputs/apk/debug/app-debug.apk preview/Nano-Search-v2-0.9.0-preview.1.apk
+          unzip -l preview/*.apk > preview/contents.txt
+          if grep -Ei 'porsche|personal/|PORSCHE' preview/contents.txt; then exit 1; fi
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging preview/*.apk > preview/package.txt
+          grep "name='ai.nanosearch.launcher.os7preview'" preview/package.txt
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs preview/*.apk > preview/signature.txt
+          (cd preview && sha256sum *.apk > SHA256SUMS.txt)
+          printf '%s\n' "$GITHUB_SHA" > preview/commit.txt
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: os7-preview-apk
+          path: preview/
+          retention-days: 7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: os7-unit-lint
+          path: |
+            app/app/build/reports/
+            app/app/build/test-results/
+  emulator:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Provision emulator with existing runner licenses
+        run: |
+          test -s "$ANDROID_HOME/licenses/android-sdk-license"
+          sdkmanager 'platforms;android-36' 'build-tools;35.0.0' 'ndk;27.0.12077973' 'cmake;3.22.1' 'emulator' 'system-images;android-35;google_apis;x86_64' < /dev/null
+          printf 'sdk.dir=%s\ncmake.dir=%s/cmake/3.22.1\n' "$ANDROID_HOME" "$ANDROID_HOME" > app/local.properties
+          echo no | avdmanager create avd -n os7 -k 'system-images;android-35;google_apis;x86_64'
+      - name: Build actual x86 emulator app and tests
+        working-directory: app
+        run: ./gradlew --no-daemon --max-workers=2 -PunsignedRelease=true -PincludePersonalOverlay=false -Pos7CloudPreview=true -PnanoEmulatorBuild=true :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Boot and test emulator
+        run: |
+          "$ANDROID_HOME/emulator/emulator" -avd os7 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -accel auto > /tmp/emulator.log 2>&1 &
+          adb wait-for-device
+          timeout 420 bash -c 'until adb shell getprop sys.boot_completed | grep -q 1; do sleep 5; done'
+          adb shell input keyevent 82
+          adb install app/app/build/outputs/apk/debug/app-debug.apk
+          adb install app/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          adb shell am instrument -w -r -e class ai.nanosearch.launcher.Os7CloudSmokeTest ai.nanosearch.launcher.os7preview.test/androidx.test.runner.AndroidJUnitRunner | tee /tmp/instrumentation.txt
+          grep -q 'OK (2 tests)' /tmp/instrumentation.txt
+      - name: Collect visual and frame evidence
+        if: always()
+        run: |
+          mkdir -p emulator-evidence
+          adb pull /sdcard/Android/data/ai.nanosearch.launcher.os7preview/files/os7-cloud-qa emulator-evidence/ || true
+          adb shell dumpsys gfxinfo ai.nanosearch.launcher.os7preview framestats > emulator-evidence/gfxinfo.txt || true
+          cp /tmp/emulator.log /tmp/instrumentation.txt emulator-evidence/ 2>/dev/null || true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: os7-emulator-evidence
+          path: emulator-evidence/
+          retention-days: 7

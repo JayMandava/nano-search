@@ -52,7 +52,7 @@ import androidx.compose.ui.unit.dp
  * Settings > Advanced. By default everything here is automatic and this screen only reports what was chosen. It exists for people who want
  * to override the processor or memory behaviour, with a one-tap return to Auto.
  */
-class AdvancedActivity : ComponentActivity() {
+class AdvancedActivity : SmoothComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Services.init(this)

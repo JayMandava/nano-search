@@ -4,6 +4,7 @@ package ai.nanosearch.launcher
 
 import ai.nanosearch.launcher.ui.SettingsSurfaceTheme as NanoTheme
 import ai.nanosearch.launcher.ui.os7SettingsEnabled
+import ai.nanosearch.launcher.ui.SettingsControlRow
 import ai.nanosearch.launcher.ui.nanoColorScheme
 import android.Manifest
 import android.app.role.RoleManager
@@ -18,8 +19,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.rememberScrollState
@@ -27,6 +26,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -40,6 +41,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.Button
 import ai.nanosearch.launcher.ui.SettingsCard as Card
 import androidx.compose.material3.CardDefaults
@@ -74,6 +76,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -82,22 +85,24 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 
 /** Nano Search's own settings: default home, appearance and what the search may read. Models come next. */
-class SettingsActivity : ComponentActivity() {
+class SettingsActivity : SmoothComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            // A change of style does not restart the screen: the old look fades into the new one, and the scroll position stays where it was.
+            // Keep one list and one composition alive. Crossfading two LazyColumns that share
+            // a LazyListState duplicates layout work and lets both lists drive the same scroll.
             val listState = rememberLazyListState()
             val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-            val appearance = SettingsTheme.version to nanoColorScheme(LocalContext.current)
-            Crossfade(targetState = appearance, animationSpec = tween(260), label = "style") { state ->
-                NanoTheme(colorScheme = state.second) { SettingsScreen(onBack = { finish() }, listState, scroll) }
-            }
+            val version = SettingsTheme.version
+            val context = LocalContext.current
+            val uiMode = androidx.compose.ui.platform.LocalConfiguration.current.uiMode
+            val colors = remember(version, uiMode) { nanoColorScheme(context) }
+            NanoTheme(colorScheme = colors) { SettingsScreen(onBack = { finish() }, listState, scroll) }
         }
     }
 }
 
-/** Bumped whenever a choice on this screen changes the look of the whole app; the screen then fades to the new look. */
+/** Bumped whenever a choice on this screen changes the look of the whole app; the existing screen recomposes in place. */
 internal object SettingsTheme {
     var version by mutableIntStateOf(0)
         private set
@@ -128,8 +133,8 @@ private fun SettingsScreen(onBack: () -> Unit, listState: LazyListState, scroll:
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(if (os7SettingsEnabled()) 8.dp else 16.dp),
-            verticalArrangement = Arrangement.spacedBy(if (os7SettingsEnabled()) 4.dp else 12.dp),
+            contentPadding = PaddingValues(if (os7SettingsEnabled()) 12.dp else 16.dp),
+            verticalArrangement = Arrangement.spacedBy(if (os7SettingsEnabled()) 8.dp else 12.dp),
         ) {
             if (BuildConfig.OS7_STANDALONE) {
                 item { Header("Search and intelligence") }
@@ -377,14 +382,22 @@ private fun IconPackRow() {
     val context = LocalContext.current
     var chosen by remember { mutableStateOf(AppSettings.iconPack(context)) }
     var open by remember { mutableStateOf(false) }
-    val packs = remember(open) { if (open) IconPacks.installed(context) else emptyList() }
-    val name = remember(chosen) {
-        if (chosen.isEmpty()) "Built in"
-        else runCatching { context.packageManager.let { it.getApplicationLabel(it.getApplicationInfo(chosen, 0)).toString() } }.getOrDefault("Not installed")
+    val packs by produceState<List<IconPacks.Pack>?>(null, open) {
+        value = if (open) kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            IconPacks.installed(context)
+        } else null
     }
-    Column(Modifier.fillMaxWidth().clickable { open = true }, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    val name by produceState(if (chosen.isEmpty()) "Built in" else "Loading…", chosen) {
+        value = if (chosen.isEmpty()) "Built in" else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { context.packageManager.let { it.getApplicationLabel(it.getApplicationInfo(chosen, 0)).toString() } }.getOrDefault("Not installed")
+        }
+    }
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Icon pack", style = MaterialTheme.typography.titleSmall)
-        Text(name, style = MaterialTheme.typography.bodyMedium)
+        OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
+            Text(name, Modifier.weight(1f).padding(end = 12.dp), style = MaterialTheme.typography.bodyLarge)
+            Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+        }
         Text(if (BuildConfig.OS7_STANDALONE) "Use an installed icon pack. Apps without matching artwork keep their built-in icons." else "Dress app icons with an installed icon pack. Apps the pack does not cover keep Nano Search's own icons.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
     if (open) AlertDialog(
@@ -392,18 +405,21 @@ private fun IconPackRow() {
         confirmButton = { TextButton(onClick = { open = false }) { Text("Close") } },
         title = { Text("Icon pack") },
         text = {
-            Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState())) {
-                val options = listOf("" to "Built in") + packs.map { it.pkg to it.label }
+            Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState()).selectableGroup()) {
+                val options = listOf("" to "Built in") + packs.orEmpty().map { it.pkg to it.label }
                 options.forEach { (pkg, label) ->
                     Row(
-                        Modifier.fillMaxWidth().clickable { chosen = pkg; AppSettings.setIconPack(context, pkg); SettingsTheme.bump(); open = false },
+                        Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                            .selectable(selected = chosen == pkg, role = Role.RadioButton,
+                                onClick = { chosen = pkg; AppSettings.setIconPack(context, pkg); SettingsTheme.bump(); open = false }),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                     ) {
                         RadioButton(selected = chosen == pkg, onClick = null)
-                        Text(label, Modifier.padding(start = 12.dp, top = 12.dp, bottom = 12.dp))
+                        Text(label, Modifier.weight(1f).padding(vertical = 12.dp))
                     }
                 }
-                if (packs.isEmpty()) Text("No icon packs are installed.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+                if (packs.isNullOrEmpty()) Text(if (packs == null) "Loading icon packs…" else "No icon packs are installed.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
             }
         },
     )
@@ -421,16 +437,14 @@ internal fun SourceRow(source: AppSettings.Source, tick: Int) {
     val permissions = if (source.kind == "photo") arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.ACCESS_MEDIA_LOCATION)
     else arrayOf(source.permission ?: "")
     Card(shape = RoundedCornerShape(20.dp)) {
-        ListItem(
-            colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
-            headlineContent = { Text(source.label) },
-            supportingContent = {
-                Column {
-                    Text(source.detail)
-                    if (!granted) Text("Needs permission", color = MaterialTheme.colorScheme.error)
-                }
+        SettingsControlRow(
+            title = source.label,
+            modifier = Modifier.padding(16.dp),
+            description = {
+                Text(source.detail, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (!granted) Text("Needs permission", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             },
-            trailingContent = {
+            control = {
                 if (!granted) FilledTonalButton(onClick = { ask.launch(permissions) }) { Text("Allow") }
                 else Switch(checked = enabled, onCheckedChange = { enabled = it; AppSettings.setSourceEnabled(context, source.kind, it) })
             },
@@ -444,11 +458,12 @@ internal fun FilesRow(tick: Int) {
     val context = LocalContext.current
     val granted = remember(tick) { Environment.isExternalStorageManager() }
     Card(shape = RoundedCornerShape(20.dp)) {
-        ListItem(
-            colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
-            headlineContent = { Text("All files access") },
-            supportingContent = { Text(if (granted) "Allowed: file names can be searched." else "Needed to search file names outside photos.") },
-            trailingContent = {
+        SettingsControlRow(
+            title = "All files access",
+            modifier = Modifier.padding(16.dp),
+            description = { Text(if (granted) "Allowed: file names can be searched." else "Needed to search file names outside photos.",
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            control = {
                 FilledTonalButton(onClick = {
                     context.startActivity(Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:${context.packageName}")))
                 }) { Text(if (granted) "Manage" else "Allow") }
@@ -533,12 +548,10 @@ internal fun LauncherNotificationsCard(tick: Int, setup: Boolean = false) {
             Text(if (allowed) "Allowed. Notifications are shown only on this phone." else "Optional. Allow access to see notifications here and badges on app icons. You can continue without it.", style = MaterialTheme.typography.bodyMedium)
             FilledTonalButton(onClick = { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }) { Text(if (allowed) "Manage access" else "Choose access") }
             if (!setup) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                    Text("App badges", Modifier.weight(1f))
+                SettingsControlRow("App badges") {
                     Switch(checked = badges, onCheckedChange = { badges = it; AppSettings.setDots(context, it) })
                 }
-                Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                    Text("Notification hub sounds", Modifier.weight(1f))
+                SettingsControlRow("Notification hub sounds") {
                     Switch(checked = sounds, onCheckedChange = { sounds = it; AppSettings.setHubSounds(context, it) })
                 }
             }
