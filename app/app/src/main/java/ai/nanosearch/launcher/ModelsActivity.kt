@@ -17,11 +17,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -192,20 +192,22 @@ internal fun ModelCard(entry: ModelEntry, selected: Boolean, version: Int, total
             }
             if (failure != null) Text(failure.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 4.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            FlowRow(Modifier.fillMaxWidth().testTag("model-actions-${entry.id}"),
-                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
-                verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            // Full-width actions avoid an intrinsic-width flow measurement squeezing large
+            // button labels. Height stays content-driven, including at accessibility font sizes.
+            Column(Modifier.fillMaxWidth().testTag("model-actions-${entry.id}"),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                val actionModifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
                 if (installed && ModelTest.canTest(entry) && tested != "Testing…") {
-                    TextButton(onClick = { ModelTest.run(context, entry) }) { Text(if (tested == null) "Try it" else "Try again") }
+                    TextButton(onClick = { ModelTest.run(context, entry) }, modifier = actionModifier) { Text(if (tested == null) "Try it" else "Try again") }
                 }
                 when {
-                    active -> TextButton(onClick = { ModelStore.cancel(entry); changed() }) { Text("Cancel") }
+                    active -> TextButton(onClick = { ModelStore.cancel(entry); changed() }, modifier = actionModifier) { Text("Cancel") }
                     installed -> TextButton(onClick = {
                         ModelStore.delete(entry)?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
                         changed()
-                    }) { Text("Delete") }
+                    }, modifier = actionModifier) { Text("Delete") }
                     tooBig -> Text("Too big for this phone", Modifier.padding(vertical = 12.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
-                    else -> FilledTonalButton(onClick = { ModelStore.download(entry, wifi); changed() }) { Text("Download") }
+                    else -> FilledTonalButton(onClick = { ModelStore.download(entry, wifi); changed() }, modifier = actionModifier) { Text("Download") }
                 }
             }
         }

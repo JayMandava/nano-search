@@ -24,6 +24,16 @@ class InteractionFrameRateTest {
         assertEquals(144f, interactionRefreshRate(listOf(60f, 144f)), 0f)
     }
 
+    @Test fun missingDisplayContextLeavesRefreshPolicyOptional() {
+        assertNull(resolveInteractionDisplay(null) { null })
+        assertNull(resolveInteractionDisplay(null) { throw UnsupportedOperationException("No visual context") })
+    }
+
+    @Test(expected = IllegalStateException::class)
+    fun unrelatedDisplayFailuresAreNotSilenced() {
+        resolveInteractionDisplay(null) { throw IllegalStateException("Unexpected window failure") }
+    }
+
     @Test fun leavingTheActivityRestoresItsOriginalWindowPreference() {
         val controller = Robolectric.buildActivity(Activity::class.java).setup()
         val activity = controller.get()

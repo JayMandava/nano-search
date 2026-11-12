@@ -74,7 +74,9 @@ class Os7SettingsLayoutTest {
         compose.onNodeWithText(text, useUnmergedTree = true)
             .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
         assertTrue("Expected laid-out text: $text", layouts.isNotEmpty())
-        assertTrue("Text must wrap without clipping: $text", layouts.none { it.hasVisualOverflow })
+        assertTrue("Text must wrap without clipping: $text at font scale $fontScale; " +
+            layouts.joinToString { "size=${it.size}, constraints=${it.layoutInput.constraints}, widthOverflow=${it.didOverflowWidth}, heightOverflow=${it.didOverflowHeight}" },
+            layouts.none { it.hasVisualOverflow })
     }
 
     @Test fun modelSelectorsDescriptionsAndActionsStaySeparatedOnNarrowScreensAtLargeFonts() {

@@ -3,6 +3,7 @@ package ai.nanosearch.launcher
 import android.app.Activity
 import android.os.Build
 import android.os.PowerManager
+import android.view.Display
 import android.view.MotionEvent
 import android.view.View
 import androidx.activity.ComponentActivity
@@ -19,7 +20,10 @@ internal class InteractionFrameRate(private val activity: Activity) {
     fun resume() {
         active = true
         previousRate = activity.window.attributes.preferredRefreshRate
-        val display = activity.display
+        // The attached window is authoritative (including secondary displays). A newly
+        // created/headless activity may not have a display-associated Context yet.
+        @Suppress("DEPRECATION")
+        val display = resolveInteractionDisplay(decor.display) { activity.windowManager.defaultDisplay }
         val current = display?.mode
         preferredRate = if (current == null) 0f else interactionRefreshRate(
             display?.supportedModes.orEmpty().filter { it.physicalWidth == current.physicalWidth && it.physicalHeight == current.physicalHeight }
@@ -66,6 +70,10 @@ internal class InteractionFrameRate(private val activity: Activity) {
         hinted = false
     }
 }
+
+/** Only missing display-context support is optional; unrelated platform failures still surface. */
+internal fun resolveInteractionDisplay(attached: Display?, windowDisplay: () -> Display?): Display? =
+    attached ?: try { windowDisplay() } catch (_: UnsupportedOperationException) { null }
 
 /** Prefer a supported 90/120 Hz mode without changing resolution or inventing an unsupported rate. */
 internal fun interactionRefreshRate(rates: List<Float>): Float {
