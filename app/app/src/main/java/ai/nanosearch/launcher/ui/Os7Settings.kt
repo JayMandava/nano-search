@@ -3,6 +3,7 @@
 package ai.nanosearch.launcher.ui
 
 import ai.nanosearch.launcher.AppSettings
+import ai.nanosearch.launcher.BuildConfig
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -24,7 +25,7 @@ import androidx.compose.ui.unit.sp
 
 /** Settings retain Android controls and semantics, with an original OS7-inspired visual treatment. */
 @Composable
-fun os7SettingsEnabled(): Boolean = AppSettings.os7Mode(LocalContext.current)
+fun os7SettingsEnabled(): Boolean = BuildConfig.OS7_STANDALONE || AppSettings.os7Mode(LocalContext.current)
 
 @Composable
 fun SettingsSurfaceTheme(colorScheme: ColorScheme? = null, content: @Composable () -> Unit) {

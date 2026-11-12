@@ -117,7 +117,7 @@ private fun HiddenAppsScreen(onBack: () -> Unit) {
             item {
                 Card(shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
                     Text(
-                        "A hidden app stays installed and keeps working. It just does not show in the app drawer, in search, in recents or favourites, or in Frames. Switch it off here to see it again.",
+                        if (BuildConfig.OS7_STANDALONE) "Hidden apps stay installed and keep working. They do not appear in the launcher, its folders or app search. Turn hiding off here to show an app again." else "A hidden app stays installed and keeps working. It just does not show in the app drawer, in search, in recents or favourites, or in Frames. Switch it off here to see it again.",
                         Modifier.padding(20.dp), style = MaterialTheme.typography.bodyMedium,
                     )
                 }

@@ -86,6 +86,7 @@ class MainActivity : Activity() {
     private var os7Dialog: android.app.AlertDialog? = null
     private var nanoWorkspace = false
     private val os7 get() = AppSettings.os7Mode(this)
+    private val standalone get() = BuildConfig.OS7_STANDALONE
     private lateinit var home: DragLayout
     private lateinit var drawer: DragLayout
     private lateinit var searchLayer: LinearLayout
@@ -221,7 +222,7 @@ class MainActivity : Activity() {
             pickPhoto = { tryStart { startActivityForResult(Intent(Intent.ACTION_GET_CONTENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE), REQ_PHOTO) } },
             openSystemApp = { tryStart { startActivity(Intent(Intent.ACTION_SET_WALLPAPER).setPackage("com.android.wallpaper")) } },
             openLive = { tryStart { startActivity(Intent(android.app.WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)) } },
-            openLockClock = if (LockClock.available(this)) ({ showLockClockSheet() }) else null,
+            openLockClock = if (LockClock.available(this)) ({ if(standalone) startActivity(Intent(this,LockClockSettingsActivity::class.java)) else showLockClockSheet() }) else null,
         )
         hubScreen = HubScreen(this, overlayHost, pal, { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); hubScreen.dismiss(false) },
             { shown -> updateBars(shown || drawerOpen || (::resultsPanel.isInitialized && resultsPanel.visibility == View.VISIBLE)) },
@@ -235,7 +236,7 @@ class MainActivity : Activity() {
 
         if (os7) os7Home = Os7HomeView(this,
             launch = { item, view -> open(item, view) }, appMenu = { item, view -> appMenu(item, view) },
-            search = { showOs7Search() }, notifications = { if(AppSettings.hub(this)) openHub() else expandNotifications() },
+            search = { showOs7Search() }, notifications = { if(standalone || AppSettings.hub(this)) openHub() else expandNotifications() },
             connections = { tryStart { startActivity(Intent(Settings.Panel.ACTION_INTERNET_CONNECTIVITY)) } },
             profiles = { tryStart { startActivity(Intent(Settings.ACTION_SOUND_SETTINGS)) } },
             menu = { view -> showOs7Menu(view) },
@@ -253,8 +254,9 @@ class MainActivity : Activity() {
                 val sys = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
                 val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout() or WindowInsets.Type.ime())
                 val barSpace = dp(BAR_SPACE_DP)
-                searchLayer.setPadding(bars.left, sys.top + if(os7 && !nanoWorkspace) dp(76) else 0, bars.right, bars.bottom)
-                os7Home?.setPadding(sys.left, sys.top, sys.right, sys.bottom)
+                os7Home?.applyTopInset(sys.top, insets.displayCutout?.boundingRects?.filter { it.top==0 }.orEmpty())
+                searchLayer.setPadding(bars.left, (if(standalone && os7) 0 else sys.top) + if(os7 && !nanoWorkspace) (os7Home?.searchTopOffset ?: dp(76)) else 0, bars.right, bars.bottom)
+                os7Home?.setPadding(sys.left, if(standalone) 0 else sys.top, sys.right, sys.bottom)
                 navBottom = sys.bottom
                 home.setPadding(bars.left, sys.top + barSpace, bars.right, 0)
                 applyDockPadding()
@@ -414,7 +416,7 @@ class MainActivity : Activity() {
                     addView(hubBadge, FrameLayout.LayoutParams(-2, dp(18), Gravity.TOP or Gravity.END).apply { topMargin = dp(2); marginEnd = dp(2) })
                 }, LinearLayout.LayoutParams(dp(56), dp(56)).apply { leftMargin = dp(8) })
             }
-            addView(mic, LinearLayout.LayoutParams(dp(56), dp(56)).apply { leftMargin = dp(8) })
+            if (!standalone) addView(mic, LinearLayout.LayoutParams(dp(56), dp(56)).apply { leftMargin = dp(8) })
         }
 
         list = ListView(this).apply {
@@ -908,7 +910,9 @@ class MainActivity : Activity() {
         overlays.appPicker(title, apps) { onPick(it.key) }
     }
 
-    private fun openSettings() = startActivity(Intent(this, SettingsActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    private fun openSettings() = startActivity(Intent(this, SettingsActivity::class.java).addFlags(
+        Intent.FLAG_ACTIVITY_NEW_TASK or if (standalone) Intent.FLAG_ACTIVITY_CLEAR_TOP else 0,
+    ))
 
     private fun showAppInfo(pkg: String) {
         runCatching { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$pkg")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
@@ -939,7 +943,7 @@ class MainActivity : Activity() {
     private fun tryStart(block: () -> Unit) = try { block() } catch (e: Exception) { Toast.makeText(this, "That option isn't available on this phone", Toast.LENGTH_SHORT).show() }
 
     /** The wallpaper screen: what is set now, the ways to change it, and a crop step for photos. */
-    private fun changeWallpaper() = wallpaperScreen.show()
+    private fun changeWallpaper() { if(os7) resetUi(); wallpaperScreen.show() }
 
     private fun setWallpaperFrom(uri: Uri, which: Int = android.app.WallpaperManager.FLAG_SYSTEM or android.app.WallpaperManager.FLAG_LOCK) {
         io.execute {
@@ -1070,10 +1074,11 @@ class MainActivity : Activity() {
             ) else emptyArray()),
             MenuItem(R.drawable.ic_menu_info, "App info") { showAppInfo(pkg) },
             MenuItem(R.drawable.ic_star, if (AppUsage.isFavourite(this, item.key)) "Remove from favourites" else "Add to favourites") { AppUsage.toggleFavourite(this, item.key); os7Home?.refresh(); search() },
-            MenuItem(R.drawable.ic_menu_add, if(os7) "Add to Nano workspace" else "Add to home") { currentPage().addShortcut(item.key); closeDrawer(clear = true); Toast.makeText(this, "${item.title} added to home", Toast.LENGTH_SHORT).show() },
+            *(if (!standalone) arrayOf(MenuItem(R.drawable.ic_menu_add, if(os7) "Add to Nano workspace" else "Add to home") { currentPage().addShortcut(item.key); closeDrawer(clear = true); Toast.makeText(this, "${item.title} added to home", Toast.LENGTH_SHORT).show() },
             MenuItem(R.drawable.ic_menu_apps, if(os7) "Add to workspace dock" else "Add to dock") {
                 overlays.listSheet("Add ${item.title} to the dock", List(dockSlots) { slot -> MenuItem(R.drawable.ic_menu_add, "Dock slot ${slot + 1}") { setDock(slot, item.key) } })
             },
+            ) else emptyArray()),
             MenuItem(R.drawable.ic_menu_remove, "Hide") {
                 AppSettings.setAppHidden(this, pkg, true)
                 refreshIndex(heavy = false)
@@ -1199,16 +1204,17 @@ class MainActivity : Activity() {
         // The user may have chosen, downloaded or removed a voice model in Settings.
         if (voiceFile != models.whisper || (voice is VoiceInput && models.whisper.exists())) { voice.release(); voice = buildVoice() }
         // First run: the setup tour asks for permissions itself, with reasons.
-        if (SetupActivity.needed(this)) startActivity(Intent(this, SetupActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) else requestAccessOnce()
+        if (SetupActivity.needed(this)) startActivity(Intent(this, SetupActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) else if (!standalone) requestAccessOnce()
         refreshIndex(heavy = false, appsChanged = listStale)
         if (listStale || drawerTab == "recent") search() // the recents tab changes every time an app is opened; the others only when apps change
         updateBanner()
         startEmbedding()
-        CpuTuner.maybeRun(this)
+        if (!standalone) CpuTuner.maybeRun(this)
     }
 
     /** Fingerprints new photos for "photos of a beach" style search; a no-op if the image models are not installed or a run is in progress. */
     private fun startEmbedding() {
+        if (standalone) return
         if (!Services.clip.available && !Services.ocr.available) return
         if (embedRunning.getAndSet(true)) { embedAgain.set(true); return } // the photos may have changed since that run began: go round again
         embedder.execute {
@@ -1234,6 +1240,16 @@ class MainActivity : Activity() {
         consumeDebugExtras(intent)
     }
 
+    override fun dispatchTouchEvent(event: android.view.MotionEvent): Boolean {
+        if (os7 && !nanoWorkspace && searchLayer.visibility == View.VISIBLE && !overlays.isShowing && !wallpaperScreen.isShowing && !hubScreen.isShowing && os7Dialog?.isShowing != true && event.actionMasked == android.view.MotionEvent.ACTION_DOWN) {
+            fun hit(v:View):Boolean { val r=android.graphics.Rect(); return v.visibility==View.VISIBLE && v.getGlobalVisibleRect(r) && r.contains(event.rawX.toInt(),event.rawY.toInt()) }
+            val inResult = hit(list) && list.pointToPosition((event.rawX-listLocation()[0]).toInt(),(event.rawY-listLocation()[1]).toInt()) != android.widget.AdapterView.INVALID_POSITION
+            if (!hit(input) && !(mic.parent!=null && hit(mic)) && !inResult && !hit(card)) { resetUi(); return true }
+        }
+        return super.dispatchTouchEvent(event)
+    }
+    private fun listLocation()=IntArray(2).also { list.getLocationOnScreen(it) }
+
     /** With a hardware keyboard, just start typing: the keys go to the search bar, wherever you are on home. */
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (os7 && keyCode == KeyEvent.KEYCODE_MENU) { showOs7Menu(os7Home ?: home); return true }
@@ -1250,10 +1266,10 @@ class MainActivity : Activity() {
             hubScreen.isShowing -> hubScreen.back()
             wallpaperScreen.isShowing -> wallpaperScreen.back()
             overlays.isShowing -> overlays.dismissAll()
+            os7 && searchLayer.visibility == View.VISIBLE && !nanoWorkspace -> resetUi()
             card.visibility == View.VISIBLE -> endChat()
             input.text.isNotEmpty() -> input.setText("")
             input.hasFocus() -> { hideKeyboard(); input.clearFocus() }
-            os7 && searchLayer.visibility == View.VISIBLE && !nanoWorkspace -> { searchLayer.visibility = View.GONE; os7Home?.showSearch(false); os7Home?.visibility = View.VISIBLE }
             os7 && nanoWorkspace -> resetUi()
             os7 && os7Home?.back() == true -> Unit
             drawerOpen -> closeDrawer(clear = true)
@@ -1363,16 +1379,17 @@ class MainActivity : Activity() {
 
     private fun showOs7Menu(anchor: View) {
         overlays.popupFor(anchor, listOf(listOf(
-            MenuItem(R.drawable.ic_menu_apps, "${if(os7Home?.expanded == true) "Collapse" else "Expand"} applications") { os7Home?.setExpanded(os7Home?.expanded != true) },
+            *(if (!standalone) arrayOf(MenuItem(R.drawable.ic_menu_apps, "${if(os7Home?.expanded == true) "Collapse" else "Expand"} applications") { os7Home?.setExpanded(os7Home?.expanded != true) }) else emptyArray()),
             MenuItem(R.drawable.ic_menu_add, "Add folder") { createOs7Folder(null) },
             MenuItem(R.drawable.ic_menu_apps, "Manage panels") { manageOs7Panels() },
-            MenuItem(R.drawable.ic_search, "Universal search") { showOs7Search() },
-            MenuItem(R.drawable.ic_hub, "Notifications") { if(AppSettings.hub(this)) openHub() else expandNotifications() },
+            MenuItem(R.drawable.ic_search, if(standalone) "Search apps" else "Universal search") { showOs7Search() },
+            MenuItem(R.drawable.ic_hub, "Notifications") { if(standalone || AppSettings.hub(this)) openHub() else expandNotifications() },
             MenuItem(R.drawable.ic_menu_wallpaper, "Wallpaper") { changeWallpaper() },
-            MenuItem(R.drawable.ic_menu_widgets, "Nano workspace & widgets") {
+            *(if (!standalone) arrayOf(MenuItem(R.drawable.ic_menu_widgets, "Nano workspace & widgets") {
                 nanoWorkspace = true; applyFullScreen(); os7Home?.visibility = View.GONE
                 home.visibility = View.VISIBLE; searchLayer.visibility = View.VISIBLE; window.decorView.requestApplyInsets()
-            },
+            }) else emptyArray()),
+            MenuItem(R.drawable.ic_menu_remove, "Hidden apps") { startActivity(Intent(this, HiddenAppsActivity::class.java)) },
             MenuItem(R.drawable.ic_kind_setting, "Options") { openSettings() },
         )))
     }
@@ -1419,7 +1436,7 @@ class MainActivity : Activity() {
         val q = input.text.toString()
         setSearchActive(q.isNotBlank() || chatOpen)
         // Photo requests ("photos from Goa last September") are understood by rules and answered instantly; a model would only blur them.
-        if (q.isNotBlank() && looksNatural(q) && parser.available && PhotoQuery.parse(q) == null && !isFollowUp(q)) ui.postDelayed(parseRunnable, PARSE_DEBOUNCE_MS)
+        if (!standalone && q.isNotBlank() && looksNatural(q) && parser.available && PhotoQuery.parse(q) == null && !isFollowUp(q)) ui.postDelayed(parseRunnable, PARSE_DEBOUNCE_MS)
         search()
     }
 
@@ -1451,6 +1468,7 @@ class MainActivity : Activity() {
 
     private fun search() {
         val query = input.text.toString()
+        if (standalone) { runSearch(query, semantic = false); return }
         ui.removeCallbacks(semanticRunnable)
         // Anything that may involve the image model ("photos of a dog", or a short plain word like "beach") waits for a pause in typing
         // rather than running on "photos of a d"; the instant keyword results appear straight away either way.
@@ -1464,7 +1482,7 @@ class MainActivity : Activity() {
         io.execute {
             val drawerApps = if (query.isBlank()) index.search("", limit = 500) else null
             val os7Apps = if (os7 && drawerApps != null) drawerApps.mapNotNull { Os7Panels.describe(this,it.key,it.title) } else emptyList()
-            val found = if (query.isBlank()) emptyList() else index.search(query, limit = 60, semantic = semantic)
+            val found = if (query.isBlank()) emptyList() else if (standalone) findStandaloneApps(query) else index.search(query, limit = 60, semantic = semantic)
             ui.post {
                 if (seq != searchSeq) return@post
                 if (drawerApps != null) {
@@ -1478,9 +1496,14 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun findStandaloneApps(query:String):List<Item> {
+        val tokens=query.trim().lowercase(java.util.Locale.ROOT).split(Regex("\\s+"))
+        return index.search("",limit=1000).filter { item -> tokens.all { item.title.lowercase(java.util.Locale.ROOT).contains(it) } }.take(60)
+    }
+
     /** An "Ask" row at the top of the results; pressing Enter does the same thing. */
     private fun withAsk(query: String, found: List<Item>): List<Item> =
-        if (answerer.available && query.isNotBlank()) listOf(Item("ask", "Ask “${query.trim()}”", "ask")) + found else found
+        if (!standalone && answerer.available && query.isNotBlank()) listOf(Item("ask", "Ask “${query.trim()}”", "ask")) + found else found
 
     private fun kindsFor(kind: String?): List<String>? = when (kind) {
         "app" -> listOf("app", "setting")
@@ -1523,6 +1546,14 @@ class MainActivity : Activity() {
     private fun submit() {
         val q = input.text.toString().trim()
         if (q.isEmpty()) return
+        if (standalone) {
+            val seq=++searchSeq
+            io.execute {
+                val top=findStandaloneApps(q).firstOrNull()
+                ui.post { if(seq==searchSeq && input.text.toString().trim()==q && top!=null) open(top) }
+            }
+            return
+        }
         // One answer at a time: the next question waits until this one is finished (or stopped with the mic button).
         if (busy) { input.performHapticFeedback(HapticFeedbackConstants.REJECT); return }
         // One press of Enter can arrive twice (as an editor action and as a key event); the second would cancel the first answer.
@@ -1799,10 +1830,20 @@ class MainActivity : Activity() {
 
     // ---------------------------------------------------------------- indexing and permissions
 
+    // Compare against the indexed snapshot, not the last lifecycle observation: hide then
+    // unhide can return to the same observed key while the index still excludes that app.
+    private var indexedHiddenKey: String? = null // confined to the serial indexer
+
     private fun refreshIndex(heavy: Boolean, appsChanged: Boolean = true) {
         indexer.execute {
             var changed = appsChanged
-            if (appsChanged || index.count("app") == 0) { index.replaceKind("app", Indexers.apps(this)); changed = true }
+            val hiddenKey = AppSettings.hiddenKey(this)
+            if (AppIndexRefresh.needsRebuild(appsChanged, index.count("app"), hiddenKey, indexedHiddenKey)) {
+                index.replaceKind("app", Indexers.apps(this))
+                indexedHiddenKey = hiddenKey
+                changed = true
+            }
+            if (standalone) { if (changed) ui.post { search() }; return@execute }
             if (index.count("setting") == 0) { index.replaceKind("setting", Indexers.settings()); changed = true }
             val now = System.currentTimeMillis()
             val force = prefs.getBoolean("reindex", false).also { if (it) prefs.edit().remove("reindex").apply() }

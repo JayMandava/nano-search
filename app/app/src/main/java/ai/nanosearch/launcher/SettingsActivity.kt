@@ -131,6 +131,26 @@ private fun SettingsScreen(onBack: () -> Unit, listState: LazyListState, scroll:
             contentPadding = PaddingValues(if (os7SettingsEnabled()) 8.dp else 16.dp),
             verticalArrangement = Arrangement.spacedBy(if (os7SettingsEnabled()) 4.dp else 12.dp),
         ) {
+            if (BuildConfig.OS7_STANDALONE) {
+                item { DefaultHomeCard(tick) }
+                item { Header("Apps") }
+                item { HiddenAppsRow(tick) }
+                item { Card { Column(Modifier.padding(16.dp)) { IconPackRow() } } }
+                item { Header("Notifications") }
+                item { LauncherNotificationsCard(tick) }
+                item { MutedNotificationAppsRow() }
+                item { Header("Display") }
+                item { FullScreenCard() }
+                item { Card(onClick = { context.startActivity(Intent(context, LockClockSettingsActivity::class.java)) }) {
+                    ListItem(headlineContent = { Text("Steel Dial wallpaper") }, supportingContent = { Text("Preview the clock, background and position before applying it.") }, colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent))
+                } }
+                item { Header("Help") }
+                item { Card { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Your launcher", style = MaterialTheme.typography.titleMedium)
+                    Text("Tap an app to open it. Touch and hold for app actions. Use the panel arrows to browse your apps, and open Notifications from the header.")
+                    Text("Hidden apps stay installed. You can show them again in Hidden apps. Choosing a default launcher and allowing notification access are optional.", style = MaterialTheme.typography.bodySmall)
+                } } }
+            } else {
             item { DefaultHomeCard(tick) }
             item { ModelsRow() }
             item { HiddenAppsRow(tick) }
@@ -148,6 +168,7 @@ private fun SettingsScreen(onBack: () -> Unit, listState: LazyListState, scroll:
             item { DataCard(tick) }
             item { SetupRow() }
             item { AdvancedRow() }
+            }
         }
     }
 }
@@ -214,7 +235,7 @@ internal fun DefaultHomeCard(tick: Int) {
         colors = CardDefaults.cardColors(containerColor = if (isDefault) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primaryContainer),
     ) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(if (isDefault) "Nano Search is your home app" else "Make Nano Search your home app", style = MaterialTheme.typography.titleLarge)
+            Text(if (BuildConfig.OS7_STANDALONE) { if (isDefault) "This is your default launcher" else "Default launcher" } else if (isDefault) "Nano Search is your home app" else "Make Nano Search your home app", style = MaterialTheme.typography.titleLarge)
             Text(
                 if (isDefault) "The home button and swipe-up gesture open this launcher."
                 else if (os7SettingsEnabled()) "Pick it as the default so the home button opens your classic home screen."
@@ -353,7 +374,7 @@ private fun IconPackRow() {
     Column(Modifier.fillMaxWidth().clickable { open = true }, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text("Icon pack", style = MaterialTheme.typography.titleSmall)
         Text(name, style = MaterialTheme.typography.bodyMedium)
-        Text("Dress app icons with an installed icon pack. Apps the pack does not cover keep Nano Search's own icons.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(if (BuildConfig.OS7_STANDALONE) "Use an installed icon pack. Apps without matching artwork keep their built-in icons." else "Dress app icons with an installed icon pack. Apps the pack does not cover keep Nano Search's own icons.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
     if (open) AlertDialog(
         onDismissRequest = { open = false },
@@ -485,4 +506,48 @@ private fun AdvancedRow() {
             supportingContent = { Text("Processor and memory. Automatic by default.") },
         )
     }
+}
+
+/** Standalone launcher controls never expose indexing, models, widgets or appearance-mode switches. */
+@Composable
+internal fun LauncherNotificationsCard(tick: Int, setup: Boolean = false) {
+    val context = LocalContext.current
+    val allowed = remember(tick) { HubStore.allowed(context) }
+    var badges by remember { mutableStateOf(AppSettings.dots(context)) }
+    var sounds by remember { mutableStateOf(AppSettings.hubSounds(context)) }
+    Card {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Notification access", style = MaterialTheme.typography.titleMedium)
+            Text(if (allowed) "Allowed. Notifications are shown only on this phone." else "Optional. Allow access to see notifications here and badges on app icons. You can continue without it.", style = MaterialTheme.typography.bodyMedium)
+            FilledTonalButton(onClick = { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }) { Text(if (allowed) "Manage access" else "Choose access") }
+            if (!setup) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Text("App badges", Modifier.weight(1f))
+                    Switch(checked = badges, onCheckedChange = { badges = it; AppSettings.setDots(context, it) })
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Text("Notification hub sounds", Modifier.weight(1f))
+                    Switch(checked = sounds, onCheckedChange = { sounds = it; AppSettings.setHubSounds(context, it) })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MutedNotificationAppsRow() {
+    val context = LocalContext.current
+    var open by remember { mutableStateOf(false) }
+    var muted by remember { mutableStateOf(HubStore.mutedApps(context)) }
+    Card(onClick = { muted = HubStore.mutedApps(context); open = true }) {
+        ListItem(headlineContent = { Text("Hidden notification apps") }, supportingContent = { Text(if (muted.isEmpty()) "None hidden" else "${muted.size} apps hidden from Notifications") }, colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent))
+    }
+    if (open) AlertDialog(onDismissRequest = { open = false }, title = { Text("Hidden notification apps") },
+        text = { Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState())) {
+            if (muted.isEmpty()) Text("No apps are hidden. Touch and hold a notification to hide its app here.")
+            muted.sorted().forEach { pkg ->
+                val label = remember(pkg) { runCatching { context.packageManager.getApplicationInfo(pkg, 0).loadLabel(context.packageManager).toString() }.getOrDefault(pkg) }
+                TextButton(onClick = { HubStore.toggleMuted(context, pkg); muted = HubStore.mutedApps(context) }) { Text("Show $label") }
+            }
+        } }, confirmButton = { TextButton(onClick = { open = false }) { Text("Done") } })
 }

@@ -1,3 +1,28 @@
+# Current standalone v2 refinement
+
+This section supersedes the earlier experimental workspace/theme behavior documented below. The OS7 launcher build is selected by `os7QaLauncherBuild`; it remains a separate application from original Nano and HTC.
+
+- Fixed three-row app tray: title taps and vertical swipes no longer resize it.
+- Compact top status region uses the sides of the verified center cutout. Corner cutouts use a safe below-cutout fallback. Clock/header use condensed typography, restrained translucent charcoal, and yellow notification counts informed by the owner-provided BlackBerry 7 OS Demo video.
+- Opening search hides app tray/footer. Outside taps and Back/Home dismiss search; no AI/model or personal-data search UI is exposed. Search is app-only, including query-validated Enter launch.
+- Standalone settings/setup omit Nano workspace, widgets, Active Frames, model downloads, indexing sources and theme-mode framing. Hidden apps and app menus retain hide/unhide support. Old preference values are preserved but do not re-enable removed features.
+- Notifications use only authorized notification-listener data, with accessible utility-list styling. No contact/SMS/call/calendar provider reads in standalone Hub. The demo does not show an opened notification Hub; this list is an Android adaptation, not an asserted exact copy.
+- Steel Dial live-wallpaper settings/preview and provider are restored only for this build. Android confirms wallpaper application; destination support and system lock-clock overlays are device-dependent.
+- Original owner-supplied 911 Porscha font/notice remain in ignored local personal assets only. They are not committed or uploaded, and release/public source sets retain the redistributable fallback. The device APK containing the private font must remain local.
+- A standalone-specific manifest excludes unrelated personal-search/audio/widget-binding permissions while preserving original Nano permissions in other profiles.
+
+## Refinement validation
+
+- Standalone and original Nano profiles each passed 279 tests with zero failures/errors and ten existing skips (269 passed), including four new indexed-hidden-state regressions. Final standalone lint passed with zero errors, 333 warnings and one hint.
+- Actual CPH2467 phone verification covered fixed three-row tray, center-cutout clearance, search hiding tray/footer, outside/Home search dismissal, menu Back/Home, standalone Settings controls and the original Steel Dial with private 911 Porscha numerals. Android wallpaper preview opened; wallpaper was not applied. Existing notification access was preserved, and only the empty Hub was viewed. Notification selection/filtering has unit coverage; populated live notification interactions were not exercised.
+- QA caught stale search results after hide then unhide. The fix compares against the hidden state used for the last successful index rebuild, not the previous activity lifecycle observation. Final phone retest verified Calculator disappears while hidden and returns immediately after unhiding, without a process restart. Options also now clears its child stack: Steel Dial → Home → Options returned the Settings root.
+- Temporary HOME testing restored and verified the original HD2 default. Hidden app state was restored. Original Nano/HTC package data was not changed.
+- A short mixed-navigation sample measured 146 frames, 10 janky (6.85%), p50 9 ms, p95 21 ms and p99 28 ms. This is not evidence of sustained 120 fps or zero jank.
+- Final private installed APK SHA-256: `e51d0ef9240671a41f727db29a6e9cf42f48bf2e577222653404cda33592385b`. It remains local and is not a public release artifact.
+- Reference captures and private APKs remain local. Only source and documentation are authorized for the feature-branch push. No private APK, font, owner video or device captures are included.
+
+---
+
 # OS 7 recreation branch
 
 Reference target: BlackBerry Bold 9900/9930, stock OS 7.0. This is an Android recreation, not firmware or a binary port. Existing Nano content and features must remain available without migration loss.

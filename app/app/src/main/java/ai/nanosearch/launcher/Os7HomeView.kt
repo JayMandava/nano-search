@@ -23,9 +23,16 @@ class Os7HomeView(
     private val connections: () -> Unit,
     private val profiles: () -> Unit,
     private val menu: (View) -> Unit,
+    private val standalone: Boolean = BuildConfig.OS7_STANDALONE,
 ) : LinearLayout(context) {
     private fun dp(n: Int) = (n * resources.displayMetrics.density).toInt()
     private val white = Color.WHITE
+    private var topInset=0
+    private var statusHeight=dp(48)
+    private lateinit var topChrome:FrameLayout
+    private lateinit var statusArea:FrameLayout
+    private lateinit var carrierLabel:TextView
+    val searchTopOffset get()=if(standalone) statusHeight+dp(48) else dp(76)
     private fun rowHeight() = dp(64) + (36 * resources.displayMetrics.scaledDensity).toInt()
     private var loaded = false
     private var all = emptyList<Item>()
@@ -33,7 +40,7 @@ class Os7HomeView(
     private val tabs = listOf("All", "Favorites", "Media", "Downloads", "Frequent")
     private var panel = 0
     private fun neighbor(delta:Int):Int { val visible=Os7Panels.visiblePanels(context).map { it.ordinal }; val i=visible.indexOf(panel).coerceAtLeast(0); return visible[(i+delta+visible.size)%visible.size] }
-    private var rows = 1
+    private var rows = if(standalone) 3 else 1
     val expanded get() = rows > 1
     val canReorder get() = panel != 4
     var folderId: String? = null; private set
@@ -44,6 +51,7 @@ class Os7HomeView(
     private val alerts = text(14f)
     private val notificationRow = LinearLayout(context)
     private val tray = LinearLayout(context)
+    private lateinit var footer:LinearLayout
     private val previous = text(14f)
     private val selected = text(16f)
     private val next = text(14f)
@@ -72,23 +80,35 @@ class Os7HomeView(
         orientation = VERTICAL
         // Genuine device values, drawn in original chrome; Android's system shade remains a swipe away.
         val top = FrameLayout(context).apply {
-            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0xC0101419.toInt(),0x30101419))
+            clipChildren=false
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0xD0101419.toInt(),0x50101419))
             battery.gravity=Gravity.START or Gravity.CENTER_VERTICAL
             battery.setPadding(dp(8),0,0,0)
             battery.compoundDrawablePadding=dp(4)
-            addView(battery, FrameLayout.LayoutParams(dp(100), dp(28), Gravity.START or Gravity.TOP))
-            addView(TextClock(context).apply { format12Hour="EEE d MMM"; format24Hour="EEE d MMM"; textSize=12f; gravity=Gravity.START or Gravity.CENTER_VERTICAL; setTextColor(white); setPadding(dp(8),0,0,0); setShadowLayer(3f,0f,1f,Color.BLACK) },FrameLayout.LayoutParams(dp(105),dp(30),Gravity.START or Gravity.BOTTOM))
             val carrier=runCatching { (context.getSystemService(Context.TELEPHONY_SERVICE) as android.telephony.TelephonyManager).networkOperatorName }.getOrDefault("")
-            addView(text(11f).apply { text=carrier },FrameLayout.LayoutParams(-1,dp(20),Gravity.TOP).apply { leftMargin=dp(105);rightMargin=dp(105) })
-            addView(TextClock(context).apply { format12Hour = "h:mm"; format24Hour = "HH:mm"; textSize = 34f; setSingleLine(); setAutoSizeTextTypeUniformWithConfiguration(18,34,1,android.util.TypedValue.COMPLEX_UNIT_SP); setTextColor(white); gravity = Gravity.CENTER; typeface = Typeface.create("sans-serif-light", Typeface.NORMAL) }, FrameLayout.LayoutParams(-1,dp(56),Gravity.BOTTOM).apply { leftMargin=dp(105); rightMargin=dp(105) })
-            addView(button("Connections", R.drawable.ic_os7_connections) { connections() }, FrameLayout.LayoutParams(dp(52),dp(52),Gravity.END or Gravity.TOP))
+            statusArea=FrameLayout(context).apply {
+                addView(battery,FrameLayout.LayoutParams(dp(100),-1,Gravity.START))
+                carrierLabel=text(12f).apply { text=carrier; maxLines=1; ellipsize=android.text.TextUtils.TruncateAt.END }
+                addView(carrierLabel,FrameLayout.LayoutParams(dp(100),-1,Gravity.END).apply { rightMargin=dp(52) })
+                addView(button("Connections",R.drawable.ic_os7_connections) { connections() },FrameLayout.LayoutParams(dp(48),dp(48),Gravity.END or Gravity.TOP))
+            }
+            if(standalone) {
+                addView(statusArea,FrameLayout.LayoutParams(-1,dp(48),Gravity.TOP))
+                addView(TextClock(context).apply { format12Hour="EEE d MMM";format24Hour="EEE d MMM";textSize=12f;setTextColor(white);gravity=Gravity.START or Gravity.CENTER_VERTICAL;setPadding(dp(8),0,0,0) },FrameLayout.LayoutParams(dp(105),dp(48),Gravity.BOTTOM))
+                addView(TextClock(context).apply { format12Hour="h:mm";format24Hour="HH:mm";setSingleLine();setAutoSizeTextTypeUniformWithConfiguration(18,32,1,android.util.TypedValue.COMPLEX_UNIT_SP);setTextColor(white);gravity=Gravity.CENTER;typeface=Typeface.create("sans-serif-condensed",Typeface.NORMAL) },FrameLayout.LayoutParams(-1,dp(48),Gravity.BOTTOM).apply { leftMargin=dp(105);rightMargin=dp(105) })
+            } else {
+                addView(statusArea,FrameLayout.LayoutParams(-1,dp(28),Gravity.TOP))
+                addView(TextClock(context).apply { format12Hour="EEE d MMM";format24Hour="EEE d MMM";textSize=12f;setTextColor(white);gravity=Gravity.START or Gravity.CENTER_VERTICAL },FrameLayout.LayoutParams(dp(105),dp(30),Gravity.BOTTOM))
+                addView(TextClock(context).apply { format12Hour="h:mm";format24Hour="HH:mm";textSize=34f;setTextColor(white);gravity=Gravity.CENTER },FrameLayout.LayoutParams(-1,dp(48),Gravity.BOTTOM).apply { leftMargin=dp(105);rightMargin=dp(105) })
+            }
         }
-        addView(top, LayoutParams(-1, dp(76)))
+        topChrome=top
+        addView(top, LayoutParams(-1,searchTopOffset))
         notificationRow.apply {
             gravity = Gravity.CENTER_VERTICAL
             setBackgroundColor(0x8010161C.toInt())
             addView(button("Sound profile", android.R.drawable.ic_lock_silent_mode_off) { profiles() }, LayoutParams(dp(48),dp(48)))
-            alerts.apply { background = focusBackground(); setOnClickListener { notifications() }; contentDescription="Notifications"; isFocusable=true }
+            alerts.apply { setTextColor(0xFFFFD86B.toInt()); background = focusBackground(); setOnClickListener { notifications() }; contentDescription="Notifications"; isFocusable=true }
             addView(alerts, LayoutParams(0,dp(48),1f))
             addView(button("Search", R.drawable.ic_search) { search() }, LayoutParams(dp(48),dp(48)))
         }
@@ -103,9 +123,9 @@ class Os7HomeView(
         }
         previous.apply { setOnClickListener { changePanel(-1) }; isFocusable=true }
         next.apply { setOnClickListener { changePanel(1) }; isFocusable=true }
-        selected.apply { setOnClickListener { setRows(if(rows<3) rows+1 else 1) }; isFocusable=true }
+        selected.apply { if(!standalone) setOnClickListener { setRows(if(rows<3) rows+1 else 1) }; isFocusable=true }
         var trayTouchY=0f
-        selected.setOnTouchListener { _,event ->
+        if(!standalone) selected.setOnTouchListener { _,event ->
             when(event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> trayTouchY=event.rawY
                 MotionEvent.ACTION_UP -> {
@@ -129,7 +149,7 @@ class Os7HomeView(
                     MotionEvent.ACTION_UP -> {
                         val dx=e.x-x; val dy=e.y-y
                         if(kotlin.math.abs(dx)>dp(80) && kotlin.math.abs(dx)>kotlin.math.abs(dy)*1.5f) { changePanel(if(dx<0) 1 else -1); return@setOnTouchListener true }
-                        if(kotlin.math.abs(dy)>dp(48) && kotlin.math.abs(dy)>kotlin.math.abs(dx)*1.5f && ((dy<0 && rows<3) || !canScrollVertically(if(dy>0) -1 else 1))) { setRows((rows+if(dy<0) 1 else -1).coerceIn(0,3)); return@setOnTouchListener true }
+                        if(!standalone && kotlin.math.abs(dy)>dp(48) && kotlin.math.abs(dy)>kotlin.math.abs(dx)*1.5f && ((dy<0 && rows<3) || !canScrollVertically(if(dy>0) -1 else 1))) { setRows((rows+if(dy<0) 1 else -1).coerceIn(0,3)); return@setOnTouchListener true }
                     }
                 }; false
             }
@@ -138,7 +158,7 @@ class Os7HomeView(
         empty.apply { setPadding(dp(20),dp(16),dp(20),dp(16)); visibility=GONE }
         tray.addView(empty,LayoutParams(-1,-2))
         addView(tray,LayoutParams(-1,-2))
-        val footer=LinearLayout(context).apply {
+        footer=LinearLayout(context).apply {
             gravity=Gravity.END; setBackgroundColor(0xEA0B1017.toInt())
             addView(text(13f).apply { text="Menu"; contentDescription="Home menu"; background=focusBackground(); isFocusable=true; setOnClickListener { menu(it) } },LayoutParams(dp(88),dp(48)))
         }
@@ -165,8 +185,8 @@ class Os7HomeView(
         alerts.contentDescription=if(count>0) "$count notifications" else "Open notifications"
         if (Os7Panels.Panel.entries[panel] !in Os7Panels.visiblePanels(context)) panel=0
         previous.text="‹ ${tabs[neighbor(-1)]}"
-        selected.text=tabs[panel]+if(expanded) "  ▾" else "  ▴"
-        selected.contentDescription="${tabs[panel]} panel, $rows rows. Change application tray height"
+        selected.text=tabs[panel]+if(standalone) "" else if(expanded) "  ▾" else "  ▴"
+        selected.contentDescription=if(standalone) "${tabs[panel]} panel, three rows" else "${tabs[panel]} panel, $rows rows. Change application tray height"
         next.text="${tabs[neighbor(1)]} ›"
         val ordered=Os7Panels.select(Os7Panels.Panel.entries[panel],metadata,AppUsage.favourites(context),AppUsage.counts(context),Os7Panels.order(context))
         val indexed=all.associateBy { it.key }
@@ -175,7 +195,7 @@ class Os7HomeView(
         if(folderId!=null && folder==null) folderId=null
         shown=if(folder!=null) {
             selected.text=folder.name
-            selected.contentDescription="${folder.name} folder, $rows rows. Change application tray height"
+            selected.contentDescription=if(standalone) "${folder.name} folder, three rows" else "${folder.name} folder, $rows rows. Change application tray height"
             ordered.filter { it.component in folder.components }.mapNotNull { indexed[it.component] }
         } else {
             val items=ordered.mapNotNull { indexed[it.component] }
@@ -231,12 +251,31 @@ class Os7HomeView(
     }
     private fun changePanel(delta:Int) { folderId=null; panel=neighbor(delta); grid.setSelection(0); refresh() }
     fun setExpanded(value:Boolean) = setRows(if(value) 3 else 1)
-    private fun setRows(value:Int) { rows=value.coerceIn(0,3); resizeTray(); refresh() }
+    private fun setRows(value:Int) { rows=if(standalone) 3 else value.coerceIn(0,3); resizeTray(); refresh() }
     private fun resizeTray() { grid.layoutParams=grid.layoutParams.apply { height=minOf(rows*rowHeight(), heightAvailable()).coerceAtLeast(dp(48)) } }
-    private fun heightAvailable()=(height-paddingTop-paddingBottom-dp(220)).coerceAtLeast(dp(96))
-    fun showSearch(show:Boolean) { notificationRow.visibility=if(show) INVISIBLE else VISIBLE }
+    private fun heightAvailable()=(height-paddingTop-paddingBottom-searchTopOffset-dp(144)).coerceAtLeast(dp(96))
+    fun applyTopInset(inset:Int,cutouts:List<android.graphics.Rect> = emptyList()) {
+        if(!standalone) return
+        topInset=inset
+        val screenWidth=resources.displayMetrics.widthPixels
+        // Center camera: use the left/right status regions. Corner cameras: keep controls below it.
+        val corner=cutouts.any { it.left < dp(100) || it.right > screenWidth-dp(52) }
+        statusHeight=if(corner) inset+dp(48) else maxOf(inset,dp(48))
+        statusArea.setPadding(0,if(corner) inset else 0,0,0)
+        val cutoutRight=if(corner) 0 else cutouts.maxOfOrNull { it.right } ?: 0
+        val available=(screenWidth-cutoutRight-dp(60)).coerceAtLeast(0)
+        carrierLabel.layoutParams=carrierLabel.layoutParams.apply { width=minOf(dp(100),available) }
+        statusArea.layoutParams=statusArea.layoutParams.apply { height=statusHeight }
+        topChrome.layoutParams=topChrome.layoutParams.apply { height=searchTopOffset }
+        resizeTray()
+    }
+    fun showSearch(show:Boolean) {
+        notificationRow.visibility=if(show) INVISIBLE else VISIBLE
+        tray.visibility=if(show && standalone) INVISIBLE else VISIBLE
+        footer.visibility=if(show && standalone) INVISIBLE else VISIBLE
+    }
     fun reset() { showSearch(false); grid.setSelection(0); panel=0; folderId=null; setRows(1) }
-    fun back():Boolean { if(folderId!=null) { folderId=null; grid.setSelection(0); refresh(); return true }; if(rows>1) { setRows(1); return true }; return false }
+    fun back():Boolean { if(folderId!=null) { folderId=null; grid.setSelection(0); refresh(); return true }; if(rows>1 && !standalone) { setRows(1); return true }; return false }
     fun move(item:Item, offset:Int) {
         val keys=shown.map { it.key }.toMutableList()
         val at=keys.indexOf(item.key); val target=(at+offset).coerceIn(0,(keys.size-1).coerceAtLeast(0))

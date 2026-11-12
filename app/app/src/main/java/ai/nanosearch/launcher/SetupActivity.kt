@@ -47,7 +47,7 @@ import kotlinx.coroutines.delay
 class SetupActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Services.init(this)
+        if (!BuildConfig.OS7_STANDALONE) Services.init(this)
         getSharedPreferences("nano", MODE_PRIVATE).edit().putBoolean("setupShown", true).apply() // leaving with Back must not bring it up again
         setContent { NanoTheme { SetupScreen(onDone = { finishSetup(this); finish() }) } }
     }
@@ -56,6 +56,7 @@ class SetupActivity : ComponentActivity() {
         fun needed(context: Context): Boolean {
             val prefs = context.getSharedPreferences("nano", Context.MODE_PRIVATE)
             if (prefs.getBoolean("setupDone", false) || prefs.getBoolean("setupShown", false)) return false
+            if (BuildConfig.OS7_STANDALONE) return true
             // A phone that already has its models (an earlier version) does not need the tour.
             if (ModelStore.installed(ModelStore.selected(Slot.PARSER))) { prefs.edit().putBoolean("setupDone", true).apply(); return false }
             return true
@@ -78,6 +79,18 @@ private fun SetupScreen(onDone: () -> Unit) {
         val obs = LifecycleEventObserver { _, e -> if (e == Lifecycle.Event.ON_RESUME) tick++ }
         owner.lifecycle.addObserver(obs)
         onDispose { owner.lifecycle.removeObserver(obs) }
+    }
+    if (BuildConfig.OS7_STANDALONE) {
+        androidx.compose.material3.Scaffold(topBar = { SettingsTopBar(title = { Text("Welcome") }) }) { padding ->
+            LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                item { Text("Make this your Home", style = MaterialTheme.typography.titleLarge) }
+                item { Text("Your apps, folders and notifications in one place. Both choices below are optional.") }
+                item { DefaultHomeCard(tick) }
+                item { LauncherNotificationsCard(tick, setup = true) }
+                item { Button(onClick = onDone, modifier = Modifier.fillMaxWidth()) { Text("Continue") } }
+            }
+        }
+        return
     }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
         Column(if (os7SettingsEnabled()) Modifier.navigationBarsPadding() else Modifier.systemBarsPadding()) {

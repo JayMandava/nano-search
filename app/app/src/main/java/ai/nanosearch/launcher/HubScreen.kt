@@ -48,6 +48,15 @@ class HubScreen(
     /** Opens a popup menu next to a row (the launcher's own menu, drawn above the Hub). */
     private val popup: (View, List<List<MenuItem>>) -> Unit = { _, _ -> },
 ) {
+    private val standalone = BuildConfig.OS7_STANDALONE
+    private val ink get() = if (standalone) 0xFF17232D.toInt() else pal.onSurface
+    private val secondaryInk get() = if (standalone) 0xFF50606C.toInt() else pal.onVariant
+    private val accent get() = if (standalone) 0xFF006BA8.toInt() else pal.primary
+    private val onAccent get() = if (standalone) Color.WHITE else pal.onPrimary
+    private val accentSurface get() = if (standalone) 0xFFDCEEF9.toInt() else pal.primaryContainer
+    private val onAccentSurface get() = if (standalone) 0xFF143B56.toInt() else pal.onPrimaryContainer
+    private val neutralSurface get() = if (standalone) 0xFFE7ECEF.toInt() else pal.container
+    private val separator get() = if (standalone) 0xFFC8D0D6.toInt() else pal.outline
     private val density = activity.resources.displayMetrics.density
     private fun dp(v: Int) = (v * density).toInt()
     private val pm = activity.packageManager
@@ -76,10 +85,10 @@ class HubScreen(
     private fun round(color: Int, radius: Int) = GradientDrawable().apply { setColor(color); cornerRadius = dp(pal.radius(radius)).toFloat() }
 
     /** Spirit gives the Hub glass: a glossy header bar, glass filter pills and card rows. */
-    private val os7 = AppSettings.os7Mode(activity)
+    private val os7 = standalone || AppSettings.os7Mode(activity)
     private val spirit = !os7
     private fun glass(radiusDp: Float, look: ai.nanosearch.launcher.ui.SpiritGlass.Look = ai.nanosearch.launcher.ui.SpiritGlass.Look.DARK): android.graphics.drawable.Drawable =
-        ai.nanosearch.launcher.ui.SpiritGlass(activity, radiusDp, look, pal.primary)
+        ai.nanosearch.launcher.ui.SpiritGlass(activity, radiusDp, look, accent)
 
     /** Builds the Hub offscreen. [peeking] true leaves it at the edge for the caller to drag in. */
     private fun build() {
@@ -88,56 +97,61 @@ class HubScreen(
         val bars = host.rootWindowInsets?.getInsetsIgnoringVisibility(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
         val top = bars?.top ?: dp(24); val bottom = bars?.bottom ?: dp(24)
         val screenW = activity.resources.displayMetrics.widthPixels
-        val width = (screenW * 0.9f).toInt()
+        val width = if (standalone) screenW else (screenW * 0.9f).toInt()
 
-        title = NText(activity).apply { text = if(os7) "Notifications" else "Hub"; textSize = if (spirit) 24f else 26f; setTextColor(pal.onSurface); if (spirit) setShadowLayer(3f, 0f, 2f, 0xCC000000.toInt()); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) }
+        title = NText(activity).apply { text = if(os7) "Notifications" else "Hub"; textSize = if (standalone) 20f else if (spirit) 24f else 26f; setTextColor(if (standalone) Color.WHITE else ink); isAccessibilityHeading = true; if (spirit) setShadowLayer(3f, 0f, 2f, 0xCC000000.toInt()); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) }
         clearButton = NText(activity).apply {
-            text = "Clear all"; textSize = 14f; setTextColor(pal.primary); gravity = Gravity.CENTER; setPadding(dp(12), 0, dp(12), 0)
+            text = "Clear all"; contentDescription = "Clear dismissible notifications"; textSize = 14f; setTextColor(if (standalone) Color.WHITE else accent); gravity = Gravity.CENTER; setPadding(dp(12), 0, dp(12), 0)
             setOnClickListener { clearAll() }
         }
-        val close = NText(activity).apply { text = "✕"; textSize = 18f; setTextColor(pal.onVariant); gravity = Gravity.CENTER; setOnClickListener { dismiss() } }
+        val close = NText(activity).apply { text = "✕"; contentDescription = "Close notifications"; textSize = 18f; setTextColor(if (standalone) Color.WHITE else secondaryInk); gravity = Gravity.CENTER; setOnClickListener { dismiss() } }
         val header = LinearLayout(activity).apply {
             gravity = Gravity.CENTER_VERTICAL
+            if (standalone) {
+                setPadding(dp(12), 0, dp(4), 0)
+                background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0xFF4A5864.toInt(), 0xFF17212B.toInt()))
+            }
             if (spirit) setPadding(dp(18), 0, dp(10), 0) // just the title and Clear all, no close button (Back or a tap beside the panel closes it)
             addView(title, LinearLayout.LayoutParams(-2, -2))
             // the unread count is a small pill beside the title, not part of it
             countBadge = NText(activity).apply {
-                textSize = 12f; setTextColor(pal.onPrimary); gravity = Gravity.CENTER; typeface = Typeface.DEFAULT_BOLD; minWidth = dp(20); setPadding(dp(6), 0, dp(6), 0)
-                background = GradientDrawable().apply { setColor(pal.primary); cornerRadius = dp(10).toFloat() }; visibility = View.GONE
+                textSize = 12f; setTextColor(onAccent); gravity = Gravity.CENTER; typeface = Typeface.DEFAULT_BOLD; minWidth = dp(20); setPadding(dp(6), 0, dp(6), 0)
+                background = GradientDrawable().apply { setColor(accent); cornerRadius = dp(10).toFloat() }; visibility = View.GONE
             }
             addView(countBadge, LinearLayout.LayoutParams(-2, dp(20)).apply { marginStart = dp(10) })
             addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
-            addView(clearButton, LinearLayout.LayoutParams(-2, dp(44)))
-            if (!spirit) addView(close, LinearLayout.LayoutParams(dp(44), dp(44)))
+            addView(clearButton, LinearLayout.LayoutParams(-2, dp(if (standalone) 48 else 44)))
+            if (!spirit) addView(close, LinearLayout.LayoutParams(dp(if (standalone) 48 else 44), dp(if (standalone) 48 else 44)))
         }
 
         val chipRow = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL }
-        for ((key, label) in listOf("all" to "All", "priority" to "Priority", "message" to "Messages", "call" to "Calls", "event" to "Calendar", "app" to "Apps")) {
+        val filters = if (standalone) listOf("all" to "All", "pinned" to "Pinned") else listOf("all" to "All", "priority" to "Priority", "message" to "Messages", "call" to "Calls", "event" to "Calendar", "app" to "Apps")
+        for ((key, label) in filters) {
             val chip = NText(activity).apply {
                 text = label; textSize = 13f; gravity = Gravity.CENTER; setPadding(dp(14), 0, dp(14), 0)
                 setOnClickListener { filter = key; replying = null; styleChips(); refreshList() }
             }
             chips[key] = chip
-            chipRow.addView(chip, LinearLayout.LayoutParams(-2, dp(34)).apply { marginEnd = dp(8) })
+            chipRow.addView(chip, LinearLayout.LayoutParams(-2, dp(if (standalone) 48 else 34)).apply { marginEnd = dp(8) })
         }
         appChip = NText(activity).apply {
             textSize = 13f; gravity = Gravity.CENTER; setPadding(dp(14), 0, dp(14), 0); visibility = View.GONE
             setOnClickListener { appFilter = null; styleChips(); refreshList() }
         }
-        chipRow.addView(appChip, 0, LinearLayout.LayoutParams(-2, dp(34)).apply { marginEnd = dp(8) })
+        chipRow.addView(appChip, 0, LinearLayout.LayoutParams(-2, dp(if (standalone) 48 else 34)).apply { marginEnd = dp(8) })
         styleChips()
         val chipScroll = HorizontalScrollView(activity).apply { isHorizontalScrollBarEnabled = false; addView(chipRow) }
 
         banner = NText(activity).apply {
-            text = "See notifications from your other apps  ›"; textSize = 13f; setTextColor(pal.onPrimaryContainer); gravity = Gravity.CENTER_VERTICAL
-            if (spirit) { background = glass(9f, ai.nanosearch.launcher.ui.SpiritGlass.Look.ACCENT); setTextColor(0xFFFFFFFF.toInt()) } else background = round(pal.primaryContainer, 19)
+            text = if (standalone) "Allow notification access  ›" else "See notifications from your other apps  ›"; textSize = 13f; setTextColor(onAccentSurface); gravity = Gravity.CENTER_VERTICAL
+            if (spirit) { background = glass(9f, ai.nanosearch.launcher.ui.SpiritGlass.Look.ACCENT); setTextColor(0xFFFFFFFF.toInt()) } else background = round(accentSurface, 19)
             setPadding(dp(14), 0, dp(14), 0); setOnClickListener { openAccess() }
         }
 
         listView = ListView(activity).apply {
             adapter = rows
             if (spirit) { divider = android.graphics.drawable.ColorDrawable(0); dividerHeight = dp(8); clipToPadding = false; setPadding(dp(10), dp(6), dp(10), bottom + dp(12)) }
-            else { divider = android.graphics.drawable.ColorDrawable(pal.outline); dividerHeight = dp(1); clipToPadding = false; setPadding(0, 0, 0, bottom + dp(12)) }
+            else { divider = android.graphics.drawable.ColorDrawable(separator); dividerHeight = dp(1); clipToPadding = false; setPadding(0, 0, 0, bottom + dp(12)) }
             emptyView = null
         }
 
@@ -148,11 +162,16 @@ class HubScreen(
                     val rad = dp(14).toFloat(); cornerRadii = floatArrayOf(0f, 0f, rad, rad, rad, rad, 0f, 0f); setStroke(dp(1), 0x33FFFFFF)
                 }
                 clipToOutline = true
+            } else if (standalone) {
+                background = android.graphics.drawable.LayerDrawable(arrayOf(
+                    android.graphics.drawable.ColorDrawable(0xFFF6F8F9.toInt()),
+                    android.graphics.drawable.ColorDrawable(0xFF17212B.toInt()),
+                )).apply { setLayerHeight(1, top + dp(48)); setLayerGravity(1, Gravity.TOP) }
             } else setBackgroundColor(pal.panel or 0xFF000000.toInt())
             isClickable = true
             elevation = dp(16).toFloat()
-            if (spirit) setPadding(0, top, 0, 0) else setPadding(dp(16), top + dp(8), dp(8), 0)
-            addView(header, LinearLayout.LayoutParams(-1, if (spirit) dp(48) else -2))
+            if (standalone || spirit) setPadding(0, top, 0, 0) else setPadding(dp(16), top + dp(8), dp(8), 0)
+            addView(header, LinearLayout.LayoutParams(-1, if (standalone || spirit) dp(48) else -2))
             if (spirit) { // a chrome rule under the title: a bright line over a dark one, fading out at both ends
                 addView(View(activity).apply {
                     background = android.graphics.drawable.GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(0x00FFFFFF, 0x88FFFFFF.toInt(), 0x88FFFFFF.toInt(), 0x00FFFFFF))
@@ -160,7 +179,7 @@ class HubScreen(
                 addView(View(activity).apply { setBackgroundColor(0x99000000.toInt()) }, LinearLayout.LayoutParams(-1, dp(1)).apply { marginStart = dp(10); marginEnd = dp(10) })
             }
             addView(chipScroll, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(if (spirit) 12 else 6); bottomMargin = dp(10); if (spirit) marginStart = dp(10) })
-            addView(banner, LinearLayout.LayoutParams(-1, dp(38)).apply { bottomMargin = dp(8); marginEnd = dp(if (spirit) 10 else 8); if (spirit) marginStart = dp(10) })
+            addView(banner, LinearLayout.LayoutParams(-1, dp(if (standalone) 48 else 38)).apply { bottomMargin = dp(8); marginEnd = dp(if (spirit) 10 else 8); if (spirit) marginStart = dp(10) })
             addView(listView, LinearLayout.LayoutParams(-1, 0, 1f))
         }
         val scrim = View(activity).apply { setBackgroundColor(pal.scrim); alpha = 0f; setOnClickListener { dismiss() } }
@@ -232,12 +251,12 @@ class HubScreen(
         appChip?.let { c ->
             val pkg = appFilter
             c.visibility = if (pkg != null) View.VISIBLE else View.GONE
-            if (pkg != null) { c.text = "${appName(pkg)}  ✕"; c.setTextColor(if (spirit) 0xFFFFFFFF.toInt() else pal.onPrimaryContainer); c.background = if (spirit) glass(9f, ai.nanosearch.launcher.ui.SpiritGlass.Look.ACCENT) else round(pal.primaryContainer, 17) }
+            if (pkg != null) { c.text = "${appName(pkg)}  ✕"; c.setTextColor(if (spirit) 0xFFFFFFFF.toInt() else onAccentSurface); c.background = if (spirit) glass(9f, ai.nanosearch.launcher.ui.SpiritGlass.Look.ACCENT) else round(accentSurface, 17) }
         }
         for ((key, chip) in chips) {
             val on = key == filter
-            chip.setTextColor(if (spirit && on) 0xFFFFFFFF.toInt() else if (on) pal.onPrimary else pal.onVariant)
-            chip.background = if (spirit) glass(9f, if (on) ai.nanosearch.launcher.ui.SpiritGlass.Look.ACCENT else ai.nanosearch.launcher.ui.SpiritGlass.Look.DARK) else round(if (on) pal.primary else pal.container, 17)
+            chip.setTextColor(if (spirit && on) 0xFFFFFFFF.toInt() else if (on) onAccent else secondaryInk)
+            chip.background = if (spirit) glass(9f, if (on) ai.nanosearch.launcher.ui.SpiritGlass.Look.ACCENT else ai.nanosearch.launcher.ui.SpiritGlass.Look.DARK) else round(if (on) accent else neutralSurface, 17)
         }
     }
 
@@ -245,7 +264,7 @@ class HubScreen(
         val l = layer ?: return
         banner?.visibility = if (HubStore.allowed(activity)) View.GONE else View.VISIBLE
         io.execute {
-            val data = runCatching { HubData.load(activity) }.getOrDefault(emptyList())
+            val data = runCatching { if (standalone) StandaloneHubData.load(activity) else HubData.load(activity) }.getOrDefault(emptyList())
             ui.post { if (layer === l) { items = data; refreshList() } }
         }
     }
@@ -257,16 +276,17 @@ class HubScreen(
         appFilter?.let { pkg -> list = list.filter { it.pkg == pkg } }
         return when (filter) {
             "all" -> list
+            "pinned" -> list.filter { it.id in HubStore.pinned(activity) }
             "priority" -> list.filter { HubData.isPriority(activity, it) }
             else -> list.filter { it.kind == filter }
         }
     }
 
     private fun refreshList() {
-        val unread = items.count { it.unread && (it.kind == "message" || it.kind == "call") }
+        val unread = items.count { it.unread && (standalone || it.kind == "message" || it.kind == "call") }
         title?.text = if(os7) "Notifications" else "Hub"
         countBadge?.let { it.text = if (unread > 99) "99+" else unread.toString(); it.visibility = if (unread > 0) View.VISIBLE else View.GONE }
-        clearButton?.visibility = if (items.isNotEmpty()) View.VISIBLE else View.GONE
+        clearButton?.visibility = if (if (standalone) items.any { it.note?.clearable == true } else items.isNotEmpty()) View.VISIBLE else View.GONE
         rows.notifyDataSetChanged()
     }
 
@@ -282,8 +302,8 @@ class HubScreen(
 
         override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
             val data = shown()
-            if (data.isEmpty()) return convertView ?: NText(activity).apply {
-                text = "All caught up"; textSize = 16f; setTextColor(pal.onVariant); gravity = Gravity.CENTER
+            if (data.isEmpty()) return ((convertView as? TextView) ?: NText(activity)).apply {
+                text = if (standalone && !HubStore.allowed(activity)) "No notification access yet\nUse Allow notification access above" else if (standalone && filter == "pinned") "No pinned notifications\nTouch and hold a notification to pin it" else "All caught up"; textSize = 16f; setTextColor(secondaryInk); gravity = Gravity.CENTER
                 layoutParams = AbsListViewParams(-1, dp(220))
                 if (spirit) { // an envelope gem above the words
                     gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL; setPadding(0, dp(48), 0, 0)
@@ -305,22 +325,22 @@ class HubScreen(
 
     private fun buildRow(): LinearLayout {
         val icon = ImageView(activity).apply { scaleType = ImageView.ScaleType.FIT_CENTER }
-        val title = NText(activity).apply { textSize = 16f; setTextColor(pal.onSurface); maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
-        val time = NText(activity).apply { textSize = 12f; setTextColor(pal.onVariant); setPadding(dp(8), 0, dp(8), 0) }
-        val body = NText(activity).apply { textSize = 14f; setTextColor(pal.onVariant); maxLines = 2; ellipsize = TextUtils.TruncateAt.END }
-        val reply = NText(activity).apply { text = "Reply"; textSize = 13f; setTextColor(pal.primary); setPadding(0, dp(8), dp(20), dp(6)) }
-        val dismiss = NText(activity).apply { text = "Dismiss"; textSize = 13f; setTextColor(pal.onVariant); setPadding(0, dp(8), dp(20), dp(6)) }
+        val title = NText(activity).apply { textSize = 16f; setTextColor(ink); maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
+        val time = NText(activity).apply { textSize = 12f; setTextColor(secondaryInk); setPadding(dp(8), 0, dp(8), 0) }
+        val body = NText(activity).apply { textSize = 14f; setTextColor(secondaryInk); maxLines = 2; ellipsize = TextUtils.TruncateAt.END }
+        val reply = NText(activity).apply { text = "Reply"; textSize = 13f; setTextColor(accent); setPadding(0, dp(8), dp(20), dp(6)) }
+        val dismiss = NText(activity).apply { text = "Dismiss"; textSize = 13f; setTextColor(secondaryInk); setPadding(0, dp(8), dp(20), dp(6)) }
         if (spirit) for (b in listOf(reply, dismiss)) { b.setPadding(dp(14), dp(6), dp(14), dp(6)); b.background = glass(9f) } // small glass buttons
         val actions = LinearLayout(activity).apply {
             if (spirit) { setPadding(0, dp(8), 0, dp(2)); addView(reply, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(8) }); addView(dismiss) }
             else { addView(reply); addView(dismiss) }
         }
         val field = NEdit(activity).apply {
-            hint = "Reply"; textSize = 15f; setTextColor(pal.onSurface); setHintTextColor(pal.onVariant); maxLines = 4
-            background = round(pal.container, 10).also { it.setStroke(dp(1), pal.outline) }
+            hint = "Reply"; textSize = 15f; setTextColor(ink); setHintTextColor(secondaryInk); maxLines = 4
+            background = round(neutralSurface, 10).also { it.setStroke(dp(1), separator) }
             setPadding(dp(10), dp(6), dp(10), dp(6)); imeOptions = EditorInfo.IME_ACTION_SEND
         }
-        val send = NText(activity).apply { text = "Send"; textSize = 14f; setTextColor(pal.onPrimary); gravity = Gravity.CENTER; background = round(pal.primary, 10); setPadding(dp(14), 0, dp(14), 0) }
+        val send = NText(activity).apply { text = "Send"; textSize = 14f; setTextColor(onAccent); gravity = Gravity.CENTER; background = round(accent, 10); setPadding(dp(14), 0, dp(14), 0) }
         val replyBox = LinearLayout(activity).apply {
             gravity = Gravity.CENTER_VERTICAL; visibility = View.GONE
             addView(field, LinearLayout.LayoutParams(0, -2, 1f)); addView(send, LinearLayout.LayoutParams(-2, dp(40)).apply { marginStart = dp(8); marginEnd = dp(8) })
@@ -332,7 +352,7 @@ class HubScreen(
         }
         return LinearLayout(activity).apply {
             gravity = Gravity.TOP
-            if (spirit) setPadding(dp(12), dp(12), dp(12), dp(10)) else setPadding(0, dp(12), 0, dp(10))
+            if (spirit || standalone) setPadding(dp(12), dp(12), dp(12), dp(10)) else setPadding(0, dp(12), 0, dp(10))
             addView(icon, LinearLayout.LayoutParams(dp(if (spirit) 46 else 42), dp(if (spirit) 46 else 42)).apply { marginEnd = dp(12); topMargin = dp(2) })
             addView(col, LinearLayout.LayoutParams(0, -2, 1f))
             tag = Parts(icon, title, time, body, actions, reply, dismiss, replyBox, field, send)
@@ -343,13 +363,23 @@ class HubScreen(
         val p = row.tag as Parts
         if (spirit) { // a glass card; an unread one has a blue edge down its left side
             val card = glass(11f, ai.nanosearch.launcher.ui.SpiritGlass.Look.CARD)
-            row.background = if (item.unread) android.graphics.drawable.LayerDrawable(arrayOf(card, android.graphics.drawable.ColorDrawable(pal.primary))).apply { setLayerWidth(1, dp(3)); setLayerGravity(1, Gravity.START); setLayerInset(1, 0, dp(9), 0, dp(9)) } else card
+            row.background = if (item.unread) android.graphics.drawable.LayerDrawable(arrayOf(card, android.graphics.drawable.ColorDrawable(accent))).apply { setLayerWidth(1, dp(3)); setLayerGravity(1, Gravity.START); setLayerInset(1, 0, dp(9), 0, dp(9)) } else card
         }
-        p.title.text = item.title.ifBlank { "(no title)" }
+        if (standalone) {
+            row.background = android.graphics.drawable.StateListDrawable().apply {
+                addState(intArrayOf(android.R.attr.state_pressed), android.graphics.drawable.ColorDrawable(0xFFC9E6F8.toInt()))
+                addState(intArrayOf(android.R.attr.state_focused), android.graphics.drawable.ColorDrawable(0xFFC9E6F8.toInt()))
+                addState(intArrayOf(), android.graphics.drawable.ColorDrawable(Color.WHITE))
+            }
+            row.isFocusable = true
+            p.reply.minHeight = dp(48); p.dismiss.minHeight = dp(48); p.send.minHeight = dp(48)
+        }
+        p.title.text = item.title.ifBlank { if (standalone) item.pkg?.let(::appName) ?: "Notification" else "(no title)" }
         p.title.typeface = Typeface.create("sans-serif", if (item.unread) Typeface.BOLD else Typeface.NORMAL)
         p.time.text = (if (item.id in HubStore.pinned(activity)) "★ " else "") + whenText(item)
-        p.body.text = item.body
-        p.body.visibility = if (item.body.isBlank()) View.GONE else View.VISIBLE
+        p.body.text = if (standalone) listOfNotNull(item.pkg?.let(::appName), item.body.takeIf { it.isNotBlank() }).joinToString(" · ") else item.body
+        p.body.maxLines = if (standalone) 3 else 2
+        p.body.visibility = if (p.body.text.isBlank()) View.GONE else View.VISIBLE
         bindIcon(p.icon, item)
         val note = item.note
         p.reply.visibility = if (note?.reply != null && replying != item.id) View.VISIBLE else View.GONE
@@ -391,9 +421,9 @@ class HubScreen(
         val drawable = pkg?.let { k -> icons.get(k) ?: runCatching { pm.getApplicationIcon(k) }.getOrNull()?.also { icons.put(k, it) } }
         if (drawable != null && item.kind != "event" && item.kind != "call") { view.setImageDrawable(drawable); return }
         view.setImageResource(when (item.kind) { "call" -> R.drawable.ic_kind_call; "event" -> R.drawable.ic_kind_event; else -> R.drawable.ic_kind_message })
-        view.setColorFilter(pal.onPrimaryContainer)
+        view.setColorFilter(onAccentSurface)
         view.setPadding(dp(10), dp(10), dp(10), dp(10))
-        view.background = round(pal.primaryContainer, 12)
+        view.background = round(accentSurface, 12)
     }
 
     private fun whenText(item: HubData.Item): String {
@@ -428,7 +458,7 @@ class HubScreen(
         item.pkg?.let { pkg ->
             groups.add(listOf(
                 MenuItem(R.drawable.ic_menu_apps, "Only ${appName(pkg)}") { appFilter = pkg; filter = "all"; styleChips(); refreshList() },
-                MenuItem(R.drawable.ic_menu_remove, "Hide ${appName(pkg)} from the Hub") { HubStore.toggleMuted(activity, pkg); reload() },
+                MenuItem(R.drawable.ic_menu_remove, if (standalone) "Hide ${appName(pkg)} from Notifications" else "Hide ${appName(pkg)} from the Hub") { HubStore.toggleMuted(activity, pkg); reload() },
             ))
         }
         popup(anchor, groups)
@@ -453,9 +483,16 @@ class HubScreen(
 
     private fun clearAll() {
         HubFeedback.play(activity, layer, HubFeedback.Cue.CLEAR)
-        HubStore.dismissAll()
-        HubStore.markDismissed(activity, items.filter { it.note == null }.map { it.id })
-        items = emptyList()
+        if (standalone) {
+            val removable = items.filter { it.note?.clearable == true }
+            removable.forEach { it.note?.let { note -> HubStore.dismiss(note.key) } }
+            val ids = removable.map { it.id }.toSet()
+            items = items.filterNot { it.id in ids }
+        } else {
+            HubStore.dismissAll()
+            HubStore.markDismissed(activity, items.filter { it.note == null }.map { it.id })
+            items = emptyList()
+        }
         replying = null
         refreshList()
     }
@@ -468,6 +505,7 @@ class HubScreen(
         private var tracker: VelocityTracker? = null
 
         override fun onTouch(v: View, e: MotionEvent): Boolean {
+            if (standalone && item.note?.clearable != true) return false
             when (e.actionMasked) {
                 MotionEvent.ACTION_DOWN -> { downX = e.rawX; downY = e.rawY; swiping = false; tracker?.recycle(); tracker = VelocityTracker.obtain().also { it.addMovement(e) } }
                 MotionEvent.ACTION_MOVE -> {

@@ -42,9 +42,9 @@ class Os7HomeViewTest {
         launched.clear()
     }
 
-    private fun home(items: List<Item> = listOf(alpha, beta, gamma)) = Os7HomeView(
+    private fun home(items: List<Item> = listOf(alpha, beta, gamma), standalone:Boolean=false) = Os7HomeView(
         context, launch = { item, _ -> launched.add(item) }, appMenu = { _, _ -> },
-        search = {}, notifications = {}, connections = {}, profiles = {}, menu = {}
+        search = {}, notifications = {}, connections = {}, profiles = {}, menu = {}, standalone=standalone
     ).also { view -> view.setApps(items, items.map { Os7Panels.App(it.key, it.title) }) }
 
     private fun descendants(view: View): List<View> = listOf(view) +
@@ -60,6 +60,34 @@ class Os7HomeViewTest {
     }
     private fun clickItem(home: Os7HomeView, position: Int) {
         assertTrue(grid(home).performItemClick(View(context), position, position.toLong()))
+    }
+
+    @Test fun standaloneHeaderUsesCenterCutoutSidesAndProtectsCornerCutouts() {
+        val home=home(standalone=true)
+        val base=home.searchTopOffset
+        val width=context.resources.displayMetrics.widthPixels
+        val inset=(20*context.resources.displayMetrics.density).toInt()
+        home.applyTopInset(inset,listOf(android.graphics.Rect(width/2-5,0,width/2+5,inset)))
+        assertEquals(base,home.searchTopOffset)
+        home.applyTopInset(inset,listOf(android.graphics.Rect(0,0,20,inset)))
+        assertEquals(base+inset,home.searchTopOffset)
+    }
+
+    @Test fun standaloneTrayStaysThreeRowsAndSearchHidesItUntilReset() {
+        val home=home(standalone=true)
+        val grid=grid(home)
+        val title=descendants(home).filterIsInstance<TextView>().single { it.contentDescription?.contains("three rows")==true }
+        assertTrue(home.expanded)
+        title.performClick()
+        home.setExpanded(false)
+        assertTrue(home.expanded)
+        assertFalse(home.back())
+        home.showSearch(true)
+        assertEquals(View.INVISIBLE,(grid.parent as View).visibility)
+        home.reset()
+        assertEquals(View.VISIBLE,(grid.parent as View).visibility)
+        assertTrue(home.expanded)
+        assertTrue(title.text.startsWith("All"))
     }
 
     @Test fun trayStepsExpandBackAndResetWithoutChangingPreferences() {

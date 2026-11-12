@@ -19,12 +19,18 @@ class Os7SettingsModeTest {
         context.getSharedPreferences("nano", Context.MODE_PRIVATE).edit().clear().commit()
     }
 
-    @Test fun experimentalBranchDefaultsToOs7AndModeChoicePersists() {
-        assertTrue(AppSettings.os7Mode(context))
+    @Test fun standaloneUsesOs7WhileLegacyModeChoicePersists() {
+        assertEquals(BuildConfig.OS7_STANDALONE,AppSettings.os7Mode(context))
         AppSettings.setOs7Mode(context, false)
-        assertFalse(AppSettings.os7Mode(context))
+        assertEquals(BuildConfig.OS7_STANDALONE, AppSettings.os7Mode(context))
         AppSettings.setOs7Mode(context, true)
         assertTrue(AppSettings.os7Mode(context))
+    }
+
+    @Test fun standaloneDisablesFramesWithoutDestroyingPreference() {
+        AppSettings.setFrames(context,true)
+        assertEquals(!BuildConfig.OS7_STANDALONE, AppSettings.frames(context))
+        assertTrue(context.getSharedPreferences("nano",Context.MODE_PRIVATE).getBoolean("frames",false))
     }
 
     @Test fun switchingInterfaceDoesNotRewriteExistingPreferences() {

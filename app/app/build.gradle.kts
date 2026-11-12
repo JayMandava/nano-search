@@ -17,10 +17,12 @@ android {
         targetSdk = 35
         versionCode = 20
         versionName = "0.8.5"
+        buildConfigField("boolean", "OS7_STANDALONE", "false")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["nanoAppLabel"] = "Nano Search"
         manifestPlaceholders["nanoHomeCategory"] = "android.intent.category.HOME"
         manifestPlaceholders["nanoWallpaperEnabled"] = "true"
+        manifestPlaceholders["nanoWallpaperLabel"] = "Nano Clock"
 
         ndk {
             abiFilters += "arm64-v8a"
@@ -70,14 +72,16 @@ android {
         debug {
             // Clock QA remains excluded from Home. Launcher QA is a separate, explicit opt-in:
             // it keeps the isolated QA package/signature while allowing actual Home-role testing.
-            // Neither profile can replace production or expose a selectable QA wallpaper provider.
+            // Neither profile replaces production. Only standalone launcher QA exposes its clock wallpaper.
             val clockQaBuild = providers.gradleProperty("clockQaBuild").map(String::toBoolean).getOrElse(false)
             val os7QaLauncherBuild = providers.gradleProperty("os7QaLauncherBuild").map(String::toBoolean).getOrElse(false)
+            buildConfigField("boolean", "OS7_STANDALONE", os7QaLauncherBuild.toString())
             if (clockQaBuild || os7QaLauncherBuild) {
                 applicationIdSuffix = ".clockqa"
                 manifestPlaceholders["nanoAppLabel"] = if (os7QaLauncherBuild) "Nano Search v2" else "Nano Clock QA"
                 manifestPlaceholders["nanoHomeCategory"] = if (os7QaLauncherBuild) "android.intent.category.HOME" else "ai.nanosearch.launcher.category.QA_ONLY"
-                manifestPlaceholders["nanoWallpaperEnabled"] = "false"
+                manifestPlaceholders["nanoWallpaperEnabled"] = os7QaLauncherBuild.toString()
+                if (os7QaLauncherBuild) manifestPlaceholders["nanoWallpaperLabel"] = "Nano Search v2 · Steel Dial"
             }
         }
         release {
@@ -115,10 +119,16 @@ android {
         }
     }
 
+    // Standalone debug launcher drops permissions belonging only to Nano search/widgets.
+    // This overlay is never attached to production/release or ordinary clock QA.
+    if (providers.gradleProperty("os7QaLauncherBuild").map(String::toBoolean).getOrElse(false)) {
+        sourceSets.getByName("debug").manifest.srcFile("src/os7Standalone/AndroidManifest.xml")
+    }
+
     // Ogg must remain ZIP_STORED for openRawResourceFd/MediaPlayer playback.
     androidResources { noCompress += "ogg" }
 
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

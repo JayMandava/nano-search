@@ -35,7 +35,7 @@ object AppSettings {
     fun setIconPack(c: Context, pkg: String) { prefs(c).edit().putString("iconPack", pkg).apply(); IconPacks.reset() }
 
     /** Experimental recreation; switching back never rewrites widgets, pages or app choices. */
-    fun os7Mode(c: Context) = prefs(c).getBoolean("os7Mode", true)
+    fun os7Mode(c: Context) = BuildConfig.OS7_STANDALONE || prefs(c).getBoolean("os7Mode", false)
     fun setOs7Mode(c: Context, on: Boolean) = prefs(c).edit().putBoolean("os7Mode", on).apply()
 
     /** "system", "light" or "dark". */
@@ -55,7 +55,7 @@ object AppSettings {
     fun setDots(c: Context, on: Boolean) = setFeature(c, "dots", on)
 
     /** Active Frames: the apps you used last, as live tiles on the first home page. */
-    fun frames(c: Context) = feature(c, "frames")
+    fun frames(c: Context) = !BuildConfig.OS7_STANDALONE && feature(c, "frames")
     fun setFrames(c: Context, on: Boolean) = setFeature(c, "frames", on)
 
     /** Full screen: the status bar and navigation bar are hidden and slide in when you swipe from the top or bottom edge. */
